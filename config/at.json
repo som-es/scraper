@@ -1,0 +1,9 @@
+{
+    "base_url": "https://www.parlament.gv.at",
+    "legislatur": "XXVII",
+    "delegate_endpoint": {
+      "delegate_url": "/person/",
+      "delegate_marker": "rows",
+      "deleagate_url_idx": 8
+    }
+}

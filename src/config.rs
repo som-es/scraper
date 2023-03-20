@@ -1,5 +1,5 @@
-use std::{path::Path, error::Error};
 use serde_derive::{Deserialize, Serialize};
+use std::{error::Error, path::Path};
 
 use self::delegate::DelegateEndpoint;
 
@@ -23,10 +23,9 @@ impl ScraperConfig {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{ScraperConfig, delegate::DelegateEndpoint};
+    use super::{delegate::DelegateEndpoint, ScraperConfig};
 
     #[test]
     fn test_save_config() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,12 +39,13 @@ mod tests {
             },
         };
 
-        config.save("config.json")
+        config.save("config2.json")
     }
+
     #[test]
     fn test_read_config() {
         let config = super::ScraperConfig::from_json("config.json").unwrap();
-        assert_eq!(config.base_url, "https://www.parlament.ch");
+        assert_eq!(config.base_url, "https://www.parlament.gv.at");
         // assert_eq!(config.deputy_url, "/de/ratsmitglieder/");
     }
 }

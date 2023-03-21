@@ -12,11 +12,11 @@ pub struct Delegate {
     pub party: String,
     pub constituency: String,
     pub council: String,
-    pub seat: Seat 
+    pub seat: Seat,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Seat {
     pub row: u16,
-    pub col: u16
+    pub col: u16,
 }

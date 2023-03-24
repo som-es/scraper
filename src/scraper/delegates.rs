@@ -11,9 +11,9 @@ use super::{AustriaScraper, Scraper};
 pub trait DelegateScraper: Scraper {
     const DELEGATE_FILTER_PATH: &'static str;
     const TO_DELEGATES_IDX: &'static str;
-    type DelegatePayload: Serialize + Send;
+    type Payload: Serialize + Send;
 
-    fn persons_payload(&self) -> Self::DelegatePayload;
+    fn persons_payload(&self) -> Self::Payload;
 
     async fn post_persons_payload(&self) -> Result<Value, ScraperError> {
         let payload = self.persons_payload();
@@ -61,7 +61,7 @@ pub trait DelegateScraper: Scraper {
 }
 
 impl DelegateScraper for AustriaScraper {
-    type DelegatePayload = Value;
+    type Payload = Value;
     const DELEGATE_FILTER_PATH: &'static str =
         "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_008&listeId=10008&showAll=true";
 
@@ -69,7 +69,7 @@ impl DelegateScraper for AustriaScraper {
 
     #[inline]
     fn persons_payload(&self) -> Value {
-        json!({"M": ["M"], "W": ["W"], "R_WF": ["FR"], "NRBR": ["NR"], "GP": ["XXVII"]})
+        json!({"M": ["M"], "W": ["W"], "R_WF": ["FR"], "NRBR": [self.scrape_info.council_type], "GP": self.scrape_info.gp})
     }
 
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate> {
@@ -79,8 +79,6 @@ impl DelegateScraper for AustriaScraper {
 
         let name = &person_info["meta"]["description"];
 
-        println!("name: {name:?}");
-        
         // contains sitzplatz at "sitzplatz"
         let api_person_info = &person_info["content"]["personInfo"];
         let council = &api_person_info["gremium"];
@@ -89,7 +87,6 @@ impl DelegateScraper for AustriaScraper {
 
         let (row, col) = seat.as_str()?.split_once('/')?;
         let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
-
 
         Some(Delegate {
             name: name.as_str()?.to_string(),
@@ -106,7 +103,6 @@ impl DelegateScraper for AustriaScraper {
                 .as_array()?
                 .iter()
                 .flat_map(|person| {
-                    println!("person: {person}");
                     let person = person.as_array()?;
                     Some(person[person.len() - 1].as_str()?.to_string())
                 })
@@ -121,7 +117,7 @@ pub type PersonPaths = Vec<String>;
 mod tests {
     use crate::{error::ScraperError, scraper::delegates::DelegateScraper};
 
-    use super::{AustriaScraper, Scraper};
+    use super::AustriaScraper;
 
     #[tokio::test]
     async fn test_austria_person_info_scraper() {
@@ -167,13 +163,20 @@ mod tests {
     async fn test_get_all_persons() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
 
+        let mut delegates = vec![];
+
         let persons = scraper.post_persons_payload().await?;
-        for person_path in scraper.person_paths(persons).unwrap() {
+        for person_path in scraper.person_paths(persons).unwrap_or_default() {
             let Ok(delegate) = scraper.get_delegate(&person_path).await else {
                 continue;
             };
             println!("del: {delegate:?}");
+            delegates.push(delegate);
         }
+
+        let contents = serde_json::to_string(&delegates).unwrap();
+        std::fs::write("../delegates.json", contents).unwrap();
+
         Ok(())
     }
 
@@ -183,10 +186,7 @@ mod tests {
 
         let persons = scraper.post_persons_payload().await?;
         let person_paths = scraper.person_paths(persons).unwrap();
-        for person_path in person_paths {
-            let delegate = scraper.get_delegate(&person_path).await?;
-            println!("del: {delegate:?}");
-        }
+
         Ok(())
     }
 }

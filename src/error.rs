@@ -28,4 +28,7 @@ pub enum ScraperError {
 
     #[error("Encounterd invalid delegate information from API")]
     InvalidDelegateInfoError,
+
+    #[error("Encounterd invalid proposal information from API")]
+    InvalidProposalInfoError,
 }

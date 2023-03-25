@@ -16,6 +16,7 @@ mod proposals;
 pub trait Scraper {
     const BASE_URL: &'static str;
     const JSON_SUFFIX: &'static str;
+    const LIST_ENTRIES: &'static str;
 
     // type DelegatePayload: Serialize;
 
@@ -27,6 +28,27 @@ pub trait Scraper {
         path: String,
     ) -> Result<Value, ScraperError> {
         request(Method::POST, self.client(), payload, path).await
+    }
+
+    async fn get_gegenstand_info(&self, path: &str) -> Result<Value, ScraperError> {
+        // let base_url = Url::new(Self::BASE_URL);
+
+        let full_url = if path.starts_with("/") {
+            format!(
+                "{base_url}{path}{json_suffix}",
+                base_url = Self::BASE_URL,
+                json_suffix = Self::JSON_SUFFIX
+            )
+        } else {
+            format!(
+                "{base_url}/{path}{json_suffix}",
+                base_url = Self::BASE_URL,
+                json_suffix = Self::JSON_SUFFIX
+            )
+        };
+
+        request(Method::GET, self.client(), (), full_url).await
+        // reqwest::get(full_url).await?.json::<serde_json::Value>().await
     }
 }
 
@@ -44,6 +66,8 @@ impl Default for GeneralScrapeInfo {
     }
 }
 
+pub type GegenstandPaths = Vec<String>;
+
 #[derive(Default)]
 pub struct AustriaScraper {
     client: Client,
@@ -57,14 +81,30 @@ impl AustriaScraper {
             base_url = Self::BASE_URL,
         ),).await
     }*/
+
+    pub fn gegenstand_paths(&self, gegenstaende: Value, gegenstand_path_idx: usize) -> Option<Vec<String>> {
+        Some(
+            gegenstaende[Self::LIST_ENTRIES]
+                .as_array()?
+                .iter()
+                .flat_map(|person| {
+                    let person = person.as_array()?;
+                    Some(person[gegenstand_path_idx].as_str()?.to_string())
+                })
+                .collect(),
+        )
+    }
 }
 
 impl Scraper for AustriaScraper {
     const BASE_URL: &'static str = "https://www.parlament.gv.at";
     const JSON_SUFFIX: &'static str = "?json=True";
+    const LIST_ENTRIES: &'static str = "rows";
+    
 
     #[inline]
     fn client(&self) -> &Client {
         &self.client
     }
+
 }

@@ -23,7 +23,7 @@ where
     }
 
     let res = req.send().await;
-
+    
     let Ok(res) = res else {
         return Err(ScraperError::RequestError);
     };

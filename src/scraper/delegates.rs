@@ -5,12 +5,11 @@ use serde_json::{json, Value};
 
 use crate::{error::ScraperError, request::request, Delegate, Seat};
 
-use super::{AustriaScraper, Scraper};
+use super::{AustriaScraper, Scraper, GegenstandPaths};
 
 #[async_trait]
 pub trait DelegateScraper: Scraper {
     const DELEGATE_FILTER_PATH: &'static str;
-    const TO_DELEGATES_IDX: &'static str;
     type Payload: Serialize + Send;
 
     fn persons_payload(&self) -> Self::Payload;
@@ -30,32 +29,12 @@ pub trait DelegateScraper: Scraper {
         .await
     }
 
-    fn person_paths(&self, persons: Value) -> Option<PersonPaths>;
+    fn person_paths(&self, persons: Value) -> Option<GegenstandPaths>;
 
-    async fn get_person_info(&self, person_path: &str) -> Result<Value, ScraperError> {
-        // let base_url = Url::new(Self::BASE_URL);
-
-        let full_url = if person_path.starts_with("/") {
-            format!(
-                "{base_url}{person_path}{json_suffix}",
-                base_url = Self::BASE_URL,
-                json_suffix = Self::JSON_SUFFIX
-            )
-        } else {
-            format!(
-                "{base_url}/{person_path}{json_suffix}",
-                base_url = Self::BASE_URL,
-                json_suffix = Self::JSON_SUFFIX
-            )
-        };
-
-        request(Method::GET, self.client(), (), full_url).await
-        // reqwest::get(full_url).await?.json::<serde_json::Value>().await
-    }
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate>;
 
     async fn get_delegate(&self, person_path: &str) -> Result<Delegate, ScraperError> {
-        let person_info = self.get_person_info(person_path).await?;
+        let person_info = self.get_gegenstand_info(person_path).await?;
         Self::person_info_into_delegate(person_info).ok_or(ScraperError::InvalidDelegateInfoError)
     }
 }
@@ -64,8 +43,6 @@ impl DelegateScraper for AustriaScraper {
     type Payload = Value;
     const DELEGATE_FILTER_PATH: &'static str =
         "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_008&listeId=10008&showAll=true";
-
-    const TO_DELEGATES_IDX: &'static str = "rows";
 
     #[inline]
     fn persons_payload(&self) -> Value {
@@ -81,6 +58,7 @@ impl DelegateScraper for AustriaScraper {
 
         // contains sitzplatz at "sitzplatz"
         let api_person_info = &person_info["content"]["personInfo"];
+        let id = &api_person_info["pad_intern"];
         let council = &api_person_info["gremium"];
 
         let seat = &api_person_info["sitzplatz"];
@@ -89,6 +67,7 @@ impl DelegateScraper for AustriaScraper {
         let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
 
         Some(Delegate {
+            id: id.as_u64()?.to_string(),
             name: name.as_str()?.to_string(),
             party: party.as_str()?.to_string(),
             constituency: constituency.as_str()?.to_string(),
@@ -97,32 +76,21 @@ impl DelegateScraper for AustriaScraper {
         })
     }
 
-    fn person_paths(&self, persons: Value) -> Option<PersonPaths> {
-        Some(
-            persons[Self::TO_DELEGATES_IDX]
-                .as_array()?
-                .iter()
-                .flat_map(|person| {
-                    let person = person.as_array()?;
-                    Some(person[person.len() - 1].as_str()?.to_string())
-                })
-                .collect(),
-        )
+    fn person_paths(&self, persons: Value) -> Option<GegenstandPaths> {
+        self.gegenstand_paths(persons, 8)
     }
 }
 
-pub type PersonPaths = Vec<String>;
-
 #[cfg(test)]
 mod tests {
-    use crate::{error::ScraperError, scraper::delegates::DelegateScraper};
+    use crate::{error::ScraperError, scraper::{delegates::DelegateScraper, Scraper}};
 
     use super::AustriaScraper;
 
     #[tokio::test]
     async fn test_austria_person_info_scraper() {
         let scraper = AustriaScraper::default();
-        let val = scraper.get_person_info("/person/16218").await.unwrap();
+        let val = scraper.get_gegenstand_info("/person/16218").await.unwrap();
 
         // und sitzplatz
         let person_info = &val["content"]["personInfo"];

@@ -8,6 +8,7 @@ mod url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Delegate {
+    pub id: String,
     pub name: String,
     pub party: String,
     pub constituency: String,

@@ -84,8 +84,8 @@ impl ProposalPayload {
     }
 
     pub fn as_json(&self) -> Value {
-        let date_start_end = self.date_start_end.map(|arr| {
-            arr.iter().map(|date| date.to_string()).collect::<Vec<_>>()
+        let date_start_end = self.date_start_end.map(|[start, end]| {
+            [format!("{start}T00:00:00.000Z"), format!("{end}T00:00:00.000Z")]
         });
 
         json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp, "DATUM_VON": date_start_end})

@@ -7,6 +7,9 @@ mod scraper;
 mod url;
 
 pub use scraper::*;
+pub mod serde_json {
+    pub use ::serde_json::*;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Delegate {

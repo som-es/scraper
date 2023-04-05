@@ -9,8 +9,8 @@ use serde_json::{Value, json};
 
 use crate::{error::ScraperError, request::request};
 
-mod delegates;
-mod proposals;
+pub mod delegates;
+pub mod proposals;
 
 #[async_trait]
 pub trait Scraper {
@@ -83,7 +83,7 @@ impl ProposalPayload {
         self
     }
 
-    pub fn to_json(&self) -> Value {
+    pub fn as_json(&self) -> Value {
         let date_start_end = self.date_start_end.map(|arr| {
             arr.iter().map(|date| date.to_string()).collect::<Vec<_>>()
         });

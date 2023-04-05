@@ -20,7 +20,7 @@ pub trait ProposalScraper: Scraper {
 
     async fn post_proposals_payload(&self, proposal_payload: ProposalPayload) -> Result<Value, ScraperError> {
         self.post_payload(
-            proposal_payload.to_json(),
+            proposal_payload.as_json(),
             format!(
                 "{base_url}{filter}",
                 base_url = Self::BASE_URL,

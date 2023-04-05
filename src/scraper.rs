@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use reqwest::{Client, Method};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::{error::ScraperError, request::request};
 
@@ -52,6 +52,7 @@ pub trait Scraper {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GeneralScrapeInfo {
     gp: Vec<String>,
     council_type: String,
@@ -66,12 +67,38 @@ impl Default for GeneralScrapeInfo {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct ProposalPayload {
+    date_start_end: Option<[chrono::NaiveDate; 2]>,
+    scrape_info: GeneralScrapeInfo
+}
+
+impl ProposalPayload {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_date_range(mut self, date_start: chrono::NaiveDate, date_end: chrono::NaiveDate) -> Self {
+        self.date_start_end = Some([date_start, date_end]);
+        self
+    }
+
+    pub fn to_json(&self) -> Value {
+        let date_start_end = self.date_start_end.map(|arr| {
+            arr.iter().map(|date| date.to_string()).collect::<Vec<_>>()
+        });
+
+        json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp, "DATUM_VON": date_start_end})
+    }
+}
+
 pub type GegenstandPaths = Vec<String>;
 
 #[derive(Default)]
 pub struct AustriaScraper {
     client: Client,
     pub scrape_info: GeneralScrapeInfo,
+    pub proposal_payload: Value
 }
 
 impl AustriaScraper {

@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use crate::error::ScraperError;
 
-use super::{AustriaScraper, Scraper, GegenstandPaths};
+use super::{AustriaScraper, Scraper, GegenstandPaths, ProposalPayload};
 
 #[async_trait]
 pub trait ProposalScraper: Scraper {
@@ -18,9 +18,9 @@ pub trait ProposalScraper: Scraper {
 
     fn proposals_payload(&self) -> Self::Payload;
 
-    async fn post_proposals_payload(&self) -> Result<Value, ScraperError> {
+    async fn post_proposals_payload(&self, proposal_payload: ProposalPayload) -> Result<Value, ScraperError> {
         self.post_payload(
-            self.proposals_payload(),
+            proposal_payload.to_json(),
             format!(
                 "{base_url}{filter}",
                 base_url = Self::BASE_URL,
@@ -57,7 +57,8 @@ impl ProposalScraper for AustriaScraper {
     const TO_DELEGATES_IDX: &'static str = "rows";
     type Payload = Value;
 
-    fn proposals_payload(&self) -> Self::Payload {
+    fn proposals_payload(&self, ) -> Self::Payload {
+        
         json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp})
     }
 
@@ -110,13 +111,14 @@ fn person_url_to_id(url: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::scraper::{AustriaScraper, proposals::ProposalScraper};
+    use crate::scraper::{AustriaScraper, proposals::ProposalScraper, ProposalPayload};
 
     #[tokio::test]
     async fn test_post_proposal_payload() {
         let scraper = AustriaScraper::default();
 
-        let proposals = scraper.post_proposals_payload().await.unwrap();
+        let proposal_payload = ProposalPayload::default();
+        let proposals = scraper.post_proposals_payload(proposal_payload).await.unwrap();
 
         for proposal in proposals["rows"].as_array().unwrap() {
             println!("{}", proposal[14]);
@@ -129,7 +131,8 @@ mod tests {
     async fn test_get_all_proposals() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
-        let proposals = scraper.post_proposals_payload().await?;
+        let proposal_payload = ProposalPayload::default();
+        let proposals = scraper.post_proposals_payload(proposal_payload).await?;
 
         let proposal_paths = scraper.proposal_paths(proposals).unwrap();
 

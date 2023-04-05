@@ -6,6 +6,8 @@ mod request;
 mod scraper;
 mod url;
 
+pub use scraper::*;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Delegate {
     pub id: String,

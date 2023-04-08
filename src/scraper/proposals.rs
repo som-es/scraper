@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use async_trait::async_trait;
 
 use serde::Serialize;
@@ -8,6 +6,20 @@ use serde_json::{json, Value};
 use crate::error::ScraperError;
 
 use super::{AustriaScraper, Scraper, GegenstandPaths, ProposalPayload};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+pub enum FileType {
+    OriginalPDF,
+    DigitalPDF,
+    HTML,
+    Unknown
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Document {
+    link: String,
+    ftype: FileType,
+}
 
 #[async_trait]
 pub trait ProposalScraper: Scraper {
@@ -49,6 +61,7 @@ pub struct Proposal {
     pub description: String,
     pub issuer_ids: Vec<String>,
     pub receiver_ids: Vec<String>,
+    pub documents: Vec<Document>
 }
 
 impl ProposalScraper for AustriaScraper {
@@ -95,14 +108,44 @@ impl ProposalScraper for AustriaScraper {
             .collect::<Vec<String>>();
 
         let description = raw_proposal_content["description"].as_str()?.to_string();
+        let raw_documents = raw_proposal_content["documents"].as_array()?;
+
+        let mut documents = vec![];
+
+        for document in raw_documents {
+            let title = document["title"].as_str()?;
+            let raw_documents = document["documents"].as_array()?;
+
+            for document in raw_documents {
+                let link = document["link"].as_str()?.to_string();
+                let ftype = document["type"].as_str()?;
+                let ftype = if title.contains("Original") {
+                    FileType::OriginalPDF
+                } else {
+                    if ftype == "PDF" {
+                        FileType::DigitalPDF
+                    } else if ftype == "HTML" { 
+                        FileType::HTML
+                    } else {
+                        FileType::Unknown
+                    }
+                };
+
+                documents.push(Document {
+                    link,
+                    ftype,
+                })
+            }
+        }
+
 
         let title = raw_proposal["meta"]["title"].as_str()?.to_string();
-
         let inr = raw_proposal_content["inr"].as_u64()?;
-
+    
         let id = format!("{ityp}/{inr}");
-        
+    
         let gp = raw_proposal_content["gp_code"].as_str()?.to_string();
+
         Some(Proposal {
             id,
             ityp,
@@ -111,6 +154,7 @@ impl ProposalScraper for AustriaScraper {
             description,
             issuer_ids,
             receiver_ids,
+            documents
         })
     }
 }
@@ -122,7 +166,7 @@ fn person_url_to_id(url: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::scraper::{AustriaScraper, proposals::ProposalScraper, ProposalPayload};
+    use crate::{scraper::{AustriaScraper, proposals::ProposalScraper, ProposalPayload}, proposals::{Document, FileType}};
 
     #[tokio::test]
     async fn test_post_proposal_payload() {
@@ -176,5 +220,29 @@ mod tests {
         Ok(())
     }
 
-    
+    #[tokio::test]
+    async fn test_get_proposal_from_path_with_documents() -> Result<(), Box<dyn std::error::Error>> {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/J/14120").await?;
+        assert_eq!(proposal.receiver_ids, ["55727"]);
+        assert_eq!(proposal.issuer_ids, ["2344"]);
+
+        assert_eq!(proposal.documents[0], Document {
+            link: "/dokument/XXVII/J/14120/imfname_1518329.pdf".to_string(),
+            ftype: FileType::OriginalPDF
+        });
+
+        assert_eq!(proposal.documents[1], Document {
+            link: "/dokument/XXVII/J/14120/fname_1518478.pdf".to_string(),
+            ftype: FileType::DigitalPDF
+        });
+
+        assert_eq!(proposal.documents[2], Document {
+            link: "/dokument/XXVII/J/14120/fnameorig_1518478.html".to_string(),
+            ftype: FileType::HTML
+        });
+        
+        Ok(())
+    }
 }

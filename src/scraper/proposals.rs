@@ -32,7 +32,7 @@ pub trait ProposalScraper: Scraper {
 
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal>;
 
-    fn proposal_paths(&self, proposals: Value) -> Option<GegenstandPaths>;
+    fn proposal_paths(&self, proposals: Value) -> Result<GegenstandPaths, ScraperError>;
 
     async fn get_proposal(&self, proposal_path: &str) -> Result<Proposal, ScraperError> {
         let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
@@ -43,6 +43,7 @@ pub trait ProposalScraper: Scraper {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Proposal {
     pub id: String,
+    pub ityp: String,
     pub gp: String,
     pub title: String,
     pub description: String,
@@ -62,12 +63,14 @@ impl ProposalScraper for AustriaScraper {
         json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp})
     }
 
-    fn proposal_paths(&self, proposals: Value) -> Option<GegenstandPaths> {
-        self.gegenstand_paths(proposals, 14)
+    fn proposal_paths(&self, proposals: Value) -> Result<GegenstandPaths, ScraperError> {
+        self.gegenstand_paths(proposals, 14).ok_or(ScraperError::ProposalParseError)
     }
 
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
         let raw_proposal_content = &raw_proposal["content"];
+        // let json = serde_json::to_string_pretty(raw_proposal_content).unwrap();
+        // println!("{json}");
 
         let names = raw_proposal_content["names"].as_array()?;
 
@@ -77,9 +80,17 @@ impl ProposalScraper for AustriaScraper {
             .flat_map(|name| Some(person_url_to_id(name["url"].as_str()?)?))
             .collect::<Vec<String>>();
 
+        let ityp = raw_proposal_content["ityp"].as_str()?.to_string();
+
+        let receiver_text = if ityp == "AB" {
+            "Beantwortet durch"
+        } else {
+            "Eingebracht an"
+        };
+
         let receiver_ids = names
             .iter()
-            .filter(|name| name["funktext"] == "Beantwortet durch")
+            .filter(|name| name["funktext"] == receiver_text)
             .flat_map(|name| Some(person_url_to_id(name["url"].as_str()?)?))
             .collect::<Vec<String>>();
 
@@ -88,13 +99,13 @@ impl ProposalScraper for AustriaScraper {
         let title = raw_proposal["meta"]["title"].as_str()?.to_string();
 
         let inr = raw_proposal_content["inr"].as_u64()?;
-        let ityp = raw_proposal_content["ityp"].as_str()?;
 
         let id = format!("{ityp}/{inr}");
         
         let gp = raw_proposal_content["gp_code"].as_str()?.to_string();
         Some(Proposal {
             id,
+            ityp,
             gp,
             title,
             description,
@@ -153,4 +164,17 @@ mod tests {
         
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_get_proposal_from_path_with_issuer_and_receiver() -> Result<(), Box<dyn std::error::Error>> {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/J/14815").await?;
+        assert_eq!(proposal.receiver_ids, ["20445"]);
+        assert_eq!(proposal.issuer_ids, ["2344"]);
+        
+        Ok(())
+    }
+
+    
 }

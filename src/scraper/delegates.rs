@@ -50,8 +50,10 @@ impl DelegateScraper for AustriaScraper {
     }
 
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate> {
+        println!("{}", serde_json::to_string_pretty(&person_info).unwrap());
         let mandate = &person_info["content"]["banner"]["mandate"];
         let party = &mandate[0]["wahlpartei"];
+
         let constituency = &mandate[0]["wahlkreis"];
 
         let name = &person_info["meta"]["description"];
@@ -62,17 +64,22 @@ impl DelegateScraper for AustriaScraper {
         let council = &api_person_info["gremium"];
 
         let seat = &api_person_info["sitzplatz"];
-
+    
         let (row, col) = seat.as_str()?.split_once('/')?;
-        let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
+        let seat = if col.is_empty() {
+            None
+        } else {
+            let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
+            Some(Seat {row, col})
+        };
 
         Some(Delegate {
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
-            party: party.as_str()?.to_string(),
-            constituency: constituency.as_str()?.to_string(),
-            council: council.as_str()?.to_string(),
-            seat: Seat { row, col },
+            party: party.as_str().map(|party| party.to_string()),
+            constituency: constituency.as_str().map(|constituency| constituency.to_string()),
+            council: council.as_str().map(|council| council.to_string()),
+            seat
         })
     }
 
@@ -103,7 +110,7 @@ mod tests {
 
         let party = &mandate[0]["wahlpartei"];
 
-        println!("party: {party}");
+
 
         let name = &val["meta"]["description"];
 
@@ -124,8 +131,8 @@ mod tests {
 
         let res = scraper.get_delegate("/person/16218").await?;
         assert_eq!(res.name, "Diesner-Wais Martina");
-        assert_eq!(res.party, "ÖVP");
-        assert_eq!(res.council, "nr");
+        assert_eq!(res.party.unwrap(), "ÖVP");
+        assert_eq!(res.council.unwrap(), "nr");
 
         Ok(())
     }
@@ -160,6 +167,22 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_person_special() -> Result<(), ScraperError> {
+        let scraper = AustriaScraper::default();
+        scraper.get_delegate("/person/55727").await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_person_special2() -> Result<(), ScraperError> {
+        let scraper = AustriaScraper::default();
+        scraper.get_delegate("/person/21029").await?;
+        Ok(())
+    }
+
 }
 
 //   curl -s \

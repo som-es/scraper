@@ -15,10 +15,10 @@ pub mod serde_json {
 pub struct Delegate {
     pub id: u64,
     pub name: String,
-    pub party: String,
-    pub constituency: String,
-    pub council: String,
-    pub seat: Seat,
+    pub party: Option<String>,
+    pub constituency: Option<String>,
+    pub council: Option<String>,
+    pub seat: Option<Seat>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

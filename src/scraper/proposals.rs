@@ -87,8 +87,8 @@ pub struct Proposal {
     pub title: String,
     pub proposal_type: ProposalType,
     pub description: String,
-    pub issuer_ids: Vec<String>,
-    pub receiver_ids: Vec<String>,
+    pub issuer_ids: Vec<u64>,
+    pub receiver_ids: Vec<u64>,
     pub documents: Vec<Document>,
 }
 
@@ -119,7 +119,7 @@ impl ProposalScraper for AustriaScraper {
             .iter()
             .filter(|name| name["funktext"] == "Eingebracht von")
             .flat_map(|name| person_url_to_id(name["url"].as_str()?))
-            .collect::<Vec<String>>();
+            .collect::<Vec<u64>>();
 
         let ityp = raw_proposal_content["ityp"].as_str()?.to_string();
 
@@ -133,7 +133,7 @@ impl ProposalScraper for AustriaScraper {
             .iter()
             .filter(|name| name["funktext"] == receiver_text)
             .flat_map(|name| person_url_to_id(name["url"].as_str()?))
-            .collect::<Vec<String>>();
+            .collect::<Vec<u64>>();
 
         let description = raw_proposal_content["description"].as_str()?.to_string();
         let raw_documents = raw_proposal_content["documents"].as_array()?;
@@ -185,8 +185,8 @@ impl ProposalScraper for AustriaScraper {
 }
 
 /// /person/83153 -> 83153
-fn person_url_to_id(url: &str) -> Option<String> {
-    url.split('/').last().map(|id| id.to_string())
+fn person_url_to_id(url: &str) -> Option<u64> {
+    url.split('/').last().and_then(|id| id.parse::<u64>().ok())
 }
 
 #[cfg(test)]
@@ -235,7 +235,7 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/UEA/568").await?;
-        assert_eq!(proposal.issuer_ids, ["83153", "5679"]);
+        assert_eq!(proposal.issuer_ids, [83153, 5679]);
 
         Ok(())
     }
@@ -246,8 +246,8 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/J/14815").await?;
-        assert_eq!(proposal.receiver_ids, ["20445"]);
-        assert_eq!(proposal.issuer_ids, ["2344"]);
+        assert_eq!(proposal.receiver_ids, [20445]);
+        assert_eq!(proposal.issuer_ids, [2344]);
 
         Ok(())
     }
@@ -258,8 +258,8 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/J/14120").await?;
-        assert_eq!(proposal.receiver_ids, ["55727"]);
-        assert_eq!(proposal.issuer_ids, ["2344"]);
+        assert_eq!(proposal.receiver_ids, [55727]);
+        assert_eq!(proposal.issuer_ids, [2344]);
 
         assert_eq!(
             proposal.documents[0],
@@ -293,7 +293,7 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/AB/13676").await?;
-        assert_eq!(proposal.receiver_ids, ["55727"]);
+        assert_eq!(proposal.receiver_ids, [55727]);
 
         match proposal.proposal_type {
             ProposalType::AB(answered_ids) => {

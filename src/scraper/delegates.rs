@@ -67,7 +67,7 @@ impl DelegateScraper for AustriaScraper {
         let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
 
         Some(Delegate {
-            id: id.as_u64()?.to_string(),
+            id: id.as_u64()?,
             name: name.as_str()?.to_string(),
             party: party.as_str()?.to_string(),
             constituency: constituency.as_str()?.to_string(),

@@ -13,7 +13,7 @@ pub mod serde_json {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Delegate {
-    pub id: String,
+    pub id: u64,
     pub name: String,
     pub party: String,
     pub constituency: String,

@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use crate::{error::ScraperError, request::request, Delegate, Seat};
 
-use super::{AustriaScraper, Scraper, GegenstandPaths};
+use super::{AustriaScraper, GegenstandPaths, Scraper};
 
 #[async_trait]
 pub trait DelegateScraper: Scraper {
@@ -83,7 +83,10 @@ impl DelegateScraper for AustriaScraper {
 
 #[cfg(test)]
 mod tests {
-    use crate::{error::ScraperError, scraper::{delegates::DelegateScraper, Scraper}};
+    use crate::{
+        error::ScraperError,
+        scraper::{delegates::DelegateScraper, Scraper},
+    };
 
     use super::AustriaScraper;
 

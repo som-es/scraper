@@ -6,7 +6,7 @@ mod request;
 mod scraper;
 mod url;
 
-pub use scraper::*;
+pub use crate::scraper::*;
 pub mod serde_json {
     pub use ::serde_json::*;
 }

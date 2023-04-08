@@ -31,7 +31,7 @@ pub enum ScraperError {
 
     #[error("Encounterd invalid proposal information from API")]
     InvalidProposalInfoError,
-    
+
     #[error("Could not parse proposal information from API")]
-    ProposalParseError
+    ProposalParseError,
 }

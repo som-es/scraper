@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use reqwest::{Client, Method};
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::{error::ScraperError, request::request};
 
@@ -33,7 +33,7 @@ pub trait Scraper {
     async fn get_gegenstand_info(&self, path: &str) -> Result<Value, ScraperError> {
         // let base_url = Url::new(Self::BASE_URL);
 
-        let full_url = if path.starts_with("/") {
+        let full_url = if path.starts_with('/') {
             format!(
                 "{base_url}{path}{json_suffix}",
                 base_url = Self::BASE_URL,
@@ -70,7 +70,7 @@ impl Default for GeneralScrapeInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct ProposalPayload {
     date_start_end: Option<[chrono::NaiveDate; 2]>,
-    scrape_info: GeneralScrapeInfo
+    scrape_info: GeneralScrapeInfo,
 }
 
 impl ProposalPayload {
@@ -78,14 +78,21 @@ impl ProposalPayload {
         Self::default()
     }
 
-    pub fn with_date_range(mut self, date_start: chrono::NaiveDate, date_end: chrono::NaiveDate) -> Self {
+    pub fn with_date_range(
+        mut self,
+        date_start: chrono::NaiveDate,
+        date_end: chrono::NaiveDate,
+    ) -> Self {
         self.date_start_end = Some([date_start, date_end]);
         self
     }
 
     pub fn as_json(&self) -> Value {
         let date_start_end = self.date_start_end.map(|[start, end]| {
-            [format!("{start}T00:00:00.000Z"), format!("{end}T00:00:00.000Z")]
+            [
+                format!("{start}T00:00:00.000Z"),
+                format!("{end}T00:00:00.000Z"),
+            ]
         });
 
         json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp, "DATUM_VON": date_start_end})
@@ -98,7 +105,7 @@ pub type GegenstandPaths = Vec<String>;
 pub struct AustriaScraper {
     client: Client,
     pub scrape_info: GeneralScrapeInfo,
-    pub proposal_payload: Value
+    pub proposal_payload: Value,
 }
 
 impl AustriaScraper {
@@ -109,7 +116,11 @@ impl AustriaScraper {
         ),).await
     }*/
 
-    pub fn gegenstand_paths(&self, gegenstaende: Value, gegenstand_path_idx: usize) -> Option<Vec<String>> {
+    pub fn gegenstand_paths(
+        &self,
+        gegenstaende: Value,
+        gegenstand_path_idx: usize,
+    ) -> Option<Vec<String>> {
         Some(
             gegenstaende[Self::LIST_ENTRIES]
                 .as_array()?
@@ -127,11 +138,9 @@ impl Scraper for AustriaScraper {
     const BASE_URL: &'static str = "https://www.parlament.gv.at";
     const JSON_SUFFIX: &'static str = "?json=True";
     const LIST_ENTRIES: &'static str = "rows";
-    
 
     #[inline]
     fn client(&self) -> &Client {
         &self.client
     }
-
 }

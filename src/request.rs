@@ -23,25 +23,23 @@ where
     }
 
     let res = req.send().await;
-    
+
     let Ok(res) = res else {
         return Err(ScraperError::RequestError);
     };
 
     if res.status().is_success() {
-        let data = res
-            .json::<Value>()
+        res.json::<Value>()
             .await
-            .map_err(|_| ScraperError::RequestError);
-        data
+            .map_err(|_| ScraperError::RequestError)
     } else {
-        return match res.status() {
+        match res.status() {
             StatusCode::UNAUTHORIZED => Err(ScraperError::Unauthorized),
             StatusCode::FORBIDDEN => Err(ScraperError::Forbidden),
             StatusCode::NOT_FOUND => Err(ScraperError::NotFound),
             StatusCode::INTERNAL_SERVER_ERROR => Err(ScraperError::InternalServerError),
             StatusCode::UNPROCESSABLE_ENTITY => Err(ScraperError::Unauthorized),
             _ => Err(ScraperError::RequestError),
-        };
+        }
     }
 }

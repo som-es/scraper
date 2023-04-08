@@ -5,14 +5,38 @@ use serde_json::{json, Value};
 
 use crate::error::ScraperError;
 
-use super::{AustriaScraper, Scraper, GegenstandPaths, ProposalPayload};
+use super::{AustriaScraper, GegenstandPaths, ProposalPayload, Scraper};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum FileType {
     OriginalPDF,
     DigitalPDF,
     HTML,
-    Unknown
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ProposalType {
+    /// String in points to the answered proposals
+    AB(Vec<String>),
+    /// String in this enum is the type of proposal!
+    Other(String),
+}
+
+impl ProposalType {
+    pub fn from_str(ityp: &str, raw_proposal_content: &Value) -> Option<Self> {
+        Some(match ityp {
+            "AB" => {
+                let answered_ids = raw_proposal_content["reference"]
+                    .as_array()?
+                    .iter()
+                    .flat_map(|reference| Some(reference["zitation"].as_str()?.to_string()))
+                    .collect::<Vec<String>>();
+                ProposalType::AB(answered_ids)
+            }
+            _ => ProposalType::Other(ityp.to_string()),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -30,7 +54,10 @@ pub trait ProposalScraper: Scraper {
 
     fn proposals_payload(&self) -> Self::Payload;
 
-    async fn post_proposals_payload(&self, proposal_payload: ProposalPayload) -> Result<Value, ScraperError> {
+    async fn post_proposals_payload(
+        &self,
+        proposal_payload: ProposalPayload,
+    ) -> Result<Value, ScraperError> {
         self.post_payload(
             proposal_payload.as_json(),
             format!(
@@ -58,10 +85,11 @@ pub struct Proposal {
     pub ityp: String,
     pub gp: String,
     pub title: String,
+    pub proposal_type: ProposalType,
     pub description: String,
     pub issuer_ids: Vec<String>,
     pub receiver_ids: Vec<String>,
-    pub documents: Vec<Document>
+    pub documents: Vec<Document>,
 }
 
 impl ProposalScraper for AustriaScraper {
@@ -71,13 +99,13 @@ impl ProposalScraper for AustriaScraper {
     const TO_DELEGATES_IDX: &'static str = "rows";
     type Payload = Value;
 
-    fn proposals_payload(&self, ) -> Self::Payload {
-        
+    fn proposals_payload(&self) -> Self::Payload {
         json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp})
     }
 
     fn proposal_paths(&self, proposals: Value) -> Result<GegenstandPaths, ScraperError> {
-        self.gegenstand_paths(proposals, 14).ok_or(ScraperError::ProposalParseError)
+        self.gegenstand_paths(proposals, 14)
+            .ok_or(ScraperError::ProposalParseError)
     }
 
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
@@ -90,7 +118,7 @@ impl ProposalScraper for AustriaScraper {
         let issuer_ids = names
             .iter()
             .filter(|name| name["funktext"] == "Eingebracht von")
-            .flat_map(|name| Some(person_url_to_id(name["url"].as_str()?)?))
+            .flat_map(|name| person_url_to_id(name["url"].as_str()?))
             .collect::<Vec<String>>();
 
         let ityp = raw_proposal_content["ityp"].as_str()?.to_string();
@@ -104,7 +132,7 @@ impl ProposalScraper for AustriaScraper {
         let receiver_ids = names
             .iter()
             .filter(|name| name["funktext"] == receiver_text)
-            .flat_map(|name| Some(person_url_to_id(name["url"].as_str()?)?))
+            .flat_map(|name| person_url_to_id(name["url"].as_str()?))
             .collect::<Vec<String>>();
 
         let description = raw_proposal_content["description"].as_str()?.to_string();
@@ -121,30 +149,26 @@ impl ProposalScraper for AustriaScraper {
                 let ftype = document["type"].as_str()?;
                 let ftype = if title.contains("Original") {
                     FileType::OriginalPDF
+                } else if ftype == "PDF" {
+                    FileType::DigitalPDF
+                } else if ftype == "HTML" {
+                    FileType::HTML
                 } else {
-                    if ftype == "PDF" {
-                        FileType::DigitalPDF
-                    } else if ftype == "HTML" { 
-                        FileType::HTML
-                    } else {
-                        FileType::Unknown
-                    }
+                    FileType::Unknown
                 };
 
-                documents.push(Document {
-                    link,
-                    ftype,
-                })
+                documents.push(Document { link, ftype })
             }
         }
 
-
         let title = raw_proposal["meta"]["title"].as_str()?.to_string();
         let inr = raw_proposal_content["inr"].as_u64()?;
-    
-        let id = format!("{ityp}/{inr}");
-    
+
+        let id = format!("{inr}/{ityp}");
+
         let gp = raw_proposal_content["gp_code"].as_str()?.to_string();
+
+        let proposal_type = ProposalType::from_str(&ityp, raw_proposal_content)?;
 
         Some(Proposal {
             id,
@@ -154,7 +178,8 @@ impl ProposalScraper for AustriaScraper {
             description,
             issuer_ids,
             receiver_ids,
-            documents
+            documents,
+            proposal_type,
         })
     }
 }
@@ -166,19 +191,25 @@ fn person_url_to_id(url: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{scraper::{AustriaScraper, proposals::ProposalScraper, ProposalPayload}, proposals::{Document, FileType}};
+    use crate::{
+        proposals::{Document, FileType, ProposalType},
+        scraper::{proposals::ProposalScraper, AustriaScraper, ProposalPayload},
+    };
 
     #[tokio::test]
     async fn test_post_proposal_payload() {
         let scraper = AustriaScraper::default();
 
         let proposal_payload = ProposalPayload::default();
-        let proposals = scraper.post_proposals_payload(proposal_payload).await.unwrap();
+        let proposals = scraper
+            .post_proposals_payload(proposal_payload)
+            .await
+            .unwrap();
 
         for proposal in proposals["rows"].as_array().unwrap() {
             println!("{}", proposal[14]);
         }
-        
+
         // println!("proposals: {}", serde_json::to_string_pretty(&proposals).unwrap());
     }
 
@@ -191,7 +222,7 @@ mod tests {
 
         let proposal_paths = scraper.proposal_paths(proposals).unwrap();
 
-        for proposal_path in &proposal_paths[600..] {
+        for proposal_path in &proposal_paths[600..800] {
             println!("proposal_path: {}", proposal_path);
             let proposal = scraper.get_proposal(&proposal_path).await?;
             println!("proposal: {proposal:?}");
@@ -200,49 +231,77 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_proposal_from_path() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_get_proposal_from_path_multiple_issuer() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/UEA/568").await?;
-        println!("proposal: {proposal:?}");
-        
+        assert_eq!(proposal.issuer_ids, ["83153", "5679"]);
+
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_get_proposal_from_path_with_issuer_and_receiver() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_get_proposal_from_path_with_issuer_and_receiver(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/J/14815").await?;
         assert_eq!(proposal.receiver_ids, ["20445"]);
         assert_eq!(proposal.issuer_ids, ["2344"]);
-        
+
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_get_proposal_from_path_with_documents() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_get_proposal_from_path_with_documents() -> Result<(), Box<dyn std::error::Error>>
+    {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/J/14120").await?;
         assert_eq!(proposal.receiver_ids, ["55727"]);
         assert_eq!(proposal.issuer_ids, ["2344"]);
 
-        assert_eq!(proposal.documents[0], Document {
-            link: "/dokument/XXVII/J/14120/imfname_1518329.pdf".to_string(),
-            ftype: FileType::OriginalPDF
-        });
+        assert_eq!(
+            proposal.documents[0],
+            Document {
+                link: "/dokument/XXVII/J/14120/imfname_1518329.pdf".to_string(),
+                ftype: FileType::OriginalPDF
+            }
+        );
 
-        assert_eq!(proposal.documents[1], Document {
-            link: "/dokument/XXVII/J/14120/fname_1518478.pdf".to_string(),
-            ftype: FileType::DigitalPDF
-        });
+        assert_eq!(
+            proposal.documents[1],
+            Document {
+                link: "/dokument/XXVII/J/14120/fname_1518478.pdf".to_string(),
+                ftype: FileType::DigitalPDF
+            }
+        );
 
-        assert_eq!(proposal.documents[2], Document {
-            link: "/dokument/XXVII/J/14120/fnameorig_1518478.html".to_string(),
-            ftype: FileType::HTML
-        });
-        
+        assert_eq!(
+            proposal.documents[2],
+            Document {
+                link: "/dokument/XXVII/J/14120/fnameorig_1518478.html".to_string(),
+                ftype: FileType::HTML
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_proposal_as_answer() -> Result<(), Box<dyn std::error::Error>> {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/AB/13676").await?;
+        assert_eq!(proposal.receiver_ids, ["55727"]);
+
+        match proposal.proposal_type {
+            ProposalType::AB(answered_ids) => {
+                assert_eq!(answered_ids[0], "14120/J");
+            }
+            _ => {panic!()}
+        }
+
         Ok(())
     }
 }

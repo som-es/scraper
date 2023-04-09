@@ -15,6 +15,7 @@ pub mod serde_json {
 pub struct Delegate {
     pub id: u64,
     pub name: String,
+    pub is_active: bool,
     pub party: Option<String>,
     pub constituency: Option<String>,
     pub council: Option<String>,

@@ -46,7 +46,7 @@ impl DelegateScraper for AustriaScraper {
 
     #[inline]
     fn persons_payload(&self) -> Value {
-        json!({"M": ["M"], "W": ["W"], "R_WF": ["FR"], "NRBR": [self.scrape_info.council_type], "GP": self.scrape_info.gp})
+        json!({"M": ["M"], "W": ["W"], "R_WF": ["FR"],/* "NRBR": [self.scrape_info.council_type],*/ "GP": self.scrape_info.gp})
     }
 
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate> {
@@ -62,6 +62,7 @@ impl DelegateScraper for AustriaScraper {
         let api_person_info = &person_info["content"]["personInfo"];
         let id = &api_person_info["pad_intern"];
         let council = &api_person_info["gremium"];
+        let is_active = api_person_info["aktiv"].as_bool()?;
 
         let seat = &api_person_info["sitzplatz"];
     
@@ -74,6 +75,7 @@ impl DelegateScraper for AustriaScraper {
         };
 
         Some(Delegate {
+            is_active,
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
             party: party.as_str().map(|party| party.to_string()),
@@ -164,6 +166,10 @@ mod tests {
 
         let persons = scraper.post_persons_payload().await?;
         let person_paths = scraper.person_paths(persons).unwrap();
+        
+        for person in person_paths {
+            println!("{person}");
+        }
 
         Ok(())
     }
@@ -171,7 +177,8 @@ mod tests {
     #[tokio::test]
     async fn test_person_special() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
-        scraper.get_delegate("/person/55727").await?;
+        let res = scraper.get_delegate("/person/55727").await?;
+        println!("res: {res:?}");
 
         Ok(())
     }

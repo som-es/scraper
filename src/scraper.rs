@@ -55,14 +55,14 @@ pub trait Scraper {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GeneralScrapeInfo {
     gp: Vec<String>,
-    council_type: String,
+    council_type: Option<String>,
 }
 
 impl Default for GeneralScrapeInfo {
     fn default() -> Self {
         Self {
             gp: vec!["XXVII".to_string()],
-            council_type: "NR".to_string(),
+            council_type: Some("NR".to_string()),
         }
     }
 }

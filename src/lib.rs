@@ -5,6 +5,9 @@ mod error;
 mod request;
 mod scraper;
 mod url;
+mod document;
+
+pub use document::*;
 
 pub use crate::scraper::*;
 pub mod serde_json {

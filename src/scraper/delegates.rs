@@ -10,7 +10,6 @@ use super::{AustriaScraper, GegenstandPaths, Scraper};
 #[async_trait]
 pub trait DelegateScraper: Scraper {
     const DELEGATE_FILTER_PATH: &'static str;
-    type Payload: Serialize + Send;
 
     fn persons_payload(&self) -> Self::Payload;
 
@@ -40,17 +39,18 @@ pub trait DelegateScraper: Scraper {
 }
 
 impl DelegateScraper for AustriaScraper {
-    type Payload = Value;
     const DELEGATE_FILTER_PATH: &'static str =
-        "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_008&listeId=10008&showAll=true";
+        // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_008&listeId=10008&showAll=true";
+        "/Filter/api/filter/data/10400?js=eval&showAll=true";
 
     #[inline]
     fn persons_payload(&self) -> Value {
-        json!({"M": ["M"], "W": ["W"], "R_WF": ["FR"],/* "NRBR": [self.scrape_info.council_type],*/ "GP": self.scrape_info.gp})
+        // json!({"M": ["M"], "W": ["W"], /*"R_WF": ["FR"],*//* "NRBR": [self.scrape_info.council_type],*/ "GP": self.scrape_info.gp})
+        json! {{}}
     }
 
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate> {
-        println!("{}", serde_json::to_string_pretty(&person_info).unwrap());
+        // println!("{}", serde_json::to_string_pretty(&person_info).unwrap());
         let mandate = &person_info["content"]["banner"]["mandate"];
         let party = &mandate[0]["wahlpartei"];
 
@@ -65,13 +65,13 @@ impl DelegateScraper for AustriaScraper {
         let is_active = api_person_info["aktiv"].as_bool()?;
 
         let seat = &api_person_info["sitzplatz"];
-    
+
         let (row, col) = seat.as_str()?.split_once('/')?;
         let seat = if col.is_empty() {
             None
         } else {
             let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
-            Some(Seat {row, col})
+            Some(Seat { row, col })
         };
 
         Some(Delegate {
@@ -79,14 +79,17 @@ impl DelegateScraper for AustriaScraper {
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
             party: party.as_str().map(|party| party.to_string()),
-            constituency: constituency.as_str().map(|constituency| constituency.to_string()),
+            constituency: constituency
+                .as_str()
+                .map(|constituency| constituency.to_string()),
             council: council.as_str().map(|council| council.to_string()),
-            seat
+            seat,
         })
     }
 
     fn person_paths(&self, persons: Value) -> Option<GegenstandPaths> {
-        self.gegenstand_paths(persons, 8)
+        // use idx 8 for delegates in parlament
+        self.gegenstand_paths(persons, 4)
     }
 }
 
@@ -111,8 +114,6 @@ mod tests {
         let mandate = &val["content"]["banner"]["mandate"];
 
         let party = &mandate[0]["wahlpartei"];
-
-
 
         let name = &val["meta"]["description"];
 
@@ -166,7 +167,7 @@ mod tests {
 
         let persons = scraper.post_persons_payload().await?;
         let person_paths = scraper.person_paths(persons).unwrap();
-        
+
         for person in person_paths {
             println!("{person}");
         }
@@ -189,7 +190,6 @@ mod tests {
         scraper.get_delegate("/person/21029").await?;
         Ok(())
     }
-
 }
 
 //   curl -s \

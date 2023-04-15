@@ -16,7 +16,10 @@ where
 {
     let allow_body = method == reqwest::Method::POST || method == reqwest::Method::PUT;
 
-    let mut req = client.request(method, url.as_ref());
+    let mut req = client
+        .request(method, url.as_ref())
+        .header("user-agent", "somes/2023.1.0")
+        .header("content-type", "application/json");
 
     if allow_body {
         req = req.json(&body);

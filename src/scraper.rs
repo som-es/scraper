@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 use crate::{error::ScraperError, request::request};
 
 pub mod delegates;
+pub mod legis_init;
 pub mod proposals;
 
 #[async_trait]
@@ -18,15 +19,16 @@ pub trait Scraper {
     const JSON_SUFFIX: &'static str;
     const LIST_ENTRIES: &'static str;
 
+    type Payload: Serialize + Send;
+
     // type DelegatePayload: Serialize;
 
     fn client(&self) -> &Client;
 
-    async fn post_payload<P: Serialize + Send>(
-        &self,
-        payload: P,
-        path: String,
-    ) -> Result<Value, ScraperError> {
+    async fn post_payload<P>(&self, payload: P, path: String) -> Result<Value, ScraperError>
+    where
+        P: Serialize + Send,
+    {
         request(Method::POST, self.client(), payload, path).await
     }
 
@@ -138,6 +140,8 @@ impl Scraper for AustriaScraper {
     const BASE_URL: &'static str = "https://www.parlament.gv.at";
     const JSON_SUFFIX: &'static str = "?json=True";
     const LIST_ENTRIES: &'static str = "rows";
+
+    type Payload = Value;
 
     #[inline]
     fn client(&self) -> &Client {

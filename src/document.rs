@@ -1,6 +1,5 @@
 use serde_json::Value;
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum FileType {
     OriginalPDF,

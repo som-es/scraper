@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use serde_json::{json, Value};
 
-use crate::{error::ScraperError, Document, documents};
+use crate::{documents, error::ScraperError, person_url_to_id, Document};
 
 use super::{AustriaScraper, GegenstandPaths, ProposalPayload, Scraper};
 
@@ -144,16 +144,12 @@ impl ProposalScraper for AustriaScraper {
     }
 }
 
-/// /person/83153 -> 83153
-fn person_url_to_id(url: &str) -> Option<u64> {
-    url.split('/').last().and_then(|id| id.parse::<u64>().ok())
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
         proposals::{Document, ProposalType},
-        scraper::{proposals::ProposalScraper, AustriaScraper, ProposalPayload}, FileType,
+        scraper::{proposals::ProposalScraper, AustriaScraper, ProposalPayload},
+        FileType,
     };
 
     #[tokio::test]

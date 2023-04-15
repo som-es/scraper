@@ -225,6 +225,7 @@ mod tests {
         assert_eq!(
             proposal.documents[0],
             Document {
+                title: "Anfrage (gescanntes Original)".to_string(),
                 link: "/dokument/XXVII/J/14120/imfname_1518329.pdf".to_string(),
                 ftype: FileType::OriginalPDF
             }
@@ -233,6 +234,7 @@ mod tests {
         assert_eq!(
             proposal.documents[1],
             Document {
+                title: "Anfrage (elektr. übermittelte Version)".to_string(),
                 link: "/dokument/XXVII/J/14120/fname_1518478.pdf".to_string(),
                 ftype: FileType::DigitalPDF
             }
@@ -241,6 +243,7 @@ mod tests {
         assert_eq!(
             proposal.documents[2],
             Document {
+                title: "Anfrage (elektr. übermittelte Version)".to_string(),
                 link: "/dokument/XXVII/J/14120/fnameorig_1518478.html".to_string(),
                 ftype: FileType::HTML
             }

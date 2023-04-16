@@ -1,10 +1,33 @@
 use async_trait::async_trait;
 
+use chrono::NaiveDate;
 use serde_json::{json, Value};
 
-use crate::{documents, error::ScraperError, person_url_to_id, Document};
+use crate::{
+    documents, error::ScraperError, person_url_to_id, DatePayload, Document, GeneralScrapeInfo,
+};
 
-use super::{AustriaScraper, GegenstandPaths, ProposalPayload, Scraper};
+use super::{AustriaScraper, GegenstandPaths, Scraper};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct ProposalsPayload {
+    pub date_payload: DatePayload,
+    scrape_info: GeneralScrapeInfo,
+}
+
+impl ProposalsPayload {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn with_date_range(mut self, date_start: NaiveDate, date_end: NaiveDate) -> Self {
+        self.date_payload.with_date_range(date_start, date_end);
+        self
+    }
+
+    pub fn as_json(&self) -> Value {
+        json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp, "DATUM_VON": self.date_payload.to_at_format()})
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ProposalType {
@@ -39,7 +62,7 @@ pub trait ProposalScraper: Scraper {
 
     async fn post_proposals_payload(
         &self,
-        proposal_payload: ProposalPayload,
+        proposal_payload: ProposalsPayload,
     ) -> Result<Value, ScraperError> {
         self.post_payload(
             proposal_payload.as_json(),
@@ -147,8 +170,8 @@ impl ProposalScraper for AustriaScraper {
 #[cfg(test)]
 mod tests {
     use crate::{
-        proposals::{Document, ProposalType},
-        scraper::{proposals::ProposalScraper, AustriaScraper, ProposalPayload},
+        proposals::{Document, ProposalType, ProposalsPayload},
+        scraper::{proposals::ProposalScraper, AustriaScraper},
         FileType,
     };
 
@@ -156,7 +179,7 @@ mod tests {
     async fn test_post_proposal_payload() {
         let scraper = AustriaScraper::default();
 
-        let proposal_payload = ProposalPayload::default();
+        let proposal_payload = ProposalsPayload::default();
         let proposals = scraper
             .post_proposals_payload(proposal_payload)
             .await
@@ -173,7 +196,7 @@ mod tests {
     async fn test_get_all_proposals() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
-        let proposal_payload = ProposalPayload::default();
+        let proposal_payload = ProposalsPayload::default();
         let proposals = scraper.post_proposals_payload(proposal_payload).await?;
 
         let proposal_paths = scraper.proposal_paths(proposals).unwrap();

@@ -1,4 +1,4 @@
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, Serialize, Deserialize)]
@@ -14,6 +14,21 @@ pub struct Document {
     pub title: String,
     pub link: String,
     pub ftype: FileType,
+}
+
+impl Document {
+    pub fn fetch(&self, base_url: &str) -> reqwest::Result<String> {
+        let url = format!("{}{}", base_url, self.link);
+        let response = reqwest::blocking::get(&url)?;
+        response.text()
+    }
+
+    pub fn save(&self, save_to: &str, base_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(format!("{save_to}{}", self.link));
+        std::fs::create_dir_all(path.parent().unwrap())?;
+        std::fs::write(path, self.fetch(base_url)?)?;
+        Ok(())
+    }
 }
 
 pub fn documents(raw_documents: &[Value]) -> Option<Vec<Document>> {

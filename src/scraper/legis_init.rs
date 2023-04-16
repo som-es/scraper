@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use regex::Regex;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
@@ -83,7 +83,10 @@ impl LegislativeInitiatives for AustriaScraper {
         let raw_documents = preconst["documents"].as_array()?;
         let documents = documents(raw_documents)?;
 
-        let names = legis_content["names"].as_array().cloned().unwrap_or_default();
+        let names = legis_content["names"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
 
         let delegate_ids = names
             .iter()
@@ -162,15 +165,19 @@ mod tests {
     async fn test_get_legis_init() {
         let scraper = AustriaScraper::default();
 
+        let start = std::time::Instant::now();
+
         let initiatives = scraper.post_legis_payload().await.unwrap();
         for path in scraper.legis_paths(initiatives).unwrap() {
-            println!("path: {path:?}");
+            //println!("path: {path:?}");
             let Ok(init) = scraper.get_legis_init(&path).await else {
                 continue;
             };
-            
-            println!("{init:?}");
+
+            println!("id: {}, title: {}", init.id, init.title);
         }
+
+        println!("elapsed: {:?}", start.elapsed());
     }
 
     #[tokio::test]
@@ -226,6 +233,5 @@ mod tests {
 
         assert_eq!(init.id, "1954/I");
         assert_eq!(init.ityp, "I".to_string());
-    
     }
 }

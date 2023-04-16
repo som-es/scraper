@@ -70,34 +70,31 @@ impl Default for GeneralScrapeInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct ProposalPayload {
+pub struct DatePayload {
     date_start_end: Option<[chrono::NaiveDate; 2]>,
-    scrape_info: GeneralScrapeInfo,
 }
 
-impl ProposalPayload {
+impl DatePayload {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn with_date_range(
-        mut self,
+        &mut self,
         date_start: chrono::NaiveDate,
         date_end: chrono::NaiveDate,
-    ) -> Self {
+    ) -> &mut Self {
         self.date_start_end = Some([date_start, date_end]);
         self
     }
 
-    pub fn as_json(&self) -> Value {
-        let date_start_end = self.date_start_end.map(|[start, end]| {
+    pub fn to_at_format(&self) -> Option<[String; 2]> {
+        self.date_start_end.map(|[start, end]| {
             [
                 format!("{start}T00:00:00.000Z"),
                 format!("{end}T00:00:00.000Z"),
             ]
-        });
-
-        json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp, "DATUM_VON": date_start_end})
+        })
     }
 }
 

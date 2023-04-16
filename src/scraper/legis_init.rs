@@ -10,9 +10,9 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Vote {
-    party: String,
-    fraction: u32,
-    infavor: bool,
+    pub party: String,
+    pub fraction: u32,
+    pub infavor: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -22,6 +22,7 @@ pub struct LegislativeInitiative {
     pub title: String,
     pub description: String,
     pub emphasis: Vec<String>,
+    pub gp: String,
     // pub council: String,
     pub votes: Vec<Vote>,
     pub accepted: bool,
@@ -80,6 +81,8 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let preconst = &legis_content["preconst"].as_array()?[0];
 
+        let gp = legis_content["gp_code"].as_str()?.to_string();
+
         let raw_documents = preconst["documents"].as_array()?;
         let documents = documents(raw_documents)?;
 
@@ -121,6 +124,7 @@ impl LegislativeInitiatives for AustriaScraper {
             description,
             emphasis: vec![], // todo: extract emphasis from html
             // council: todo!(),
+            gp,
             ityp,
             id,
             votes,
@@ -197,6 +201,8 @@ mod tests {
             init.description,
             "Kraftfahrgesetz, Änderung (41. KFG-Novelle) (1954 d.B.)"
         );
+
+        assert_eq!(init.gp, "XXVII");
         assert_eq!(init.emphasis, Vec::<String>::new());
         assert_eq!(
             init.votes,

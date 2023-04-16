@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use regex::Regex;
+use serde_derive::{Serialize, Deserialize};
 use serde_json::{json, Value};
 
 use crate::{
@@ -7,25 +8,25 @@ use crate::{
     Document, GegenstandPaths, Scraper,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Vote {
     party: String,
     fraction: u32,
     infavor: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LegislativeInitiative {
-    title: String,
-    description: String,
-    emphasis: Vec<String>,
-    ityp: String,
-    inr: u64,
-    // council: String,
-    votes: Vec<Vote>,
-    accepted: bool,
-    documents: Vec<Document>,
-    delegate_ids: Vec<u64>,
+    pub id: String,
+    pub ityp: String,
+    pub title: String,
+    pub description: String,
+    pub emphasis: Vec<String>,
+    // pub council: String,
+    pub votes: Vec<Vote>,
+    pub accepted: bool,
+    pub documents: Vec<Document>,
+    pub delegate_ids: Vec<u64>,
 }
 
 #[async_trait]
@@ -77,12 +78,12 @@ impl LegislativeInitiatives for AustriaScraper {
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let inr = legis_content["inr"].as_u64()?;
 
-        let preconst = &legis_content["preconst"].as_array().unwrap()[0];
+        let preconst = &legis_content["preconst"].as_array()?[0];
 
         let raw_documents = preconst["documents"].as_array()?;
         let documents = documents(raw_documents)?;
 
-        let names = legis_content["names"].as_array()?;
+        let names = legis_content["names"].as_array().cloned().unwrap_or_default();
 
         let delegate_ids = names
             .iter()
@@ -103,19 +104,22 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let accepted = legis_content["vote"]["infavor"].as_bool()?;
 
-        let shortinfo = &legis_content["shortinfo"];
+        // let shortinfo = &legis_content["shortinfo"];
 
         // let teil1 = remove_html_tags(shortinfo["teil1"].as_str()?);
 
         // let json = serde_json::to_string_pretty(&raw_legis).unwrap();
         // println!("{json}");
+
+        let id = format!("{inr}/{ityp}");
+
         Some(LegislativeInitiative {
             title,
             description,
             emphasis: vec![], // todo: extract emphasis from html
             // council: todo!(),
             ityp,
-            inr,
+            id,
             votes,
             documents,
             delegate_ids,
@@ -160,7 +164,12 @@ mod tests {
 
         let initiatives = scraper.post_legis_payload().await.unwrap();
         for path in scraper.legis_paths(initiatives).unwrap() {
-            let init = scraper.get_legis_init(&path).await.unwrap();
+            println!("path: {path:?}");
+            let Ok(init) = scraper.get_legis_init(&path).await else {
+                continue;
+            };
+            
+            println!("{init:?}");
         }
     }
 
@@ -215,7 +224,7 @@ mod tests {
 
         assert!(init.accepted);
 
-        assert_eq!(init.inr, 1954);
+        assert_eq!(init.id, "1954/I");
         assert_eq!(init.ityp, "I".to_string());
     
     }

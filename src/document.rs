@@ -1,6 +1,7 @@
+use serde_derive::{Serialize, Deserialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, Serialize, Deserialize)]
 pub enum FileType {
     OriginalPDF,
     DigitalPDF,
@@ -8,7 +9,7 @@ pub enum FileType {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Document {
     pub title: String,
     pub link: String,

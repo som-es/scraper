@@ -1,6 +1,19 @@
-use serde_derive::{Deserialize, Serialize};
+use common_scrapes::{Document, FileType};
 use serde_json::Value;
 
+pub trait Fetch {
+    fn fetch(&self, base_url: &str) -> reqwest::Result<String>;
+}
+
+impl Fetch for Document {
+    fn fetch(&self, base_url: &str) -> reqwest::Result<String> {
+        let url = format!("{}{}", base_url, self.link);
+        let response = reqwest::blocking::get(&url)?;
+        response.text()
+    }
+}
+
+/*
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, Serialize, Deserialize)]
 pub enum FileType {
     OriginalPDF,
@@ -30,7 +43,7 @@ impl Document {
         Ok(())
     }
 }
-
+*/
 pub fn documents(raw_documents: &[Value]) -> Option<Vec<Document>> {
     let mut documents = vec![];
 

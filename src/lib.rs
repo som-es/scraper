@@ -9,6 +9,8 @@ mod url;
 
 pub use document::*;
 
+pub use common_scrapes::*;
+
 pub use crate::scraper::*;
 pub mod serde_json {
     pub use ::serde_json::*;
@@ -17,21 +19,4 @@ pub mod serde_json {
 /// /person/83153 -> 83153
 fn person_url_to_id(url: &str) -> Option<u64> {
     url.split('/').last().and_then(|id| id.parse::<u64>().ok())
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Delegate {
-    pub id: u64,
-    pub name: String,
-    pub is_active: bool,
-    pub party: Option<String>,
-    pub constituency: Option<String>,
-    pub council: Option<String>,
-    pub seat: Option<Seat>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Seat {
-    pub row: u16,
-    pub col: u16,
 }

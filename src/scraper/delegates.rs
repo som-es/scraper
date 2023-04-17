@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use reqwest::Method;
-use serde::Serialize;
+use common_scrapes::{Seat, Delegate};
 use serde_json::{json, Value};
 
-use crate::{error::ScraperError, request::request, Delegate, Seat};
+use crate::{error::ScraperError, request::request};
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
 

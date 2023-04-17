@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 
+use common_scrapes::Document;
 use chrono::NaiveDate;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, person_url_to_id, DatePayload, Document, GeneralScrapeInfo,
+    documents, error::ScraperError, person_url_to_id, DatePayload, GeneralScrapeInfo,
 };
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
@@ -172,8 +173,9 @@ mod tests {
     use crate::{
         proposals::{Document, ProposalType, ProposalsPayload},
         scraper::{proposals::ProposalScraper, AustriaScraper},
-        FileType,
     };
+
+    use common_scrapes::FileType;
 
     #[tokio::test]
     async fn test_post_proposal_payload() {

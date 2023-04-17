@@ -1,34 +1,13 @@
 use async_trait::async_trait;
+use common_scrapes::{LegislativeInitiative, Vote};
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
     documents, error::ScraperError, person_url_to_id, proposals::ProposalScraper, AustriaScraper,
-    Document, GegenstandPaths, Scraper,
+    GegenstandPaths, Scraper,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Vote {
-    pub party: String,
-    pub fraction: u32,
-    pub infavor: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct LegislativeInitiative {
-    pub id: String,
-    pub ityp: String,
-    pub title: String,
-    pub description: String,
-    pub emphasis: Vec<String>,
-    pub gp: String,
-    // pub council: String,
-    pub votes: Vec<Vote>,
-    pub accepted: bool,
-    pub documents: Vec<Document>,
-    pub delegate_ids: Vec<u64>,
-}
 
 #[async_trait]
 pub trait LegislativeInitiatives: Scraper {

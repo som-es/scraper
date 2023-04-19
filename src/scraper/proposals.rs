@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 
-use common_scrapes::Document;
 use chrono::NaiveDate;
+use common_scrapes::Document;
 use serde_json::{json, Value};
 
-use crate::{
-    documents, error::ScraperError, person_url_to_id, DatePayload, GeneralScrapeInfo,
-};
+use crate::{documents, error::ScraperError, person_url_to_id, DatePayload, GeneralScrapeInfo};
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
 
@@ -148,7 +146,7 @@ impl ProposalScraper for AustriaScraper {
         let title = raw_proposal["meta"]["title"].as_str()?.to_string();
         let inr = raw_proposal_content["inr"].as_u64()?;
 
-        let id = format!("{inr}/{ityp}");
+        let id = format!("{ityp}/{inr}");
 
         let gp = raw_proposal_content["gp_code"].as_str()?.to_string();
 

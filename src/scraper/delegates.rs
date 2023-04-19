@@ -1,6 +1,6 @@
 use async_trait::async_trait;
+use common_scrapes::{Delegate, Seat};
 use reqwest::Method;
-use common_scrapes::{Seat, Delegate};
 use serde_json::{json, Value};
 
 use crate::{error::ScraperError, request::request};

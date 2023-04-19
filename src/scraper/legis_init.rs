@@ -96,7 +96,7 @@ impl LegislativeInitiatives for AustriaScraper {
         // let json = serde_json::to_string_pretty(&raw_legis).unwrap();
         // println!("{json}");
 
-        let id = format!("{inr}/{ityp}");
+        let id = format!("{ityp}/{inr}");
 
         Some(LegislativeInitiative {
             title,

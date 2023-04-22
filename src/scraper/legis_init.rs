@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 use common_scrapes::{LegislativeInitiative, Vote};
 use regex::Regex;
-use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, person_url_to_id, proposals::ProposalScraper, AustriaScraper,
-    GegenstandPaths, Scraper,
+    documents, error::ScraperError, person_url_to_id, AustriaScraper, GegenstandPaths, Scraper,
 };
 
 #[async_trait]

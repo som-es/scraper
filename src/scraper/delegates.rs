@@ -57,6 +57,7 @@ impl DelegateScraper for AustriaScraper {
         let constituency = &mandate[0]["wahlkreis"];
 
         let name = &person_info["meta"]["description"];
+        let image_url = person_info["meta"]["openGraph"]["image"].as_str().map(|path| path.to_string());
 
         // contains sitzplatz at "sitzplatz"
         let api_person_info = &person_info["content"]["personInfo"];
@@ -76,6 +77,7 @@ impl DelegateScraper for AustriaScraper {
 
         Some(Delegate {
             is_active,
+            image_url,
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
             party: party.as_str().map(|party| party.to_string()),

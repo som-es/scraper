@@ -56,6 +56,12 @@ impl LegislativeInitiatives for AustriaScraper {
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let inr = legis_content["inr"].as_u64()?;
 
+        let date = legis_content
+            .get("update")
+            .unwrap_or(&legis_content["einlangen"])
+            .as_str()?
+            .to_string();
+
         let preconst = &legis_content["preconst"].as_array()?[0];
 
         let gp = legis_content["gp_code"].as_str()?.to_string();
@@ -108,6 +114,7 @@ impl LegislativeInitiatives for AustriaScraper {
             documents,
             delegate_ids,
             accepted,
+            date,
         })
     }
 
@@ -214,7 +221,7 @@ mod tests {
 
         assert!(init.accepted);
 
-        assert_eq!(init.id, "1954/I");
+        assert_eq!(init.id, "I/1954");
         assert_eq!(init.ityp, "I".to_string());
     }
 }

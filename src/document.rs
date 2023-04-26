@@ -8,7 +8,7 @@ pub trait Fetch {
 impl Fetch for Document {
     fn fetch(&self, base_url: &str) -> reqwest::Result<String> {
         let url = format!("{}{}", base_url, self.link);
-        let response = reqwest::blocking::get(&url)?;
+        let response = reqwest::blocking::get(url)?;
         response.text()
     }
 }

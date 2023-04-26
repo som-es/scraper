@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common_scrapes::{LegislativeInitiative, Vote};
+use common_scrapes::{LegislativeInitiative, Speech, Vote};
 use regex::Regex;
 use serde_json::{json, Value};
 
@@ -79,17 +79,8 @@ impl LegislativeInitiatives for AustriaScraper {
             .flat_map(|name| person_url_to_id(name["url"].as_str()?))
             .collect::<Vec<u64>>();
 
-        let votes = legis_content["vote"]["result"]
-            .as_array()?
-            .iter()
-            .flat_map(|vote| {
-                Some(Vote {
-                    party: vote["text"].as_str()?.to_string(),
-                    fraction: vote["fraction"].as_u64()? as u32,
-                    infavor: vote["infavor"].as_bool()?,
-                })
-            })
-            .collect::<Vec<Vote>>();
+        let votes = extract_votes(legis_content)?;
+        let speeches = extract_speeches(legis_content).unwrap_or_default();
 
         let accepted = legis_content["vote"]["infavor"].as_bool()?;
 
@@ -115,6 +106,7 @@ impl LegislativeInitiatives for AustriaScraper {
             delegate_ids,
             accepted,
             date,
+            speeches
         })
     }
 
@@ -122,6 +114,86 @@ impl LegislativeInitiatives for AustriaScraper {
         self.gegenstand_paths(initiatives, 12)
             .ok_or(ScraperError::ProposalParseError)
     }
+}
+
+fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
+    let mut speeches = vec![];
+    for phase in legis_content.get("phase")?.as_array()? {
+        let Some(stages) = phase.get("stages") else {
+            continue;
+        };
+
+        for stage in stages.as_array()? {
+            let Some(reden) = stage.get("reden") else {
+                continue;
+            };
+
+            for rede in reden["data"]["rows"].as_array()? {
+                let a_tag_delegate_url = rede[0].as_str()?;
+                let Some(delegate_id) = extract_person_id_from_a_tag(a_tag_delegate_url) else {
+                    continue;
+                };
+
+                let Some(opinion) = rede[1].as_str() else {
+                    continue;
+                };
+                let infavor;
+                if opinion == "Pro" {
+                    infavor = true;
+                } else if opinion == "Contra" {
+                    infavor = false;
+                } else {
+                    continue;
+                }
+
+                let spoken_text_html_urls = extract_spoken_text_html_urls(rede);
+
+                speeches.push(Speech {
+                    delegate_id,
+                    infavor,
+                    spoken_text_html_urls,
+                });
+            }
+        }
+    }
+    Some(speeches)
+}
+
+
+fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
+    rede.get(2)
+        .map(|spoken_text_infos| {
+            spoken_text_infos
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .map(|info| info["url"].to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn extract_person_id_from_a_tag(a_tag_delegate_url: &str) -> Option<u64> {
+    a_tag_delegate_url
+        .split('/')
+        .nth(2)
+        .and_then(|id| id.split('"').next()?.parse::<u64>().ok())
+}
+
+fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
+    Some(
+        legis_content["vote"]["result"]
+            .as_array()?
+            .iter()
+            .flat_map(|vote| {
+                Some(Vote {
+                    party: vote["text"].as_str()?.to_string(),
+                    fraction: vote["fraction"].as_u64()? as u32,
+                    infavor: vote["infavor"].as_bool()?,
+                })
+            })
+            .collect::<Vec<Vote>>(),
+    )
 }
 
 // not working
@@ -138,6 +210,16 @@ mod tests {
         legis_init::{LegislativeInitiatives, Vote},
         AustriaScraper,
     };
+
+    use super::extract_person_id_from_a_tag;
+
+    #[test]
+    fn test_extract_id_from_url() {
+        let id = extract_person_id_from_a_tag(
+            r#"<a href="/person/52687" target="_blank">Alois Stöger, diplômé (S)</a>"#,
+        );
+        assert_eq!(id, Some(52687))
+    }
 
     #[tokio::test]
     async fn test_legis_init() {
@@ -223,5 +305,7 @@ mod tests {
 
         assert_eq!(init.id, "I/1954");
         assert_eq!(init.ityp, "I".to_string());
+
+        println!("{:?}", init.speeches);
     }
 }

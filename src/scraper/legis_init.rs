@@ -306,6 +306,16 @@ mod tests {
         assert_eq!(init.id, "I/1954");
         assert_eq!(init.ityp, "I".to_string());
 
-        println!("{:?}", init.speeches);
+        assert_eq!(init.speeches[0].delegate_id, 52687);
+        assert_eq!(init.speeches[0].infavor, false);
+
+        assert_eq!(init.speeches[1].delegate_id, 5680);
+        assert_eq!(init.speeches[1].infavor, true);
+
+        assert_eq!(init.speeches[2].delegate_id, 51557);
+        assert_eq!(init.speeches[2].infavor, false);
+        
+        assert_eq!(init.speeches[3].delegate_id, 83150);
+        assert_eq!(init.speeches[3].infavor, true);
     }
 }

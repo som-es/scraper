@@ -24,7 +24,7 @@ impl ProposalsPayload {
     }
 
     pub fn as_json(&self) -> Value {
-        json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp, "DATUM_VON": self.date_payload.to_at_format()})
+        json!({"NRBR": self.scrape_info.council_type, "GP_CODE": self.scrape_info.gp, "DATUM_VON": self.date_payload.to_at_format()})
     }
 }
 

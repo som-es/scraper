@@ -106,7 +106,7 @@ impl LegislativeInitiatives for AustriaScraper {
             delegate_ids,
             accepted,
             date,
-            speeches
+            speeches,
         })
     }
 
@@ -158,7 +158,6 @@ fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
     }
     Some(speeches)
 }
-
 
 fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
     rede.get(2)
@@ -314,7 +313,7 @@ mod tests {
 
         assert_eq!(init.speeches[2].delegate_id, 51557);
         assert_eq!(init.speeches[2].infavor, false);
-        
+
         assert_eq!(init.speeches[3].delegate_id, 83150);
         assert_eq!(init.speeches[3].infavor, true);
     }

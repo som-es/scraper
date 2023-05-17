@@ -35,6 +35,9 @@ pub enum ScraperError {
     #[error("Could not parse proposal information from API")]
     ProposalParseError,
 
+    #[error("Could not parse plenar gegenstand paths from API")]
+    PlenarGegenstandParseError,
+    
     #[error("Could not parse legislative initiative information from API")]
     LegisInitParseError,
 }

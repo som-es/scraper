@@ -5,13 +5,15 @@
 use async_trait::async_trait;
 use reqwest::{Client, Method};
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::{error::ScraperError, request::request};
 
 pub mod delegates;
 pub mod legis_init;
+pub mod plenar;
 pub mod proposals;
+pub mod call_to_order;
 
 #[async_trait]
 pub trait Scraper {
@@ -57,14 +59,14 @@ pub trait Scraper {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GeneralScrapeInfo {
     gp: Vec<String>,
-    council_type: Option<String>,
+    council_type: Vec<String>,
 }
 
 impl Default for GeneralScrapeInfo {
     fn default() -> Self {
         Self {
             gp: vec!["XXVII".to_string()],
-            council_type: Some("NR".to_string()),
+            council_type: vec!["NR".to_string()],
         }
     }
 }

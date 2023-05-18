@@ -1,14 +1,15 @@
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::{error::ScraperError, Scraper};
+use crate::{error::ScraperError, Scraper, AustriaScraper};
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct CallToOrderInfo {
     pub description: String,
     pub ityp: String,
     pub inr: u64,
-    pub person_name: String,
-    pub person_id: u64,
+    pub receiver: String,
+    pub receiver_id: u64,
     pub links_to: Option<String>,
 }
 
@@ -23,6 +24,10 @@ pub trait CallToOrder: Scraper {
             .ok_or(ScraperError::CallTorOrderGegenstandParseError)
     }
 
+    fn extract_raw_call_to_order(raw_call_to_order: Value) -> Option<CallToOrderInfo>;
+}
+
+impl CallToOrder for AustriaScraper {
     fn extract_raw_call_to_order(raw_call_to_order: Value) -> Option<CallToOrderInfo> {
         let description = raw_call_to_order["meta"]["description"]
             .as_str()?
@@ -34,8 +39,8 @@ pub trait CallToOrder: Scraper {
         let inr = call_to_order_content["inr"].as_u64()?;
 
         let name = call_to_order_content["names"].as_array()?.get(0)?;
-        let person_name = name["name"].as_str()?.to_string();
-        let person_id = name["url"].as_str()?.to_string();
+        let receiver = name["name"].as_str()?.to_string();
+        let receiver_id = name["url"].as_str()?.split('/').nth(2)?.to_string();
 
         let links_to =
             if let Some(reference) = call_to_order_content["reference"].as_array()?.get(0) {
@@ -52,8 +57,8 @@ pub trait CallToOrder: Scraper {
             description,
             ityp,
             inr,
-            person_name,
-            person_id: person_id.parse::<u64>().unwrap(),
+            receiver,
+            receiver_id: receiver_id.parse::<u64>().unwrap(),
             links_to,
         })
     }
@@ -61,6 +66,22 @@ pub trait CallToOrder: Scraper {
 
 #[cfg(test)]
 mod tests {
+    use crate::{AustriaScraper, call_to_order::CallToOrder};
+
     #[tokio::test]
-    async fn test_call_to_order() {}
+    async fn test_call_to_order() {
+    
+        let scraper = AustriaScraper::default();
+        let call_to_order = scraper
+            .get_call_to_order("/gegenstand/XXVII/GO/1238")
+            .await
+            .unwrap();
+        assert_eq!(call_to_order.description, "Präsident Ing. Hofer - Abg. Mag. Gerstl (1238/GO)");
+        assert_eq!(call_to_order.ityp, "GO");
+        assert_eq!(call_to_order.inr, 1238);
+        assert_eq!(call_to_order.receiver, "Mag. Wolfgang Gerstl");
+        assert_eq!(call_to_order.receiver_id, 67199);
+        assert_eq!(call_to_order.links_to, Some("NRSITZ/211".into()));
+        println!("call_to_order: {call_to_order:?}")
+    }
 }

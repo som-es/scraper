@@ -9,11 +9,11 @@ use serde_json::Value;
 
 use crate::{error::ScraperError, request::request};
 
+pub mod call_to_order;
 pub mod delegates;
 pub mod legis_init;
 pub mod plenar;
 pub mod proposals;
-pub mod call_to_order;
 
 #[async_trait]
 pub trait Scraper {

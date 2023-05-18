@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use common_scrapes::{LegislativeInitiative, Speech, Vote};
+use lazy_static::__Deref;
 use regex::Regex;
+use scraper::Html;
 use serde_json::{json, Value};
 
 use crate::{
@@ -84,19 +86,20 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let accepted = legis_content["vote"]["infavor"].as_bool()?;
 
-        // let shortinfo = &legis_content["shortinfo"];
-
-        // let teil1 = remove_html_tags(shortinfo["teil1"].as_str()?);
-
-        // let json = serde_json::to_string_pretty(&raw_legis).unwrap();
-        // println!("{json}");
+        let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
+            let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
+            let teil2 = extract_text_from_html(shortinfo["teil2"].as_str()?);
+            Some(format!("{teil1} {teil2}"))
+        } else {
+            None
+        };
 
         let id = format!("{ityp}/{inr}");
 
         Some(LegislativeInitiative {
             title,
             description,
-            emphasis: vec![], // todo: extract emphasis from html
+            emphasis,
             // council: todo!(),
             gp,
             ityp,
@@ -203,12 +206,30 @@ fn remove_html_tags(html: &str) -> String {
     HTML_REGEX.replace_all(html, "").to_string()
 }
 
+fn extract_text_from_html(html: &str) -> String {
+    let fragment = Html::parse_fragment(html);
+
+    fragment
+        .tree
+        .nodes()
+        .flat_map(|node| node.value().as_text().map(|text| text.deref()))
+        .collect::<String>()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        legis_init::{LegislativeInitiatives, Vote},
+        legis_init::{LegislativeInitiatives, Vote, extract_text_from_html},
         AustriaScraper,
     };
+
+    #[test]
+    fn test_text_extract() {    
+        let html = r#"<h4>Schwerpunkte der Regierungsvorlage</h4>\n\n<ul class=\"unordered-list\">\n\t<li>&Auml;nderung des &sect; 46 KFG und Schaffung exakterer Vorgaben f&uuml;r die Bewilligung von &Uuml;berstellungsfahrten</li>\n\t<li>Entsprechende &Auml;nderung des &sect; 40 und des &sect; 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister &uuml;bernehmen k&ouml;nnen. Zus&auml;tzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgef&uuml;hrt werden</li>\n</ul>\n"#;
+    
+        let text = extract_text_from_html(html);
+        assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
+    }
 
     use super::extract_person_id_from_a_tag;
 
@@ -268,7 +289,7 @@ mod tests {
         );
 
         assert_eq!(init.gp, "XXVII");
-        assert_eq!(init.emphasis, Vec::<String>::new());
+        assert_eq!(init.emphasis, Some("Schwerpunkte der Regierungsvorlage\n\n\n\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\n\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\n\n \n\tNeuregelung der Ausbildung und Prüfung des in den Fahrschulen eingesetzten Lehrpersonals, wobei ein stärkerer Praxisbezug hergestellt wird und auch eine verpflichtende Aus- und Weiterbildung vorgeschrieben wird\n\tSchaffung einer entsprechenden Bestimmung in § 123 Abs. 2a KFG, wodurch besonders geschulten Organen der Asfinag diese Befugnis eingeräumt wird\n\tIn § 125 KFG wird der Kreis der potentiellen § 125 –Sachverständigen erweitert und auf Personen mit Meisterprüfung im Kraftfahrzeugtechnikerhandwerk, die eine Reifeprüfung oder Berufsreifeprüfung erfolgreich bestanden haben, ausgedehnt\n\tIn § 134 Abs. 3c wird die Höhe des Organmandates für Verstöße gegen das sog. Handyverbot von 50 Euro auf 100 Euro angehoben und in § 134 Abs. 3d wird die Höhe des Organmandates für Verstöße gegen die Gurt- oder die Sturzhelmpflicht von 35 Euro auf 50 Euro angehoben\n\n".to_string()));
         assert_eq!(
             init.votes,
             vec![

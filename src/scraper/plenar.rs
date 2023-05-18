@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::{error::ScraperError, AustriaScraper, GegenstandPaths, Scraper};
 
@@ -38,7 +38,8 @@ pub trait Plenar: Scraper {
 }
 
 impl Plenar for AustriaScraper {
-    const FILTER_PATH: &'static str = "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_007&listeId=undefined&showAll=true";
+    const FILTER_PATH: &'static str =
+        "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_007&listeId=undefined&showAll=true";
 
     fn plenar_payload(&self) -> Self::Payload {
         json!({"MODUS": ["PLENAR"], "GP": self.scrape_info.gp, "NRBRBV": self.scrape_info.council_type})
@@ -74,12 +75,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_gegenstand_paths_plenar() {
         let scraper = AustriaScraper::default();
-        let plenar_infos = scraper
-            .post_plenar_payload()
-            .await
-            .unwrap();
+        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
 
-        let paths = scraper.plenar_paths(plenar_infos).expect("Failed to get paths");
+        let paths = scraper
+            .plenar_paths(plenar_infos)
+            .expect("Failed to get paths");
         println!("paths: {paths:?}");
     }
 
@@ -87,12 +87,11 @@ mod tests {
     async fn test_look_all_plenar_gegenstand_paths() {
         let scraper = AustriaScraper::default();
 
-        let plenar_infos = scraper
-            .post_plenar_payload()
-            .await
-            .unwrap();
+        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
 
-        let paths = scraper.plenar_paths(plenar_infos).expect("Failed to get paths");
+        let paths = scraper
+            .plenar_paths(plenar_infos)
+            .expect("Failed to get paths");
         for path in paths {
             scraper.get_gegenstand_info(&path).await.unwrap();
         }

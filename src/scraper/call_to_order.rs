@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::{error::ScraperError, Scraper, AustriaScraper};
+use crate::{error::ScraperError, AustriaScraper, Scraper};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct CallToOrderInfo {
@@ -66,17 +66,19 @@ impl CallToOrder for AustriaScraper {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AustriaScraper, call_to_order::CallToOrder};
+    use crate::{call_to_order::CallToOrder, AustriaScraper};
 
     #[tokio::test]
     async fn test_call_to_order() {
-    
         let scraper = AustriaScraper::default();
         let call_to_order = scraper
             .get_call_to_order("/gegenstand/XXVII/GO/1238")
             .await
             .unwrap();
-        assert_eq!(call_to_order.description, "Präsident Ing. Hofer - Abg. Mag. Gerstl (1238/GO)");
+        assert_eq!(
+            call_to_order.description,
+            "Präsident Ing. Hofer - Abg. Mag. Gerstl (1238/GO)"
+        );
         assert_eq!(call_to_order.ityp, "GO");
         assert_eq!(call_to_order.inr, 1238);
         assert_eq!(call_to_order.receiver, "Mag. Wolfgang Gerstl");

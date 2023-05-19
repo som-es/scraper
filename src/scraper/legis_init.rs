@@ -130,6 +130,8 @@ fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
             };
 
             for rede in reden["data"]["rows"].as_array()? {
+                let spoken_text_html_urls = extract_spoken_text_html_urls(rede);
+
                 let a_tag_delegate_url = rede[0].as_str()?;
                 let Some(delegate_id) = extract_person_id_from_a_tag(a_tag_delegate_url) else {
                     continue;
@@ -146,8 +148,6 @@ fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
                 } else {
                     continue;
                 }
-
-                let spoken_text_html_urls = extract_spoken_text_html_urls(rede);
 
                 speeches.push(Speech {
                     delegate_id,

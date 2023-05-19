@@ -98,6 +98,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<PlenarSpeech> {
                         delegate_id,
                         ty,
                         duration_in_seconds,
+                        // TODO: get spoken text html urls, use content[0]
                         spoken_text_html_urls: vec![],
                     })
                 })

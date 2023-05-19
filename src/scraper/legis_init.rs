@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 use common_scrapes::{LegislativeInitiative, Speech, Vote};
-use lazy_static::__Deref;
 use regex::Regex;
-use scraper::Html;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, person_url_to_id, AustriaScraper, GegenstandPaths, Scraper,
+    documents, error::ScraperError, person_url_to_id, AustriaScraper, GegenstandPaths, Scraper, extract_text_from_html,
 };
 
 #[async_trait]
@@ -169,7 +167,7 @@ fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
                 .as_array()
                 .unwrap_or(&vec![])
                 .iter()
-                .map(|info| info["url"].to_string())
+                .flat_map(|info| Some(info["url"].as_str()?.to_string()))
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default()
@@ -206,21 +204,11 @@ fn remove_html_tags(html: &str) -> String {
     HTML_REGEX.replace_all(html, "").to_string()
 }
 
-fn extract_text_from_html(html: &str) -> String {
-    let fragment = Html::parse_fragment(html);
-
-    fragment
-        .tree
-        .nodes()
-        .flat_map(|node| node.value().as_text().map(|text| text.deref()))
-        .collect::<String>()
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
-        legis_init::{extract_text_from_html, LegislativeInitiatives, Vote},
-        AustriaScraper,
+        legis_init::{LegislativeInitiatives, Vote},
+        AustriaScraper, extract_text_from_html,
     };
 
     #[test]

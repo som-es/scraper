@@ -44,7 +44,7 @@ impl LegislativeInitiatives for AustriaScraper {
         "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=10103&showAll";
 
     fn legis_payload(&self) -> Self::Payload {
-        json!({"GP": self.scrape_info.gp})
+        json!({"GP": self.scrape_info.gp, "NRBR": self.scrape_info.council_type})
     }
 
     fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative> {

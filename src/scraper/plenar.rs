@@ -6,7 +6,7 @@ use crate::{error::ScraperError, AustriaScraper, GegenstandPaths, Scraper};
 
 pub struct Debate {
     about: String,
-    speeches: Vec<PlenarSpeech>
+    speeches: Vec<PlenarSpeech>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

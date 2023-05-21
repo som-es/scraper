@@ -4,7 +4,8 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, person_url_to_id, AustriaScraper, GegenstandPaths, Scraper, extract_text_from_html,
+    documents, error::ScraperError, extract_text_from_html, person_url_to_id, AustriaScraper,
+    GegenstandPaths, Scraper,
 };
 
 #[async_trait]
@@ -207,8 +208,9 @@ fn remove_html_tags(html: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::{
+        extract_text_from_html,
         legis_init::{LegislativeInitiatives, Vote},
-        AustriaScraper, extract_text_from_html,
+        AustriaScraper,
     };
 
     #[test]

@@ -1,5 +1,5 @@
+use ::scraper::{ElementRef, Html, Selector};
 use lazy_static::__Deref;
-use ::scraper::{Html, Selector, ElementRef};
 use serde_derive::{Deserialize, Serialize};
 
 mod config;
@@ -7,7 +7,10 @@ mod document;
 mod error;
 mod request;
 mod scraper;
+mod text_extractor;
 mod url;
+
+pub use text_extractor::*;
 
 pub use document::*;
 
@@ -40,7 +43,13 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
 
     document
         .select(&selector)
-        .flat_map(|node| Some(ElementRef::wrap(node.parent()?.parent()?)?.text().collect::<String>()))
+        .flat_map(|node| {
+            Some(
+                ElementRef::wrap(node.parent()?.parent()?)?
+                    .text()
+                    .collect::<String>(),
+            )
+        })
         .collect::<String>()
 }
 
@@ -50,7 +59,8 @@ mod tests {
 
     #[test]
     fn test_extract_text_from_html_via_name_attribute() {
-        let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/43/fnameorig_845422.html#RU_221617";
+        let url =
+            "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/43/fnameorig_845422.html#RU_221617";
         let html = reqwest::blocking::get(url).unwrap();
         let html = html.text().unwrap();
 

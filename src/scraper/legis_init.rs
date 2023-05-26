@@ -141,14 +141,12 @@ fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
                 let Some(opinion) = rede[1].as_str() else {
                     continue;
                 };
-                let infavor;
-                if opinion == "Pro" {
-                    infavor = true;
-                } else if opinion == "Contra" {
-                    infavor = false;
-                } else {
-                    continue;
-                }
+
+                let infavor = match opinion {
+                    "Pro" => Some(true),
+                    "Contra" => Some(false),
+                    _ => None
+                };
 
                 speeches.push(Speech {
                     delegate_id,
@@ -317,15 +315,18 @@ mod tests {
         assert_eq!(init.ityp, "I".to_string());
 
         assert_eq!(init.speeches[0].delegate_id, 52687);
-        assert_eq!(init.speeches[0].infavor, false);
+        assert_eq!(init.speeches[0].infavor.unwrap(), false);
 
         assert_eq!(init.speeches[1].delegate_id, 5680);
-        assert_eq!(init.speeches[1].infavor, true);
+        assert_eq!(init.speeches[1].infavor.unwrap(), true);
 
         assert_eq!(init.speeches[2].delegate_id, 51557);
-        assert_eq!(init.speeches[2].infavor, false);
+        assert_eq!(init.speeches[2].infavor.unwrap(), false);
 
         assert_eq!(init.speeches[3].delegate_id, 83150);
-        assert_eq!(init.speeches[3].infavor, true);
+        assert_eq!(init.speeches[3].infavor.unwrap(), true);
+
+        assert_eq!(init.speeches[4].delegate_id, 5653);
+        assert_eq!(init.speeches[4].infavor, None);
     }
 }

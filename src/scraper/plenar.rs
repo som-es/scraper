@@ -70,7 +70,8 @@ impl Plenar for AustriaScraper {
         let ityp = plenar_content_0["ityp"].as_str().unwrap().to_string();
         let inr = plenar_content_0["inr"].as_u64().unwrap();
 
-        let past_debates = raw_plenar["content"][1].as_array()?;
+        // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
+        let past_debates = raw_plenar["content"][1].as_array().expect("no content at 1");
         let speeches = extract_speeches(past_debates);
 
         Some(PlenarInfo {
@@ -135,6 +136,8 @@ mod tests {
             .plenar_paths(plenar_infos)
             .expect("Failed to get paths");
         for path in paths {
+            println!("path: {path}");
+            // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
             let plenar_info = scraper.get_plenar(&path).await.unwrap();
             println!("plenar_info: {plenar_info:?}");
         }

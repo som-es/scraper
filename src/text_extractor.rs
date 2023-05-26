@@ -80,7 +80,7 @@ impl TextExtractor {
         return extract_text_from_html(&html)
     }
 
-    pub async fn extract_text_from_speech(&mut self, speech: &impl HasHTMLUrl) -> String {
+    pub async fn extract_text_from_url(&mut self, speech: &impl HasHTMLUrl) -> String {
         let url = format!("{}{}", self.base_url, speech.html_url());
 
         let key = if url.contains("#") {
@@ -126,7 +126,7 @@ mod tests {
 
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         for speech in init.speeches {
-            let text = extractor.extract_text_from_speech(&speech).await;
+            let text = extractor.extract_text_from_url(&speech).await;
             println!("{}", text);
         }
     }
@@ -145,7 +145,7 @@ mod tests {
         let mut prev_html = None;
         let mut once = false;
         for speech in init.speeches {
-            let text = extractor.extract_text_from_speech(&speech).await;
+            let text = extractor.extract_text_from_url(&speech).await;
             let url = format!("{}{}", extractor.base_url, speech.html_url());
 
             if url.contains("/43/fnameorig_845422.html#RU_221643") {
@@ -174,7 +174,7 @@ mod tests {
             .unwrap();
 
         for speech in init.speeches {
-            let text = extractor.extract_text_from_speech(&speech).await;
+            let text = extractor.extract_text_from_url(&speech).await;
             let url = format!("{}{}", extractor.base_url, speech.html_url());
 
             if url == "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/205/A_-_14_40_19_00292508.html" {

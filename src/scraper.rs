@@ -58,8 +58,8 @@ pub trait Scraper {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GeneralScrapeInfo {
-    gp: Vec<String>,
-    council_type: Vec<String>,
+    pub gp: Vec<String>,
+    pub council_type: Vec<String>,
 }
 
 impl Default for GeneralScrapeInfo {
@@ -102,7 +102,7 @@ impl DatePayload {
 
 pub type GegenstandPaths = Vec<String>;
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct AustriaScraper {
     client: Client,
     pub scrape_info: GeneralScrapeInfo,

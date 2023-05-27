@@ -71,7 +71,9 @@ impl Plenar for AustriaScraper {
         let inr = plenar_content_0["inr"].as_u64().unwrap();
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
-        let past_debates = raw_plenar["content"][1].as_array().expect("no content at 1");
+        let past_debates = raw_plenar["content"][1]
+            .as_array()
+            .expect("no content at 1");
         let speeches = extract_speeches(past_debates);
 
         Some(PlenarInfo {

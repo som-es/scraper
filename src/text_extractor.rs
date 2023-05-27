@@ -77,7 +77,7 @@ impl TextExtractor {
                 &url.split('#').nth(1).unwrap(),
             );
         }
-        return extract_text_from_html(&html)
+        return extract_text_from_html(&html);
     }
 
     pub async fn extract_text_from_url(&mut self, speech: &impl HasHTMLUrl) -> String {
@@ -92,7 +92,7 @@ impl TextExtractor {
         match &self.state {
             State::NoCache => {
                 return self.get_html(&url, key).await;
-            },
+            }
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
                     return extract_text_from_html_via_name_attribute(
@@ -106,13 +106,14 @@ impl TextExtractor {
                 }
             }
         }
-
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{legis_init::LegislativeInitiatives, AustriaScraper, Scraper, TextExtractor, HasHTMLUrl};
+    use crate::{
+        legis_init::LegislativeInitiatives, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
+    };
 
     #[tokio::test]
     async fn test_text_extractor() {
@@ -181,18 +182,25 @@ mod tests {
                 assert!(text.contains("Wenn man sonst nichts hat, doktert man ein bisschen"))
             }
 
-            if url == "https://www.parlament.gv.at/dokument/BR/BRSITZ/952/A_-_12_09_27_00293857.html" {
-                assert!(text.contains("ch bin Polizist und fange bei der Asfinag an, dort bin ich dann"))
+            if url
+                == "https://www.parlament.gv.at/dokument/BR/BRSITZ/952/A_-_12_09_27_00293857.html"
+            {
+                assert!(text
+                    .contains("ch bin Polizist und fange bei der Asfinag an, dort bin ich dann"))
             }
 
-            if url == "https://www.parlament.gv.at/dokument/BR/BRSITZ/952/A_-_12_27_36_00293862.html" {
+            if url
+                == "https://www.parlament.gv.at/dokument/BR/BRSITZ/952/A_-_12_27_36_00293862.html"
+            {
                 assert!(text.contains("hat und sich hinterher gedacht hat: Das"))
             }
 
-            if url == "https://www.parlament.gv.at/dokument/BR/BRSITZ/952/A_-_12_20_14_00293852.html" {
+            if url
+                == "https://www.parlament.gv.at/dokument/BR/BRSITZ/952/A_-_12_20_14_00293852.html"
+            {
                 assert!(text.contains("b das die Letzte Generation ist oder das Letzte, und stellt"))
             }
-            
+
             assert_eq!(extractor.cached_html, None);
         }
     }

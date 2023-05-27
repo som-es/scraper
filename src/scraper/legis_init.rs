@@ -63,11 +63,14 @@ impl LegislativeInitiatives for AustriaScraper {
             .as_str()?
             .to_string();
 
-        let preconst = &legis_content["preconst"].as_array()?[0];
-
         let gp = legis_content["gp_code"].as_str()?.to_string();
 
-        let raw_documents = preconst["documents"].as_array()?;
+        let raw_documents = if let Some(preconst) = legis_content.get("preconst") {
+            let preconst = &preconst.as_array()?[0];
+            preconst["documents"].as_array()?
+        } else {
+            legis_content["documents"].as_array()?
+        };
         let documents = documents(raw_documents)?;
 
         let names = legis_content["names"]
@@ -145,7 +148,7 @@ fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
                 let infavor = match opinion {
                     "Pro" => Some(true),
                     "Contra" => Some(false),
-                    _ => None
+                    _ => None,
                 };
 
                 speeches.push(Speech {
@@ -328,5 +331,58 @@ mod tests {
 
         assert_eq!(init.speeches[4].delegate_id, 5653);
         assert_eq!(init.speeches[4].infavor, None);
+    }
+
+    #[tokio::test]
+    async fn test_get_legis_init_a_3021_path() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3021")
+            .await
+            .unwrap();
+
+
+        assert_eq!(init.id, "A/3021");
+        assert_eq!(init.ityp, "A");
+        assert_eq!(
+            init.title,
+            "Arbeitsvertragsrechts-Anpassungsgesetz, Änderung (3021/A) | Parlament Österreich"
+        );
+
+        assert_eq!(
+            init.description,
+            "Arbeitsvertragsrechts-Anpassungsgesetz, Änderung (3021/A)"
+        );
+        assert_eq!(
+            init.votes,
+            [
+                Vote {
+                    party: "ÖVP".to_string(),
+                    fraction: 71,
+                    infavor: true
+                },
+                Vote {
+                    party: "SPÖ".to_string(),
+                    fraction: 40,
+                    infavor: true
+                },
+                Vote {
+                    party: "FPÖ".to_string(),
+                    fraction: 30,
+                    infavor: true
+                },
+                Vote {
+                    party: "GRÜNE".to_string(),
+                    fraction: 26,
+                    infavor: true
+                },
+                Vote {
+                    party: "NEOS".to_string(),
+                    fraction: 15,
+                    infavor: false
+                }
+            ]
+        )
     }
 }

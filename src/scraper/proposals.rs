@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use chrono::NaiveDate;
 use common_scrapes::Document;
+use serde_derive::{Serialize, Deserialize};
 use serde_json::{json, Value};
 
 use crate::{documents, error::ScraperError, person_url_to_id, DatePayload, GeneralScrapeInfo};
@@ -28,7 +29,7 @@ impl ProposalsPayload {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProposalType {
     /// String in points to the answered proposals
     AB(Vec<String>),
@@ -84,7 +85,7 @@ pub trait ProposalScraper: Scraper {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Proposal {
     pub id: String,
     pub ityp: String,

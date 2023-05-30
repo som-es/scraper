@@ -97,6 +97,8 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<PlenarSpeech> {
                     let (minutes, seconds) = speech[7].as_str()?.split_at(2);
                     let duration_in_seconds =
                         minutes.parse::<u32>().unwrap() + seconds.parse::<u32>().unwrap();
+                    
+
                     Some(PlenarSpeech {
                         delegate_id,
                         ty,

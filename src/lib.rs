@@ -1,12 +1,12 @@
 use ::scraper::{ElementRef, Html, Selector};
 use lazy_static::__Deref;
-use serde_derive::{Deserialize, Serialize};
 
 mod config;
 mod document;
 mod error;
 mod request;
 mod scraper;
+mod speeches;
 mod text_extractor;
 mod url;
 

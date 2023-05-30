@@ -4,8 +4,11 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_text_from_html, person_url_to_id, AustriaScraper,
-    GegenstandPaths, Scraper,
+    documents,
+    error::ScraperError,
+    extract_text_from_html, person_url_to_id,
+    speeches::{extract_speech, extract_speeches_from_reden, extract_speeches},
+    AustriaScraper, GegenstandPaths, Scraper,
 };
 
 #[async_trait]
@@ -121,66 +124,6 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 }
 
-fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
-    let mut speeches = vec![];
-    for phase in legis_content.get("phase")?.as_array()? {
-        let Some(stages) = phase.get("stages") else {
-            continue;
-        };
-
-        for stage in stages.as_array()? {
-            let Some(reden) = stage.get("reden") else {
-                continue;
-            };
-
-            for rede in reden["data"]["rows"].as_array()? {
-                let spoken_text_html_urls = extract_spoken_text_html_urls(rede);
-
-                let a_tag_delegate_url = rede[0].as_str()?;
-                let Some(delegate_id) = extract_person_id_from_a_tag(a_tag_delegate_url) else {
-                    continue;
-                };
-
-                let Some(opinion) = rede[1].as_str() else {
-                    continue;
-                };
-
-                let infavor = match opinion {
-                    "Pro" => Some(true),
-                    "Contra" => Some(false),
-                    _ => None,
-                };
-
-                speeches.push(Speech {
-                    delegate_id,
-                    infavor,
-                    spoken_text_html_urls,
-                });
-            }
-        }
-    }
-    Some(speeches)
-}
-
-fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
-    rede.get(2)
-        .map(|spoken_text_infos| {
-            spoken_text_infos
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .flat_map(|info| Some(info["url"].as_str()?.to_string()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
-}
-
-fn extract_person_id_from_a_tag(a_tag_delegate_url: &str) -> Option<u64> {
-    a_tag_delegate_url
-        .split('/')
-        .nth(2)
-        .and_then(|id| id.split('"').next()?.parse::<u64>().ok())
-}
 
 fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
     Some(
@@ -220,16 +163,6 @@ mod tests {
 
         let text = extract_text_from_html(html);
         assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
-    }
-
-    use super::extract_person_id_from_a_tag;
-
-    #[test]
-    fn test_extract_id_from_url() {
-        let id = extract_person_id_from_a_tag(
-            r#"<a href="/person/52687" target="_blank">Alois Stöger, diplômé (S)</a>"#,
-        );
-        assert_eq!(id, Some(52687))
     }
 
     #[tokio::test]
@@ -341,7 +274,6 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/3021")
             .await
             .unwrap();
-
 
         assert_eq!(init.id, "A/3021");
         assert_eq!(init.ityp, "A");

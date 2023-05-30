@@ -30,7 +30,16 @@ pub fn extract_speeches_from_reden(rows_reden: &Value, speeches: &mut Vec<Speech
     }
     Some(())
 }
-pub fn extract_speeches_from_stages(stages: &Value) {}
+pub fn extract_speeches_from_stages(stages: &Value, speeches: &mut Vec<Speech>) -> Option<()> {
+    for stage in stages.as_array()? {
+        let Some(reden) = stage.get("reden") else {
+            continue;
+        };
+
+        extract_speeches_from_reden(reden, speeches)?;
+    }
+    Some(())
+}
 
 pub fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
     let mut speeches = vec![];
@@ -38,14 +47,7 @@ pub fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
         let Some(stages) = phase.get("stages") else {
             continue;
         };
-
-        for stage in stages.as_array()? {
-            let Some(reden) = stage.get("reden") else {
-                continue;
-            };
-
-            extract_speeches_from_reden(reden, &mut speeches)?;
-        }
+        extract_speeches_from_stages(stages, &mut speeches);
     }
     Some(speeches)
 }

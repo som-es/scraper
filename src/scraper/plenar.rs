@@ -2,8 +2,9 @@ use async_trait::async_trait;
 use common_scrapes::PlenarSpeech;
 use serde_json::{json, Value};
 
-use crate::{error::ScraperError, AustriaScraper, GegenstandPaths, Scraper};
+use crate::{error::ScraperError, AustriaScraper, GegenstandPaths, Scraper, speeches::extract_speeches_from_stages};
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Debate {
     about: String,
     speeches: Vec<PlenarSpeech>,
@@ -14,6 +15,7 @@ pub struct PlenarInfo {
     description: String,
     ityp: String,
     inr: u64,
+    debates: Vec<Debate>
 }
 
 #[async_trait]
@@ -65,40 +67,62 @@ impl Plenar for AustriaScraper {
             .to_string();
 
         // TODO: there is even more content! look in insomnia
-        let plenar_content_0 = &raw_plenar["content"][0];
+        let plenar_content_0 = &raw_plenar["content"].as_array()?[0];
 
         let ityp = plenar_content_0["ityp"].as_str().unwrap().to_string();
         let inr = plenar_content_0["inr"].as_u64().unwrap();
 
+        let mut document_link_speeches = vec![];
+        if let Some(stages) = plenar_content_0.get("stages") {
+            extract_speeches_from_stages(stages, &mut document_link_speeches);
+        }
+
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
-        let past_debates = raw_plenar["content"][1]
-            .as_array()
-            .expect("no content at 1");
-        let speeches = extract_speeches(past_debates);
+        let past_debates = raw_plenar["content"].as_array()?.get(1)
+            .expect("no content at 1")["past_debates"].as_array().unwrap();
+
+        let debate_with_speeches = extract_speeches(past_debates);
+
+        let mut end_idx = 0;
+        let mut debates = vec![];
+        for (debate_title, mut speeches) in debate_with_speeches {
+            let speeches_len = speeches.len();
+            for (speech, doc_link_speech) in speeches.iter_mut().zip(document_link_speeches[end_idx..end_idx+speeches_len].iter()) {
+                speech.spoken_text_html_urls = doc_link_speech.spoken_text_html_urls.clone()
+            }
+            end_idx += speeches.len();
+            debates.push(Debate {
+                about: debate_title,
+                speeches
+            })
+        }
 
         Some(PlenarInfo {
             description,
             ityp,
             inr,
+            debates
         })
     }
 }
 
-pub fn extract_speeches(past_debates: &[Value]) -> Vec<PlenarSpeech> {
+pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech>)> {
+    let mut debates = vec![];
+
     past_debates
         .into_iter()
-        .flat_map(|past_debate| past_debate["speeches"].as_array())
-        .map(|speeches| {
-            speeches
+        .flat_map(|past_debate| Some((past_debate["text"].as_str()?, past_debate["speeches"].as_array()?)))
+        .flat_map(|(text, speeches)| {
+            debates.push(text.to_string());
+            Some((text.to_string(), speeches
                 .iter()
                 .flat_map(|speech| {
                     let delegate_id = speech[3].as_u64()?;
                     let ty = speech[5].as_str()?.to_string();
-                    let (minutes, seconds) = speech[7].as_str()?.split_at(2);
+                    let duration = speech[7].as_str()?.split(':').collect::<Vec<&str>>();
                     let duration_in_seconds =
-                        minutes.parse::<u32>().unwrap() + seconds.parse::<u32>().unwrap();
-                    
-
+                        duration[0].parse::<u32>().ok()? * 60 + duration[1].parse::<u32>().ok()?;
+                
                     Some(PlenarSpeech {
                         delegate_id,
                         ty,
@@ -107,15 +131,14 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<PlenarSpeech> {
                         spoken_text_html_urls: vec![],
                     })
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>()))
         })
-        .flatten()
         .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{AustriaScraper, Scraper};
+    use crate::AustriaScraper;
 
     use super::Plenar;
 
@@ -145,5 +168,21 @@ mod tests {
             let plenar_info = scraper.get_plenar(&path).await.unwrap();
             println!("plenar_info: {plenar_info:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxvii_nrsitz_211() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/211")
+            .await
+            .unwrap();
+
+        assert_eq!(plenar.debates[1].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
+        assert_eq!(plenar.debates[1].speeches[0].spoken_text_html_urls[0], "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html");
+        assert_eq!(plenar.debates[1].speeches[0].duration_in_seconds, 831);
+        assert_eq!(plenar.debates[2].speeches[plenar.debates[2].speeches.len()-4].duration_in_seconds, 300);
+        assert_eq!(plenar.debates[2].speeches[plenar.debates[2].speeches.len()-4].spoken_text_html_urls[0], "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html");
     }
 }

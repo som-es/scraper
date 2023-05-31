@@ -67,7 +67,7 @@ impl Plenar for AustriaScraper {
             .to_string();
 
         // TODO: there is even more content! look in insomnia
-        let plenar_content_0 = &raw_plenar["content"].as_array()?[0];
+        let plenar_content_0 = &raw_plenar["content"].as_array().unwrap()[0];
 
         let ityp = plenar_content_0["ityp"].as_str().unwrap().to_string();
         let inr = plenar_content_0["inr"].as_u64().unwrap();
@@ -77,16 +77,21 @@ impl Plenar for AustriaScraper {
             extract_speeches_from_stages(stages, &mut document_link_speeches);
         }
 
+        let past_debates = if let Some(content_1) = raw_plenar["content"].as_array().unwrap().get(1) {
+            content_1["past_debates"].as_array().map(|debates| debates.as_slice()).unwrap_or_default()
+        } else {
+            &[]
+        };
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
-        let past_debates = raw_plenar["content"].as_array()?.get(1)
-            .expect("no content at 1")["past_debates"].as_array().unwrap();
 
         let debate_with_speeches = extract_speeches(past_debates);
 
         let mut end_idx = 0;
         let mut debates = vec![];
+        println!("doc link spe: {}", document_link_speeches.len());
         for (debate_title, mut speeches) in debate_with_speeches {
             let speeches_len = speeches.len();
+            println!("speeches_len: {speeches_len}");
             for (speech, doc_link_speech) in speeches.iter_mut().zip(document_link_speeches[end_idx..end_idx+speeches_len].iter()) {
                 speech.spoken_text_html_urls = doc_link_speech.spoken_text_html_urls.clone()
             }
@@ -184,5 +189,15 @@ mod tests {
         assert_eq!(plenar.debates[1].speeches[0].duration_in_seconds, 831);
         assert_eq!(plenar.debates[2].speeches[plenar.debates[2].speeches.len()-4].duration_in_seconds, 300);
         assert_eq!(plenar.debates[2].speeches[plenar.debates[2].speeches.len()-4].spoken_text_html_urls[0], "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html");
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxvii_nrsitz_117() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/117")
+            .await
+            .unwrap();
     }
 }

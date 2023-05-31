@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common_scrapes::PlenarSpeech;
+use common_scrapes::{PlenarSpeech, Opinion};
 use serde_json::{json, Value};
 
 use crate::{error::ScraperError, AustriaScraper, GegenstandPaths, Scraper, speeches::extract_speeches_from_stages};
@@ -88,14 +88,15 @@ impl Plenar for AustriaScraper {
 
         let mut end_idx = 0;
         let mut debates = vec![];
-        println!("doc link spe: {}", document_link_speeches.len());
+        // println!("doc link spe: {}", document_link_speeches.len());
         for (debate_title, mut speeches) in debate_with_speeches {
             let speeches_len = speeches.len();
-            println!("speeches_len: {speeches_len}");
-            for (speech, doc_link_speech) in speeches.iter_mut().zip(document_link_speeches[end_idx..end_idx+speeches_len].iter()) {
-                speech.spoken_text_html_urls = doc_link_speech.spoken_text_html_urls.clone()
+            for (speech, doc_link_speech) in speeches.iter_mut().zip(document_link_speeches[end_idx..end_idx+speeches_len].iter().cloned()) {
+                speech.spoken_text_html_urls = doc_link_speech.spoken_text_html_urls;
+                speech.opinion = doc_link_speech.opinion
             }
             end_idx += speeches.len();
+            
             debates.push(Debate {
                 about: debate_title,
                 speeches
@@ -134,6 +135,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
                         duration_in_seconds,
                         // TODO: get spoken text html urls, use content[0]
                         spoken_text_html_urls: vec![],
+                        opinion: Opinion::None
                     })
                 })
                 .collect::<Vec<_>>()))
@@ -143,6 +145,8 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
 
 #[cfg(test)]
 mod tests {
+    use common_scrapes::Opinion;
+
     use crate::AustriaScraper;
 
     use super::Plenar;
@@ -199,5 +203,30 @@ mod tests {
             .get_plenar("/gegenstand/XXVII/NRSITZ/117")
             .await
             .unwrap();
+
+        // assert_eq!(plenar.debates[1].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
+        let first_speech = &plenar.debates[1].speeches[0];
+        assert_eq!(first_speech.delegate_id, 5642);
+        assert_eq!(first_speech.opinion, Opinion::Against);
+        
+        let opinion_none_speech = &plenar.debates[1].speeches[2];
+        assert_eq!(opinion_none_speech.delegate_id, 83127);
+        assert_eq!(opinion_none_speech.opinion, Opinion::None);
+        assert_eq!(opinion_none_speech.duration_in_seconds, 5*60 + 12);
+
+        let next_debate_speech = &plenar.debates[2].speeches[1];
+        assert_eq!(next_debate_speech.delegate_id, 2006);
+        assert_eq!(next_debate_speech.opinion, Opinion::Infavor);
+        assert_eq!(next_debate_speech.duration_in_seconds, 5*60 + 32);
+
+        let last_speech_of_next_debate = plenar.debates[2].speeches.last().unwrap();
+        assert_eq!(last_speech_of_next_debate.delegate_id, 83299);
+        assert_eq!(last_speech_of_next_debate.opinion, Opinion::Infavor);
+        assert_eq!(last_speech_of_next_debate.duration_in_seconds, 2*60 + 20);
+
+        let next_debate_speech = &plenar.debates[3].speeches[0];
+        assert_eq!(next_debate_speech.delegate_id, 8178);
+        assert_eq!(next_debate_speech.opinion, Opinion::Against);
+        assert_eq!(next_debate_speech.duration_in_seconds, 4*60 + 28);
     }
 }

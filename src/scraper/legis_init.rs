@@ -151,6 +151,8 @@ fn remove_html_tags(html: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use common_scrapes::Opinion;
+
     use crate::{
         extract_text_from_html,
         legis_init::{LegislativeInitiatives, Vote},
@@ -251,19 +253,19 @@ mod tests {
         assert_eq!(init.ityp, "I".to_string());
 
         assert_eq!(init.speeches[0].delegate_id, 52687);
-        assert_eq!(init.speeches[0].infavor.unwrap(), false);
+        assert_eq!(init.speeches[0].opinion, Opinion::Against);
 
         assert_eq!(init.speeches[1].delegate_id, 5680);
-        assert_eq!(init.speeches[1].infavor.unwrap(), true);
+        assert_eq!(init.speeches[1].opinion, Opinion::Infavor);
 
         assert_eq!(init.speeches[2].delegate_id, 51557);
-        assert_eq!(init.speeches[2].infavor.unwrap(), false);
+        assert_eq!(init.speeches[2].opinion, Opinion::Against);
 
         assert_eq!(init.speeches[3].delegate_id, 83150);
-        assert_eq!(init.speeches[3].infavor.unwrap(), true);
+        assert_eq!(init.speeches[3].opinion, Opinion::Infavor);
 
         assert_eq!(init.speeches[4].delegate_id, 5653);
-        assert_eq!(init.speeches[4].infavor, None);
+        assert_eq!(init.speeches[4].opinion, Opinion::Other("Regierungsbank".into()));
     }
 
     #[tokio::test]

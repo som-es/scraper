@@ -1,4 +1,4 @@
-use common_scrapes::Speech;
+use common_scrapes::{Speech, Opinion};
 use serde_json::Value;
 
 fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
@@ -35,8 +35,9 @@ pub fn extract_speeches_from_stages(stages: &Value, speeches: &mut Vec<Speech>) 
         let Some(reden) = stage.get("reden") else {
             continue;
         };
-
+        // let before_speeches_len = speeches.len();
         extract_speeches_from_reden(reden, speeches)?;
+        // println!("doc_link_speech_len: {}", speeches.len() - before_speeches_len)
     }
     Some(())
 }
@@ -58,17 +59,18 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
     let a_tag_delegate_url = speech[0].as_str()?;
     let delegate_id = extract_person_id_from_a_tag(a_tag_delegate_url)?;
 
-    let opinion = speech[1].as_str()?;
+    let opinion = speech[1].as_str().unwrap_or_else(|| "None");
 
-    let infavor = match opinion {
-        "Pro" => Some(true),
-        "Contra" => Some(false),
-        _ => None,
+    let opinion = match opinion {
+        "Pro" => Opinion::Infavor,
+        "Contra" => Opinion::Against,
+        "None" => Opinion::None,
+        other => Opinion::Other(other.into())
     };
 
     Some(Speech {
         delegate_id,
-        infavor,
+        opinion,
         spoken_text_html_urls,
     })
 }

@@ -7,7 +7,7 @@ use crate::{
     documents,
     error::ScraperError,
     extract_text_from_html, person_url_to_id,
-    speeches::{extract_speech, extract_speeches_from_reden, extract_speeches},
+    speeches::{extract_speech, extract_speeches, extract_speeches_from_reden},
     AustriaScraper, GegenstandPaths, Scraper,
 };
 
@@ -123,7 +123,6 @@ impl LegislativeInitiatives for AustriaScraper {
             .ok_or(ScraperError::ProposalParseError)
     }
 }
-
 
 fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
     Some(
@@ -265,7 +264,10 @@ mod tests {
         assert_eq!(init.speeches[3].opinion, Opinion::Infavor);
 
         assert_eq!(init.speeches[4].delegate_id, 5653);
-        assert_eq!(init.speeches[4].opinion, Opinion::Other("Regierungsbank".into()));
+        assert_eq!(
+            init.speeches[4].opinion,
+            Opinion::Other("Regierungsbank".into())
+        );
     }
 
     #[tokio::test]

@@ -1,4 +1,4 @@
-use common_scrapes::{Speech, Opinion};
+use common_scrapes::{Opinion, Speech};
 use serde_json::Value;
 
 fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
@@ -65,7 +65,7 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
         "Pro" => Opinion::Infavor,
         "Contra" => Opinion::Against,
         "None" => Opinion::None,
-        other => Opinion::Other(other.into())
+        other => Opinion::Other(other.into()),
     };
 
     Some(Speech {

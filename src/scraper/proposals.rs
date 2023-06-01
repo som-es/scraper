@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use chrono::NaiveDate;
 use common_scrapes::Document;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{documents, error::ScraperError, person_url_to_id, DatePayload, GeneralScrapeInfo};

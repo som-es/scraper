@@ -59,7 +59,7 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
     let a_tag_delegate_url = speech[0].as_str()?;
     let delegate_id = extract_person_id_from_a_tag(a_tag_delegate_url)?;
 
-    let opinion = speech[1].as_str().unwrap_or_else(|| "None");
+    let opinion = speech[1].as_str().unwrap_or("None");
 
     let opinion = match opinion {
         "Pro" => Opinion::Infavor,

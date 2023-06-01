@@ -134,7 +134,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
     let mut debates = vec![];
 
     past_debates
-        .into_iter()
+        .iter()
         .flat_map(|past_debate| {
             Some((
                 past_debate["text"].as_str()?,

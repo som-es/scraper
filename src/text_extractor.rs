@@ -74,35 +74,35 @@ impl TextExtractor {
 
             return extract_text_from_html_via_name_attribute(
                 &html,
-                &url.split('#').nth(1).unwrap(),
+                url.split('#').nth(1).unwrap(),
             );
         }
-        return extract_text_from_html(&html);
+        extract_text_from_html(&html)
     }
 
     pub async fn extract_text_from_url(&mut self, speech: &impl HasHTMLUrl) -> String {
         let url = format!("{}{}", self.base_url, speech.html_url());
 
-        let key = if url.contains("#") {
-            speech.html_url().split("#").next()
+        let key = if url.contains('#') {
+            speech.html_url().split('#').next()
         } else {
             None
         };
 
         match &self.state {
             State::NoCache => {
-                return self.get_html(&url, key).await;
+                self.get_html(&url, key).await
             }
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
                     return extract_text_from_html_via_name_attribute(
                         self.cached_html.as_ref().unwrap(),
-                        &url.split('#').nth(1).unwrap(),
+                        url.split('#').nth(1).unwrap(),
                     );
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
-                    return self.get_html(&url, key).await;
+                    self.get_html(&url, key).await
                 }
             }
         }

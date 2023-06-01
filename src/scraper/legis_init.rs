@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common_scrapes::{LegislativeInitiative, Speech, Vote};
+use common_scrapes::{LegislativeInitiative, Vote};
 use regex::Regex;
 use serde_json::{json, Value};
 
@@ -7,7 +7,7 @@ use crate::{
     documents,
     error::ScraperError,
     extract_text_from_html, person_url_to_id,
-    speeches::{extract_speech, extract_speeches, extract_speeches_from_reden},
+    speeches::extract_speeches,
     AustriaScraper, GegenstandPaths, Scraper,
 };
 

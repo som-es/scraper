@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use scraper::{Html, Selector};
 use serde_json::Value;
 
 use crate::{error::ScraperError, AustriaScraper, Scraper};
@@ -64,9 +65,47 @@ impl CallToOrder for AustriaScraper {
     }
 }
 
+pub fn extract_call_to_order_paths_from_stages(stages: &Value) -> Option<()> {
+    for stage in stages.as_array()? {
+        let Some(text) = stage.get("text") else {
+            continue;
+        };
+        let text = text.as_str()?;
+
+        if !text.contains("Ordnungsruf") {
+            continue;
+        }
+
+        if !text.contains("erteilt") {
+            continue;
+        }
+
+    }
+    Some(())
+}
+
+pub fn extract_call_to_order_info(text: &str) {
+    let fragment = Html::parse_fragment(text);
+    let selector = Selector::parse("[href]").unwrap();
+
+    for val in fragment.select(&selector) {
+        println!("val: {:?}", val.value().attrs().collect::<Vec<_>>())
+    }
+        
+
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{call_to_order::CallToOrder, AustriaScraper};
+
+    use super::extract_call_to_order_info;
+
+    #[test]
+    fn test_extract_call_to_order_info_from_text() {
+        let text = r#"Ordnungsruf erteilt an die Abgeordnete <a href="/person/83101" target="_blank">Sigrid Maurer, BA</a> (<a href="/gegenstand/XXVII/GO/1239">1239/GO</a>)"#;
+        extract_call_to_order_info(text);
+    }
 
     #[tokio::test]
     async fn test_call_to_order() {

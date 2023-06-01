@@ -1,8 +1,6 @@
 use reqwest::{Client, Method, StatusCode};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 use serde_json::Value;
-use std::fmt::Debug;
-
 use crate::error::ScraperError;
 
 pub async fn request<B, S: AsRef<str>>(

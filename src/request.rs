@@ -1,7 +1,7 @@
+use crate::error::ScraperError;
 use reqwest::{Client, Method, StatusCode};
 use serde::Serialize;
 use serde_json::Value;
-use crate::error::ScraperError;
 
 pub async fn request<B, S: AsRef<str>>(
     method: Method,

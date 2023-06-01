@@ -90,9 +90,7 @@ impl TextExtractor {
         };
 
         match &self.state {
-            State::NoCache => {
-                self.get_html(&url, key).await
-            }
+            State::NoCache => self.get_html(&url, key).await,
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
                     return extract_text_from_html_via_name_attribute(

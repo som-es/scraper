@@ -1,14 +1,10 @@
 use async_trait::async_trait;
 use common_scrapes::{LegislativeInitiative, Vote};
-use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    documents,
-    error::ScraperError,
-    extract_text_from_html, person_url_to_id,
-    speeches::extract_speeches,
-    AustriaScraper, GegenstandPaths, Scraper,
+    documents, error::ScraperError, extract_text_from_html, person_url_to_id,
+    speeches::extract_speeches, AustriaScraper, GegenstandPaths, Scraper,
 };
 
 #[async_trait]
@@ -138,14 +134,6 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
             })
             .collect::<Vec<Vote>>(),
     )
-}
-
-// not working
-fn remove_html_tags(html: &str) -> String {
-    lazy_static::lazy_static! {
-        static ref HTML_REGEX: Regex = Regex::new(r"<.*>").unwrap();
-    }
-    HTML_REGEX.replace_all(html, "").to_string()
 }
 
 #[cfg(test)]

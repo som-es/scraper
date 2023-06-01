@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 
 use crate::{
     error::ScraperError, speeches::extract_speeches_from_stages, AustriaScraper, GegenstandPaths,
-    Scraper,
+    Scraper, call_to_order::{extract_call_to_order_paths_from_stages, CallToOrder, CallToOrderInfo}, person_url_to_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -76,8 +76,24 @@ impl Plenar for AustriaScraper {
         let inr = plenar_content_0["inr"].as_u64().unwrap();
 
         let mut document_link_speeches = vec![];
+        // let mut call_to_orders = vec![];
         if let Some(stages) = plenar_content_0.get("stages") {
             extract_speeches_from_stages(stages, &mut document_link_speeches);
+            
+            let scraper = AustriaScraper::default();
+            for (person_path, call_to_order_path) in extract_call_to_order_paths_from_stages(stages).unwrap_or_default() {
+                let receiver_id = person_url_to_id(&person_path).unwrap();
+                CallToOrderInfo {
+                    description,
+                    ityp,
+                    inr,
+                    receiver: "!!NOT AVAILABLE!!".into(),
+                    receiver_id,
+                    links_to: Some(format!("{ityp}/{inr}")),
+                };
+                // person_path.
+                // call_to_orders.push(call_to_order);
+            }
         }
 
         let past_debates = if let Some(content_1) = raw_plenar["content"].as_array().unwrap().get(1)
@@ -92,7 +108,6 @@ impl Plenar for AustriaScraper {
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debate_with_speeches = extract_speeches(past_debates);
-
         let debates = combine_speech_info(debate_with_speeches, &document_link_speeches);
 
         Some(PlenarInfo {

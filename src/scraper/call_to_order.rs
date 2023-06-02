@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use scraper::{Html, Selector};
 use serde_json::Value;
 
-use crate::{error::ScraperError, AustriaScraper, Scraper};
+use crate::{AustriaScraper, Scraper};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct CallToOrderInfo {
@@ -25,32 +25,68 @@ pub trait CallToOrder: Scraper {
         Ok(call_to_order)
     }
 
-    fn extract_raw_call_to_order(raw_call_to_order: Value) -> Result<CallToOrderInfo, CallToOrderError>;
+    fn extract_raw_call_to_order(
+        raw_call_to_order: Value,
+    ) -> Result<CallToOrderInfo, CallToOrderError>;
 }
 
 impl CallToOrder for AustriaScraper {
-    fn extract_raw_call_to_order(raw_call_to_order: Value) -> Result<CallToOrderInfo, CallToOrderError> {
+    fn extract_raw_call_to_order(
+        raw_call_to_order: Value,
+    ) -> Result<CallToOrderInfo, CallToOrderError> {
         let description = raw_call_to_order["meta"]["description"]
-            .as_str().ok_or(CallToOrderError::DescriptionNotAString)?
+            .as_str()
+            .ok_or(CallToOrderError::DescriptionNotAString)?
             .to_string();
 
         let call_to_order_content = &raw_call_to_order["content"];
 
-        let ityp = call_to_order_content["ityp"].as_str().ok_or(CallToOrderError::ItypNotAString)?.to_string();
-        let inr = call_to_order_content["inr"].as_u64().ok_or(CallToOrderError::InrNotANumber)?;
+        let ityp = call_to_order_content["ityp"]
+            .as_str()
+            .ok_or(CallToOrderError::ItypNotAString)?
+            .to_string();
+        let inr = call_to_order_content["inr"]
+            .as_u64()
+            .ok_or(CallToOrderError::InrNotANumber)?;
 
-        let name = call_to_order_content["names"].as_array().ok_or(CallToOrderError::NamesNotAnArray)?.get(0).ok_or(CallToOrderError::NamesArrayIsEmpty)?;
-        let receiver = name["name"].as_str().ok_or(CallToOrderError::ReceiverNameNotAString)?.to_string();
-        let receiver_id = name["url"].as_str().ok_or(CallToOrderError::ReceiverUrlNotAString)?.split('/').nth(2).ok_or(CallToOrderError::ReceiverUrlWrongFormat)?.to_string();
+        let name = call_to_order_content["names"]
+            .as_array()
+            .ok_or(CallToOrderError::NamesNotAnArray)?
+            .get(0)
+            .ok_or(CallToOrderError::NamesArrayIsEmpty)?;
+        let receiver = name["name"]
+            .as_str()
+            .ok_or(CallToOrderError::ReceiverNameNotAString)?
+            .to_string();
+        let receiver_id = name["url"]
+            .as_str()
+            .ok_or(CallToOrderError::ReceiverUrlNotAString)?
+            .split('/')
+            .nth(2)
+            .ok_or(CallToOrderError::ReceiverUrlWrongFormat)?
+            .to_string();
 
-        let links_to =
-            if let Some(reference) = call_to_order_content["reference"].as_array().ok_or(CallToOrderError::ReferenceNotAnArray)?.get(0) {
-                let zitation = reference["zitation"].as_str().ok_or(CallToOrderError::ZitationNotAString)?;
-                let zitation = zitation.split('/').collect::<Vec<&str>>();
-                Some(format!("{}/{}", zitation.get(1).ok_or(CallToOrderError::ZitationWrongFormat)?, zitation.get(0).ok_or(CallToOrderError::ZitationWrongFormat)?))
-            } else {
-                None
-            };
+        let links_to = if let Some(reference) = call_to_order_content["reference"]
+            .as_array()
+            .ok_or(CallToOrderError::ReferenceNotAnArray)?
+            .get(0)
+        {
+            let zitation = reference["zitation"]
+                .as_str()
+                .ok_or(CallToOrderError::ZitationNotAString)?;
+            let zitation = zitation.split('/').collect::<Vec<&str>>();
+            Some(format!(
+                "{}/{}",
+                zitation
+                    .get(1)
+                    .ok_or(CallToOrderError::ZitationWrongFormat)?,
+                zitation
+                    .get(0)
+                    .ok_or(CallToOrderError::ZitationWrongFormat)?
+            ))
+        } else {
+            None
+        };
 
         // protection layer against API changes?
 
@@ -95,7 +131,9 @@ pub enum CallToOrderError {
     ZitationWrongFormat,
 }
 
-pub fn extract_call_to_order_paths_from_stages(stages: &Value) -> Option<Vec<(String, String)>> {
+pub fn extract_call_to_order_paths_from_stages(
+    stages: &Value,
+) -> Option<Vec<HtmlCallToOrderExtraction>> {
     let mut call_to_orders_urls = vec![];
     for stage in stages.as_array()? {
         let Some(text) = stage.get("text") else {
@@ -118,39 +156,64 @@ pub fn extract_call_to_order_paths_from_stages(stages: &Value) -> Option<Vec<(St
     Some(call_to_orders_urls)
 }
 
-pub fn extract_call_to_order_urls(text: &str) -> Option<(String, String)> {
+pub type HtmlCallToOrderExtraction = (String, String, String);
+
+pub fn extract_call_to_order_urls(text: &str) -> Option<HtmlCallToOrderExtraction> {
     let fragment = Html::parse_fragment(text);
     let selector = Selector::parse("[href]").unwrap();
 
     let mut hrefs = fragment.select(&selector);
-    let (_, person_path) = hrefs
-        .next()?
+
+    let person_href = hrefs.next()?;
+    let (_, person_path) = person_href
         .value()
         .attrs()
         .find(|(tag, _)| *tag == "href")?;
+
+    let person_name = person_href.inner_html();
+
     let (_, call_to_order_gegenstand_path) = hrefs
         .next()?
         .value()
         .attrs()
         .find(|(tag, _)| *tag == "href")?;
+
     Some((
         person_path.to_string(),
+        person_name,
         call_to_order_gegenstand_path.to_string(),
     ))
 }
 
+pub fn extract_call_to_order_id_from_path(gegenstand_path: &str) -> (Option<&str>, Option<&str>) {
+    let mut components = gegenstand_path.split('/').rev();
+    (components.next(), components.next())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{call_to_order::CallToOrder, AustriaScraper};
+    use crate::{
+        call_to_order::{extract_call_to_order_id_from_path, CallToOrder},
+        AustriaScraper,
+    };
 
     use super::extract_call_to_order_urls;
 
     #[test]
+    fn test_extract_call_to_order_id_from_path() {
+        let (inr, ityp) = extract_call_to_order_id_from_path("/gegenstand/XXVII/GO/1239");
+        assert_eq!(inr, Some("1239"));
+        assert_eq!(ityp, Some("GO"));
+    }
+
+    #[test]
     fn test_extract_call_to_order_info_from_text() {
         let text = r#"Ordnungsruf erteilt an die Abgeordnete <a href="/person/83101" target="_blank">Sigrid Maurer, BA</a> (<a href="/gegenstand/XXVII/GO/1239">1239/GO</a>)"#;
-        let (person_path, call_to_order_gegenstand_path) = extract_call_to_order_urls(text).unwrap();
+        let (person_path, person_name, call_to_order_gegenstand_path) =
+            extract_call_to_order_urls(text).unwrap();
         assert_eq!(person_path, "/person/83101");
         assert_eq!(call_to_order_gegenstand_path, "/gegenstand/XXVII/GO/1239");
+        assert_eq!(person_name, "Sigrid Maurer, BA");
     }
 
     #[tokio::test]

@@ -3,8 +3,14 @@ use common_scrapes::{Opinion, PlenarSpeech, Speech};
 use serde_json::{json, Value};
 
 use crate::{
-    error::ScraperError, speeches::extract_speeches_from_stages, AustriaScraper, GegenstandPaths,
-    Scraper, call_to_order::{extract_call_to_order_paths_from_stages, CallToOrder, CallToOrderInfo}, person_url_to_id,
+    call_to_order::{
+        extract_call_to_order_id_from_path, extract_call_to_order_paths_from_stages,
+        CallToOrderInfo,
+    },
+    error::ScraperError,
+    person_url_to_id,
+    speeches::extract_speeches_from_stages,
+    AustriaScraper, GegenstandPaths, Scraper,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -19,6 +25,7 @@ pub struct PlenarInfo {
     ityp: String,
     inr: u64,
     debates: Vec<Debate>,
+    call_to_orders: Vec<CallToOrderInfo>,
 }
 
 #[async_trait]
@@ -76,24 +83,10 @@ impl Plenar for AustriaScraper {
         let inr = plenar_content_0["inr"].as_u64().unwrap();
 
         let mut document_link_speeches = vec![];
-        // let mut call_to_orders = vec![];
+        let mut call_to_orders = vec![];
         if let Some(stages) = plenar_content_0.get("stages") {
             extract_speeches_from_stages(stages, &mut document_link_speeches);
-            
-            let scraper = AustriaScraper::default();
-            for (person_path, call_to_order_path) in extract_call_to_order_paths_from_stages(stages).unwrap_or_default() {
-                let receiver_id = person_url_to_id(&person_path).unwrap();
-                CallToOrderInfo {
-                    description,
-                    ityp,
-                    inr,
-                    receiver: "!!NOT AVAILABLE!!".into(),
-                    receiver_id,
-                    links_to: Some(format!("{ityp}/{inr}")),
-                };
-                // person_path.
-                // call_to_orders.push(call_to_order);
-            }
+            call_to_orders = extract_call_to_order_info_from_stages(&ityp, inr, stages);            
         }
 
         let past_debates = if let Some(content_1) = raw_plenar["content"].as_array().unwrap().get(1)
@@ -115,8 +108,30 @@ impl Plenar for AustriaScraper {
             ityp,
             inr,
             debates,
+            call_to_orders,
         })
     }
+}
+
+fn extract_call_to_order_info_from_stages(ityp: &str, inr: u64, stages: &Value) -> Vec<CallToOrderInfo> {
+    let mut call_to_orders = vec![];
+    for (person_path, person_name, call_to_order_path) in
+        extract_call_to_order_paths_from_stages(stages).unwrap_or_default()
+    {
+        let receiver_id = person_url_to_id(&person_path).unwrap();
+        let (call_to_order_inr, call_to_order_ityp) =
+            extract_call_to_order_id_from_path(&call_to_order_path);
+
+        call_to_orders.push(CallToOrderInfo {
+            description: "".into(),
+            ityp: call_to_order_ityp.unwrap_or("GO").into(),
+            inr: call_to_order_inr.unwrap().parse().unwrap(),
+            receiver: person_name,
+            receiver_id,
+            links_to: Some(format!("{ityp}/{inr}")),
+        });
+    }
+    call_to_orders
 }
 
 fn combine_speech_info(
@@ -244,6 +259,27 @@ mod tests {
                 [0],
             "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html"
         );
+
+        let cto = &plenar.call_to_orders[0];
+        assert_eq!(cto.inr, 1239);
+        assert_eq!(cto.ityp, "GO");
+        assert_eq!(cto.links_to, Some("NRSITZ/211".into()));
+        assert_eq!(cto.receiver_id, 83101);
+        assert_eq!(cto.receiver, "Sigrid Maurer, BA");
+
+        let cto = &plenar.call_to_orders[1];
+        assert_eq!(cto.inr, 1240);
+        assert_eq!(cto.ityp, "GO");
+        assert_eq!(cto.links_to, Some("NRSITZ/211".into()));
+        assert_eq!(cto.receiver_id, 83101);
+        assert_eq!(cto.receiver, "Sigrid Maurer, BA");
+
+        let cto = &plenar.call_to_orders[3];
+        assert_eq!(cto.inr, 1238);
+        assert_eq!(cto.ityp, "GO");
+        assert_eq!(cto.links_to, Some("NRSITZ/211".into()));
+        assert_eq!(cto.receiver_id, 67199);
+        assert_eq!(cto.receiver, "Mag. Wolfgang Gerstl");
     }
 
     #[tokio::test]

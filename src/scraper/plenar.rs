@@ -34,16 +34,8 @@ pub trait Plenar: Scraper {
     fn plenar_payload(&self) -> Self::Payload;
 
     async fn post_plenar_payload(&self) -> Result<Value, ScraperError> {
-        let payload = self.plenar_payload();
-        self.post_payload(
-            payload,
-            format!(
-                "{base_url}{filter}",
-                base_url = Self::BASE_URL,
-                filter = Self::FILTER_PATH
-            ),
-        )
-        .await
+        self.post_payload_filter(self.plenar_payload(), Self::FILTER_PATH)
+            .await
     }
 
     fn plenar_paths(&self, plenar_infos: Value) -> Result<GegenstandPaths, ScraperError>;
@@ -86,7 +78,7 @@ impl Plenar for AustriaScraper {
         let mut call_to_orders = vec![];
         if let Some(stages) = plenar_content_0.get("stages") {
             extract_speeches_from_stages(stages, &mut document_link_speeches);
-            call_to_orders = extract_call_to_order_info_from_stages(&ityp, inr, stages);            
+            call_to_orders = extract_call_to_order_info_from_stages(&ityp, inr, stages);
         }
 
         let past_debates = if let Some(content_1) = raw_plenar["content"].as_array().unwrap().get(1)
@@ -113,7 +105,11 @@ impl Plenar for AustriaScraper {
     }
 }
 
-fn extract_call_to_order_info_from_stages(ityp: &str, inr: u64, stages: &Value) -> Vec<CallToOrderInfo> {
+fn extract_call_to_order_info_from_stages(
+    ityp: &str,
+    inr: u64,
+    stages: &Value,
+) -> Vec<CallToOrderInfo> {
     let mut call_to_orders = vec![];
     for (person_path, person_name, call_to_order_path) in
         extract_call_to_order_paths_from_stages(stages).unwrap_or_default()

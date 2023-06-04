@@ -11,6 +11,7 @@ use crate::{error::ScraperError, request::request};
 
 pub mod call_to_order;
 pub mod delegates;
+pub mod gov_officials;
 pub mod legis_init;
 pub mod plenar;
 pub mod proposals;
@@ -32,6 +33,17 @@ pub trait Scraper {
         P: Serialize + Send,
     {
         request(Method::POST, self.client(), payload, path).await
+    }
+
+    async fn post_payload_filter<P>(&self, payload: P, filter: &str) -> Result<Value, ScraperError>
+    where
+        P: Serialize + Send,
+    {
+        self.post_payload(
+            payload,
+            format!("{base_url}{filter}", base_url = Self::BASE_URL,),
+        )
+        .await
     }
 
     async fn get_gegenstand_info(&self, path: &str) -> Result<Value, ScraperError> {
@@ -126,8 +138,8 @@ impl AustriaScraper {
             gegenstaende[Self::LIST_ENTRIES]
                 .as_array()?
                 .iter()
-                .flat_map(|person| {
-                    let person = person.as_array()?;
+                .flat_map(|gegenstand| {
+                    let person = gegenstand.as_array()?;
                     Some(person[gegenstand_path_idx].as_str()?.to_string())
                 })
                 .collect(),

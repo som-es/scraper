@@ -41,7 +41,7 @@ pub trait LegislativeInitiatives: Scraper {
 
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
-        "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=10103&showAll";
+        "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=10103&showAll=true";
 
     fn legis_payload(&self) -> Self::Payload {
         json!({"GP": self.scrape_info.gp, "NRBR": self.scrape_info.council_type})
@@ -159,9 +159,12 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let initiatives = scraper.post_legis_payload().await.unwrap();
-        for path in scraper.legis_paths(initiatives).unwrap() {
+        let paths = scraper.legis_paths(initiatives).unwrap();
+        assert!(paths.len() >= 10);
+        for path in &paths {
             println!("path: {path:?}");
         }
+        println!("paths: {}", paths.len());
     }
 
     #[tokio::test]

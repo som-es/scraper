@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use common_scrapes::{Delegate, GovOfficial};
 use serde_json::{json, Value};
 
-use crate::{error::ScraperError, AustriaScraper, Scraper, extract_text_from_html};
+use crate::{error::ScraperError, extract_text_from_html, AustriaScraper, Scraper};
 
 #[async_trait]
 pub trait GovOfficials: Scraper {
@@ -26,13 +26,14 @@ pub fn extract_gov_from_html(gov_html: &str) -> String {
 
 // /WWER/PAD_18140/index.shtml => 18140
 pub fn extract_id_from_unnecessary_link(link_containing_id: &str) -> Option<u64> {
-    let start_idx = link_containing_id
-        .find('_')? + 1;
-    
-    let end_idx = link_containing_id
-        .rfind('/')?;
+    let start_idx = link_containing_id.find('_')? + 1;
 
-    link_containing_id.get(start_idx..end_idx)?.parse::<u64>().ok()
+    let end_idx = link_containing_id.rfind('/')?;
+
+    link_containing_id
+        .get(start_idx..end_idx)?
+        .parse::<u64>()
+        .ok()
 }
 
 pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
@@ -42,7 +43,8 @@ pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
     let name = raw_official[1].as_str()?.to_string();
     let id = extract_id_from_unnecessary_link(raw_official[9].as_str()?)?;
 
-    let joined = chrono::NaiveDate::parse_from_str(function_and_dates.start_date, "%d.%m.%Y").ok()?;
+    let joined =
+        chrono::NaiveDate::parse_from_str(function_and_dates.start_date, "%d.%m.%Y").ok()?;
 
     let left = function_and_dates
         .end_date
@@ -63,6 +65,7 @@ pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
             constituency: None,
             council: None,
             seat: None,
+            contact: todo!(),
         },
     })
 }
@@ -126,8 +129,11 @@ fn extract_function_and_dates(function_text: &str) -> Option<FunctionAndDates> {
 mod tests {
     use serde_json::json;
 
-    use crate::{gov_officials::{FunctionAndDates, extract_id_from_unnecessary_link}, AustriaScraper};
     use super::{extract_function_and_dates, GovOfficials};
+    use crate::{
+        gov_officials::{extract_id_from_unnecessary_link, FunctionAndDates},
+        AustriaScraper,
+    };
 
     #[tokio::test]
     async fn test_extract_all_govs_from_austria_api() {
@@ -139,22 +145,28 @@ mod tests {
     #[test]
     fn test_extract_single_gov_official_from_json() {
         let raw_gov = json!([
-			r#"<span title="06.12.2021 - " class="zeigeTooltip">Nehammer</span>"#,
-			"Mag. Werner Kogler",
-			"Bundesminister<br />06.12.2021 - ",
-			"134",
-			"007",
-			"Kogler",
-			"D",
-			"Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport",
-			"10.05.2023",
-			"/WWER/PAD_08242/index.shtml"
-		]);
+            r#"<span title="06.12.2021 - " class="zeigeTooltip">Nehammer</span>"#,
+            "Mag. Werner Kogler",
+            "Bundesminister<br />06.12.2021 - ",
+            "134",
+            "007",
+            "Kogler",
+            "D",
+            "Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport",
+            "10.05.2023",
+            "/WWER/PAD_08242/index.shtml"
+        ]);
         let gov_official = super::extract_gov_official(&raw_gov).unwrap();
         assert_eq!(gov_official.government, "Nehammer");
         assert_eq!(gov_official.function, "Bundesminister");
-        assert_eq!(gov_official.ministry, "Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport");
-        assert_eq!(gov_official.joined, chrono::NaiveDate::from_ymd_opt(2021, 12, 6).unwrap());
+        assert_eq!(
+            gov_official.ministry,
+            "Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport"
+        );
+        assert_eq!(
+            gov_official.joined,
+            chrono::NaiveDate::from_ymd_opt(2021, 12, 6).unwrap()
+        );
         assert_eq!(gov_official.left, None);
         assert_eq!(gov_official.delegate.id, 8242);
         assert_eq!(gov_official.delegate.name, "Mag. Werner Kogler");
@@ -186,7 +198,7 @@ mod tests {
         let gov_html = r#"<span title="06.12.2021 - " class="zeigeTooltip">Nehammer</span>"#;
         let gov = super::extract_gov_from_html(gov_html);
         assert_eq!(gov, "Nehammer");
-    }   
+    }
 
     #[test]
     fn test_function_extraction_without_end() {

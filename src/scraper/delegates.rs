@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common_scrapes::{Delegate, Seat};
+use common_scrapes::{Delegate, Seat, SocialMedium, SocialMediumChannel, Contact, SocialMedia};
 use reqwest::Method;
 use serde_json::{json, Value};
 
@@ -67,6 +67,22 @@ impl DelegateScraper for AustriaScraper {
         let council = &api_person_info["gremium"];
         let is_active = api_person_info["aktiv"].as_bool()?;
 
+        let api_contact_info = &person_info["content"]["kontakt"];
+        
+        let phone_number = api_contact_info
+            .get("telefonnr")
+            .map(|phones| phones.get(0).map(|phone| phone.as_str()).flatten())
+            .flatten()
+            .map(ToString::to_string);
+
+        let mail = api_contact_info
+            .get("mail")
+            .map(|mails| mails.get(0).map(|mail| mail.as_str()).flatten())
+            .flatten()
+            .map(ToString::to_string);
+
+        let social_media = api_contact_info.get("socialMedia").map(|raw_social_media| extract_social_media(raw_social_media)).flatten().map(SocialMedia::from).unwrap_or_default();
+         
         let seat = &api_person_info["sitzplatz"];
 
         let (row, col) = seat.as_str()?.split_once('/')?;
@@ -88,6 +104,11 @@ impl DelegateScraper for AustriaScraper {
                 .map(|constituency| constituency.to_string()),
             council: council.as_str().map(|council| council.to_string()),
             seat,
+            contact: Contact {
+                mail,
+                phone_number,
+                social_media,
+            },
         })
     }
 
@@ -97,8 +118,35 @@ impl DelegateScraper for AustriaScraper {
     }
 }
 
+pub fn extract_social_media(raw_social_media: &Value) -> Option<Vec<SocialMedium>> {
+    Some(
+        raw_social_media
+            .as_array()?
+            .iter()
+            .flat_map(extract_social_medium)
+            .collect(),
+    )
+}
+
+pub fn extract_social_medium(raw_medium: &Value) -> Option<SocialMedium> {
+    let url = raw_medium["url"].as_str()?.to_string();
+    let channel = match raw_medium["type"].as_str()? {
+        "FACEBOOK" => SocialMediumChannel::Facebook,
+        "TWITTER" => SocialMediumChannel::Twitter,
+        "INSTAGRAM" => SocialMediumChannel::Instagram,
+        "YOUTUBE" => SocialMediumChannel::Youtube,
+        "WEBSITE" => SocialMediumChannel::Website,
+        "TIKTOK" => SocialMediumChannel::TikTok,
+        _ => return None,
+    };
+
+    Some(SocialMedium { url, channel })
+}
+
 #[cfg(test)]
 mod tests {
+    use common_scrapes::SocialMedia;
+
     use crate::{
         error::ScraperError,
         scraper::{delegates::DelegateScraper, Scraper},
@@ -137,11 +185,19 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let res = scraper.get_delegate("/person/16218").await?;
+        println!("res: {res:?}");
+
         assert_eq!(res.name, "Diesner-Wais Martina");
         assert_eq!(res.party.unwrap(), "ÖVP");
         assert_eq!(res.council.unwrap(), "nr");
 
+        // subject to change in coming elections
+        assert_eq!(res.contact.phone_number, Some("+43 1 401 10-4687".into()));
+        assert_eq!(res.contact.mail, Some("martina.diesner-wais@parlament.gv.at".into()));
+        assert_eq!(res.contact.social_media, SocialMedia::default());
+
         Ok(())
+        
     }
 
     #[tokio::test]
@@ -191,7 +247,13 @@ mod tests {
     #[tokio::test]
     async fn test_person_special2() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
-        scraper.get_delegate("/person/21029").await?;
+        let delegate = scraper.get_delegate("/person/21029").await?;
+        assert_eq!(delegate.name, "Rauch Johannes");
+        assert_eq!(delegate.contact.mail, Some("johannes.rauch@sozialministerium.at".into()));
+        assert_eq!(delegate.contact.phone_number, None);
+        assert_eq!(delegate.contact.social_media, SocialMedia { twitter: todo!(), facebook: todo!(), website: todo!(), tiktok: todo!(), youtube: todo!(), instagram: todo!() });
+        assert!(delegate.is_active);
+
         Ok(())
     }
 }

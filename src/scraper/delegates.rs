@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common_scrapes::{Delegate, Seat, SocialMedium, SocialMediumChannel, Contact, SocialMedia};
+use common_scrapes::{Contact, Delegate, Seat, SocialMedia, SocialMedium, SocialMediumChannel};
 use reqwest::Method;
 use serde_json::{json, Value};
 
@@ -68,7 +68,7 @@ impl DelegateScraper for AustriaScraper {
         let is_active = api_person_info["aktiv"].as_bool()?;
 
         let api_contact_info = &person_info["content"]["kontakt"];
-        
+
         let phone_number = api_contact_info
             .get("telefonnr")
             .map(|phones| phones.get(0).map(|phone| phone.as_str()).flatten())
@@ -81,8 +81,13 @@ impl DelegateScraper for AustriaScraper {
             .flatten()
             .map(ToString::to_string);
 
-        let social_media = api_contact_info.get("socialMedia").map(|raw_social_media| extract_social_media(raw_social_media)).flatten().map(SocialMedia::from).unwrap_or_default();
-         
+        let social_media = api_contact_info
+            .get("socialMedia")
+            .map(|raw_social_media| extract_social_media(raw_social_media))
+            .flatten()
+            .map(SocialMedia::from)
+            .unwrap_or_default();
+
         let seat = &api_person_info["sitzplatz"];
 
         let (row, col) = seat.as_str()?.split_once('/')?;
@@ -193,11 +198,13 @@ mod tests {
 
         // subject to change in coming elections
         assert_eq!(res.contact.phone_number, Some("+43 1 401 10-4687".into()));
-        assert_eq!(res.contact.mail, Some("martina.diesner-wais@parlament.gv.at".into()));
+        assert_eq!(
+            res.contact.mail,
+            Some("martina.diesner-wais@parlament.gv.at".into())
+        );
         assert_eq!(res.contact.social_media, SocialMedia::default());
 
         Ok(())
-        
     }
 
     #[tokio::test]
@@ -249,9 +256,22 @@ mod tests {
         let scraper = AustriaScraper::default();
         let delegate = scraper.get_delegate("/person/21029").await?;
         assert_eq!(delegate.name, "Rauch Johannes");
-        assert_eq!(delegate.contact.mail, Some("johannes.rauch@sozialministerium.at".into()));
+        assert_eq!(
+            delegate.contact.mail,
+            Some("johannes.rauch@sozialministerium.at".into())
+        );
         assert_eq!(delegate.contact.phone_number, None);
-        assert_eq!(delegate.contact.social_media, SocialMedia { twitter: todo!(), facebook: todo!(), website: todo!(), tiktok: todo!(), youtube: todo!(), instagram: todo!() });
+        assert_eq!(
+            delegate.contact.social_media,
+            SocialMedia {
+                twitter: Some("https://twitter.com/johannes_rauch".into()),
+                facebook: None,
+                website: Some("https://www.johannes-rauch.at/".into()),
+                tiktok: None,
+                youtube: None,
+                instagram: None
+            }
+        );
         assert!(delegate.is_active);
 
         Ok(())

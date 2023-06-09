@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::NaiveDate;
 use common_scrapes::{Opinion, PlenarSpeech, Speech};
 use serde_json::{json, Value};
 
@@ -21,10 +22,12 @@ pub struct Debate {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct PlenarInfo {
+    title: String,
     description: String,
     ityp: String,
     inr: u64,
     debates: Vec<Debate>,
+    date: NaiveDate,
     call_to_orders: Vec<CallToOrderInfo>,
 }
 
@@ -73,6 +76,9 @@ impl Plenar for AustriaScraper {
 
         let ityp = plenar_content_0["ityp"].as_str().unwrap().to_string();
         let inr = plenar_content_0["inr"].as_u64().unwrap();
+        let title = plenar_content_0["title"].as_str().unwrap_or(&description).to_string();
+        
+        let date = NaiveDate::parse_from_str(plenar_content_0["einlangen"].as_str().unwrap(), "%Y-%m-%dT%H:%M:%S").unwrap();
 
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];
@@ -96,11 +102,13 @@ impl Plenar for AustriaScraper {
         let debates = combine_speech_info(debate_with_speeches, &document_link_speeches);
 
         Some(PlenarInfo {
+            title,
             description,
             ityp,
             inr,
             debates,
             call_to_orders,
+            date
         })
     }
 }

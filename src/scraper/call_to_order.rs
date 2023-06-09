@@ -11,6 +11,7 @@ pub struct CallToOrderInfo {
     pub inr: u64,
     pub receiver: String,
     pub receiver_id: u64,
+    // pub issuer: String, ??
     pub links_to: Option<String>,
 }
 

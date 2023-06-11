@@ -95,7 +95,7 @@ impl LegislativeInitiatives for AustriaScraper {
             None
         };
 
-        let id = format!("{ityp}/{inr}");
+        let id = format!("{gp}/{ityp}/{inr}");
 
         Some(LegislativeInitiative {
             title,
@@ -239,7 +239,7 @@ mod tests {
 
         assert!(init.accepted);
 
-        assert_eq!(init.id, "I/1954");
+        assert_eq!(init.id, "XXVII/I/1954");
         assert_eq!(init.ityp, "I".to_string());
 
         assert_eq!(init.speeches[0].delegate_id, 52687);
@@ -270,7 +270,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(init.id, "A/3021");
+        assert_eq!(init.id, "XXVII/A/3021");
         assert_eq!(init.ityp, "A");
         assert_eq!(
             init.title,

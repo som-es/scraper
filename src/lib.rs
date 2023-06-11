@@ -1,5 +1,6 @@
+use std::ops::Deref;
+
 use ::scraper::{ElementRef, Html, Selector};
-use lazy_static::__Deref;
 
 mod config;
 mod document;

@@ -1,5 +1,11 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
-use common_scrapes::{Contact, Delegate, Seat, SocialMedia, SocialMedium, SocialMediumChannel};
+use chrono::NaiveDate;
+use common_scrapes::{
+    Contact, Delegate, Mandate, Seat, SocialMedia, SocialMedium, SocialMediumChannel, Gender,
+};
+use once_cell::sync::Lazy;
 use reqwest::Method;
 use serde_json::{json, Value};
 
@@ -53,6 +59,7 @@ impl DelegateScraper for AustriaScraper {
         // println!("{}", serde_json::to_string_pretty(&person_info).unwrap());
         let mandate = &person_info["content"]["banner"]["mandate"];
         let party = &mandate[0]["wahlpartei"];
+        let gender_indicator = &mandate[0]["mandat"].as_str()?.split_whitespace().next()?;
 
         let constituency = &mandate[0]["wahlkreis"];
 
@@ -68,6 +75,8 @@ impl DelegateScraper for AustriaScraper {
         let is_active = api_person_info["aktiv"].as_bool()?;
 
         let api_contact_info = &person_info["content"]["kontakt"];
+
+        let mandates = extract_mandates(&person_info["content"]["biografie"]["mandatefunktionen"])?;
 
         let phone_number = api_contact_info
             .get("telefonnr")
@@ -109,11 +118,13 @@ impl DelegateScraper for AustriaScraper {
                 .map(|constituency| constituency.to_string()),
             council: council.as_str().map(|council| council.to_string()),
             seat,
+            mandates,
             contact: Contact {
                 mail,
                 phone_number,
                 social_media,
             },
+            gender: Gender::from(*gender_indicator)
         })
     }
 
@@ -121,6 +132,33 @@ impl DelegateScraper for AustriaScraper {
         // use idx 8 for delegates in parlament
         self.gegenstand_paths(persons, 4)
     }
+}
+
+pub fn extract_mandates(raw_mandates: &Value) -> Option<Vec<Mandate>> {
+    Some(
+        raw_mandates["mandate"]
+            .as_array()?
+            .iter()
+            .flat_map(extract_mandate)
+            .collect(),
+    )
+}
+
+pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
+    let name = raw_mandate["mandat"].as_str()?.to_string();
+
+    let start = raw_mandate["mandatVon"].as_str()?.to_string();
+    let end = raw_mandate["mandatBis"].as_str()?.to_string();
+
+    let start = NaiveDate::parse_from_str(&start, "%d.%m.%Y").ok()?;
+
+    let end = if end.is_empty() {
+        None
+    } else {
+        NaiveDate::parse_from_str(&end, "%d.%m.%Y").ok()
+    };
+
+    Some(Mandate { name, start, end })
 }
 
 pub fn extract_social_media(raw_social_media: &Value) -> Option<Vec<SocialMedium>> {
@@ -150,7 +188,7 @@ pub fn extract_social_medium(raw_medium: &Value) -> Option<SocialMedium> {
 
 #[cfg(test)]
 mod tests {
-    use common_scrapes::SocialMedia;
+    use common_scrapes::{SocialMedia, Gender};
 
     use crate::{
         error::ScraperError,
@@ -203,6 +241,7 @@ mod tests {
             Some("martina.diesner-wais@parlament.gv.at".into())
         );
         assert_eq!(res.contact.social_media, SocialMedia::default());
+        assert_eq!(res.gender, Gender::Female);
 
         Ok(())
     }
@@ -252,6 +291,14 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_person_next_check_contacts_72959() -> Result<(), ScraperError> {
+        let scraper = AustriaScraper::default();
+        let res = scraper.get_delegate("/person/72959").await?;
+        println!("res: {res:?}");
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_person_special2() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
         let delegate = scraper.get_delegate("/person/21029").await?;
@@ -273,6 +320,7 @@ mod tests {
             }
         );
         assert!(delegate.is_active);
+        assert_eq!(delegate.gender, Gender::Male);
 
         Ok(())
     }

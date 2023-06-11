@@ -60,12 +60,14 @@ pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
             id,
             name,
             is_active: left.is_none(),
-            image_url: None,
+            image_url: None, // from delegate call
             party: None,
             constituency: None,
             council: None,
             seat: None,
-            contact: todo!(),
+            mandates: todo!(),
+            contact: todo!(),// from delegate call
+            gender: todo!(), 
         },
     })
 }

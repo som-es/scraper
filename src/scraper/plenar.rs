@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::NaiveDateTime;
 use common_scrapes::{Opinion, PlenarSpeech, Speech};
 use serde_json::{json, Value};
 
@@ -29,6 +29,7 @@ pub struct PlenarInfo {
     pub debates: Vec<Debate>,
     pub date: NaiveDateTime,
     pub call_to_orders: Vec<CallToOrderInfo>,
+    pub legislative_period: String,
 }
 
 #[async_trait]
@@ -76,9 +77,19 @@ impl Plenar for AustriaScraper {
 
         let ityp = plenar_content_0["ityp"].as_str().unwrap().to_string();
         let inr = plenar_content_0["inr"].as_u64().unwrap();
-        let title = plenar_content_0["title"].as_str().unwrap_or(&description).to_string();
-        
-        let date = NaiveDateTime::parse_from_str(plenar_content_0["einlangen"].as_str().unwrap(), "%Y-%m-%dT%H:%M:%S").unwrap();
+
+        let gp_code = plenar_content_0["gp_code"].as_str().unwrap().to_string();
+
+        let title = plenar_content_0["title"]
+            .as_str()
+            .unwrap_or(&description)
+            .to_string();
+
+        let date = NaiveDateTime::parse_from_str(
+            plenar_content_0["einlangen"].as_str().unwrap(),
+            "%Y-%m-%dT%H:%M:%S",
+        )
+        .unwrap();
 
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];
@@ -108,7 +119,8 @@ impl Plenar for AustriaScraper {
             inr,
             debates,
             call_to_orders,
-            date
+            date,
+            legislative_period: gp_code,
         })
     }
 }
@@ -248,6 +260,7 @@ mod tests {
             .await
             .unwrap();
 
+        assert_eq!(plenar.legislative_period, "XXVII");
         assert_eq!(plenar.ityp, "NRSITZ");
         assert_eq!(plenar.inr, 211);
         assert_eq!(plenar.debates[1].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");

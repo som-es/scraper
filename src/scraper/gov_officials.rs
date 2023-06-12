@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(gov_official.left, None);
         assert_eq!(gov_official.delegate.id, 8242);
         assert_eq!(gov_official.delegate.name, "Mag. Werner Kogler");
-        assert_eq!(gov_official.delegate.is_active, true);
+        assert!(gov_official.delegate.is_active);
     }
 
     #[test]

@@ -204,7 +204,7 @@ mod tests {
 
         for proposal_path in &proposal_paths[600..800] {
             println!("proposal_path: {}", proposal_path);
-            let proposal = scraper.get_proposal(&proposal_path).await?;
+            let proposal = scraper.get_proposal(proposal_path).await?;
             println!("proposal: {proposal:?}");
         }
         Ok(())

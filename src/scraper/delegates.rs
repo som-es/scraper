@@ -77,30 +77,25 @@ impl DelegateScraper for AustriaScraper {
         let newest_mandate = mandates.get(0);
 
         let party = newest_mandate
-            .map(|mandate| mandate.party.clone())
-            .flatten();
+            .and_then(|mandate| mandate.party.clone());
         let gender_indicator = newest_mandate.map(|mandate| mandate.name.as_str());
         let constituency = newest_mandate
-            .map(|mandate| mandate.constituency.clone())
-            .flatten();
+            .and_then(|mandate| mandate.constituency.clone());
 
 
         let phone_number = api_contact_info
             .get("telefonnr")
-            .map(|phones| phones.get(0).map(|phone| phone.as_str()).flatten())
-            .flatten()
+            .and_then(|phones| phones.get(0).and_then(|phone| phone.as_str()))
             .map(ToString::to_string);
 
         let mail = api_contact_info
             .get("mail")
-            .map(|mails| mails.get(0).map(|mail| mail.as_str()).flatten())
-            .flatten()
+            .and_then(|mails| mails.get(0).and_then(|mail| mail.as_str()))
             .map(ToString::to_string);
 
         let social_media = api_contact_info
             .get("socialMedia")
-            .map(extract_social_media)
-            .flatten()
+            .and_then(extract_social_media)
             .map(SocialMedia::from)
             .unwrap_or_default();
 
@@ -226,13 +221,13 @@ mod tests {
 
         let mandate = &val["content"]["banner"]["mandate"];
 
-        let party = &mandate[0]["wahlpartei"];
+        let _party = &mandate[0]["wahlpartei"];
 
         let name = &val["meta"]["description"];
 
         println!("name: {name}");
 
-        let pretty_val = serde_json::to_string_pretty(&val).unwrap();
+        let _pretty_val = serde_json::to_string_pretty(&val).unwrap();
 
         let delegate = AustriaScraper::person_info_into_delegate(val);
         println!("delegate: {delegate:?}");

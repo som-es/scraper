@@ -81,8 +81,7 @@ impl CallToOrder for AustriaScraper {
                 zitation
                     .get(1)
                     .ok_or(CallToOrderError::ZitationWrongFormat)?,
-                zitation
-                    .get(0)
+                zitation.first()
                     .ok_or(CallToOrderError::ZitationWrongFormat)?
             ))
         } else {

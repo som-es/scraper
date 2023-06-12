@@ -55,11 +55,8 @@ impl DelegateScraper for AustriaScraper {
 
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate> {
         // println!("{}", serde_json::to_string_pretty(&person_info).unwrap());
-        let mandate = &person_info["content"]["banner"]["mandate"];
-        let party = &mandate[0]["wahlpartei"];
-        let gender_indicator = &mandate[0]["mandat"].as_str()?.split_whitespace().next()?;
 
-        let constituency = &mandate[0]["wahlkreis"];
+        // let gender_indicator = mandate[0]["mandat"].as_str();
 
         let name = &person_info["meta"]["description"];
         let image_url = person_info["meta"]["openGraph"]["image"]
@@ -76,6 +73,18 @@ impl DelegateScraper for AustriaScraper {
 
         let mandates = extract_mandates(&person_info["content"]["biografie"]["mandatefunktionen"])?;
 
+        // choose newest mandate
+        let newest_mandate = mandates.get(0);
+
+        let party = newest_mandate
+            .map(|mandate| mandate.party.clone())
+            .flatten();
+        let gender_indicator = newest_mandate.map(|mandate| mandate.name.as_str());
+        let constituency = newest_mandate
+            .map(|mandate| mandate.constituency.clone())
+            .flatten();
+
+
         let phone_number = api_contact_info
             .get("telefonnr")
             .map(|phones| phones.get(0).map(|phone| phone.as_str()).flatten())
@@ -90,19 +99,23 @@ impl DelegateScraper for AustriaScraper {
 
         let social_media = api_contact_info
             .get("socialMedia")
-            .map(|raw_social_media| extract_social_media(raw_social_media))
+            .map(extract_social_media)
             .flatten()
             .map(SocialMedia::from)
             .unwrap_or_default();
 
         let seat = &api_person_info["sitzplatz"];
 
-        let (row, col) = seat.as_str()?.split_once('/')?;
-        let seat = if col.is_empty() {
-            None
+        let seat = if let Some(seat) = seat.as_str() {
+            let (row, col) = seat.split_once('/')?;
+            if col.is_empty() {
+                None
+            } else {
+                let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
+                Some(Seat { row, col })
+            }
         } else {
-            let (row, col) = (row.parse::<u16>().ok()?, col.parse::<u16>().ok()?);
-            Some(Seat { row, col })
+            None
         };
 
         Some(Delegate {
@@ -110,19 +123,17 @@ impl DelegateScraper for AustriaScraper {
             image_url,
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
-            party: party.as_str().map(|party| party.to_string()),
-            constituency: constituency
-                .as_str()
-                .map(|constituency| constituency.to_string()),
+            party,
+            constituency,
             council: council.as_str().map(|council| council.to_string()),
             seat,
+            gender: Gender::from(gender_indicator),
             mandates,
             contact: Contact {
                 mail,
                 phone_number,
                 social_media,
             },
-            gender: Gender::from(*gender_indicator),
         })
     }
 
@@ -148,6 +159,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     let start = raw_mandate["mandatVon"].as_str()?.to_string();
     let end = raw_mandate["mandatBis"].as_str()?.to_string();
     let party = raw_mandate["wahlpartei"].as_str().map(ToString::to_string);
+    let constituency = raw_mandate["wahlkreis"].as_str().map(ToString::to_string);
 
     let start = NaiveDate::parse_from_str(&start, "%d.%m.%Y").ok()?;
 
@@ -160,6 +172,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     Some(Mandate {
         name,
         party,
+        constituency,
         start,
         end,
     })
@@ -252,6 +265,7 @@ mod tests {
             [
                 Mandate {
                     name: "Abgeordnete zum Nationalrat".into(),
+                    constituency: Some("3B - Waldviertel".to_string()),
                     party: Some("ÖVP".into()),
                     start: NaiveDate::from_ymd_opt(2013, 10, 29).unwrap(),
                     end: None
@@ -259,18 +273,21 @@ mod tests {
                 Mandate {
                     name: "Mitglied des Bundesrates".into(),
                     party: Some("ÖVP".into()),
+                    constituency: Some("In den Bundesrat entsendet vom Niederösterreichischen Landtag".into()),
                     start: NaiveDate::from_ymd_opt(2003, 4, 24).unwrap(),
                     end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
                 },
                 Mandate {
                     name: "Schriftführerin des Bundesrates".into(),
                     party: None,
+                    constituency: None,
                     start: NaiveDate::from_ymd_opt(2010, 11, 5).unwrap(),
                     end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
                 },
                 Mandate {
                     name: "Schriftführerin des Bundesrates".into(),
                     party: None,
+                    constituency: None,
                     start: NaiveDate::from_ymd_opt(2006, 1, 1).unwrap(),
                     end: Some(NaiveDate::from_ymd_opt(2006, 6, 30).unwrap())
                 },
@@ -278,6 +295,14 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delegate_84060() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper.get_delegate("/person/84060").await.unwrap();
+        println!("res: {res:?}");
     }
 
     #[tokio::test]

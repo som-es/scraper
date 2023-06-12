@@ -1,11 +1,9 @@
-use std::collections::HashSet;
-
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use common_scrapes::{
-    Contact, Delegate, Mandate, Seat, SocialMedia, SocialMedium, SocialMediumChannel, Gender,
+    Contact, Delegate, Gender, Mandate, Seat, SocialMedia, SocialMedium, SocialMediumChannel,
 };
-use once_cell::sync::Lazy;
+
 use reqwest::Method;
 use serde_json::{json, Value};
 
@@ -124,7 +122,7 @@ impl DelegateScraper for AustriaScraper {
                 phone_number,
                 social_media,
             },
-            gender: Gender::from(*gender_indicator)
+            gender: Gender::from(*gender_indicator),
         })
     }
 
@@ -149,6 +147,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
 
     let start = raw_mandate["mandatVon"].as_str()?.to_string();
     let end = raw_mandate["mandatBis"].as_str()?.to_string();
+    let party = raw_mandate["wahlpartei"].as_str().map(ToString::to_string);
 
     let start = NaiveDate::parse_from_str(&start, "%d.%m.%Y").ok()?;
 
@@ -158,7 +157,12 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
         NaiveDate::parse_from_str(&end, "%d.%m.%Y").ok()
     };
 
-    Some(Mandate { name, start, end })
+    Some(Mandate {
+        name,
+        party,
+        start,
+        end,
+    })
 }
 
 pub fn extract_social_media(raw_social_media: &Value) -> Option<Vec<SocialMedium>> {
@@ -188,7 +192,8 @@ pub fn extract_social_medium(raw_medium: &Value) -> Option<SocialMedium> {
 
 #[cfg(test)]
 mod tests {
-    use common_scrapes::{SocialMedia, Gender};
+    use chrono::NaiveDate;
+    use common_scrapes::{Gender, Mandate, SocialMedia};
 
     use crate::{
         error::ScraperError,
@@ -242,6 +247,35 @@ mod tests {
         );
         assert_eq!(res.contact.social_media, SocialMedia::default());
         assert_eq!(res.gender, Gender::Female);
+        assert_eq!(
+            res.mandates,
+            [
+                Mandate {
+                    name: "Abgeordnete zum Nationalrat".into(),
+                    party: Some("ÖVP".into()),
+                    start: NaiveDate::from_ymd_opt(2013, 10, 29).unwrap(),
+                    end: None
+                },
+                Mandate {
+                    name: "Mitglied des Bundesrates".into(),
+                    party: Some("ÖVP".into()),
+                    start: NaiveDate::from_ymd_opt(2003, 4, 24).unwrap(),
+                    end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
+                },
+                Mandate {
+                    name: "Schriftführerin des Bundesrates".into(),
+                    party: None,
+                    start: NaiveDate::from_ymd_opt(2010, 11, 5).unwrap(),
+                    end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
+                },
+                Mandate {
+                    name: "Schriftführerin des Bundesrates".into(),
+                    party: None,
+                    start: NaiveDate::from_ymd_opt(2006, 1, 1).unwrap(),
+                    end: Some(NaiveDate::from_ymd_opt(2006, 6, 30).unwrap())
+                },
+            ]
+        );
 
         Ok(())
     }

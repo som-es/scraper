@@ -66,8 +66,8 @@ pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
             council: None,
             seat: None,
             mandates: todo!(),
-            contact: todo!(),// from delegate call
-            gender: todo!(), 
+            contact: todo!(), // from delegate call
+            gender: todo!(),
         },
     })
 }

@@ -47,6 +47,6 @@ pub enum ScraperError {
     #[error("Could not parse legislative initiative information from API")]
     LegisInitParseError,
 
-    #[error("Could legis init from enactment")]
-    NoLegisInit,
+    #[error("Could not parse enactment")]
+    NoEnactmentError,
 }

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::NaiveDate;
 use common_scrapes::LegislativeInitiative;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -11,8 +11,8 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Enactment {
-    pub nr_date: NaiveDateTime,
-    pub br_date: Option<NaiveDateTime>,
+    pub nr_date: NaiveDate,
+    pub br_date: Option<NaiveDate>,
     pub legislative_initiative: LegislativeInitiative,
 }
 
@@ -29,19 +29,13 @@ pub trait EnactmentScraper: Scraper {
 
     fn enactment_paths(&self, raw_enactments: Value) -> Option<GegenstandPaths>;
 
-    async fn raw_enactment_into_enactment(
-        &self,
-        raw_enactment: &Value,
-    ) -> Option<Enactment>;
+    async fn raw_enactment_into_enactment(&self, raw_enactment: &Value) -> Option<Enactment>;
 
-    async fn get_enactment(
-        &self,
-        enactment_path: &str,
-    ) -> Result<Enactment, ScraperError> {
+    async fn get_enactment(&self, enactment_path: &str) -> Result<Enactment, ScraperError> {
         let raw_enactment = self.get_gegenstand_info(enactment_path).await.unwrap();
         self.raw_enactment_into_enactment(&raw_enactment)
             .await
-            .ok_or(ScraperError::NoLegisInit)
+            .ok_or(ScraperError::NoEnactmentError)
     }
 
     fn legis_inits_from_enactments();
@@ -73,33 +67,32 @@ impl EnactmentScraper for AustriaScraper {
         self.gegenstand_paths(raw_enactments, 14)
     }
 
-    async fn raw_enactment_into_enactment(
-        &self,
-        raw_enactment: &Value,
-    ) -> Option<Enactment> {
+    async fn raw_enactment_into_enactment(&self, raw_enactment: &Value) -> Option<Enactment> {
         let content = &raw_enactment["content"];
         let reference = &content["reference"].as_array()?[0];
         let legis_init_path = reference["url"].as_str()?;
 
         let stages = &content["stages"].as_array()?;
-        let nr_stage = &stages[0]; 
-        let nr_date = NaiveDateTime::parse_from_str(
-            &nr_stage["date"].as_str()?, "%Y-%m-%dT%H:%M:%S",
-        ).ok()?;
+        let nr_stage = &stages[0];
+        let nr_date = NaiveDate::parse_from_str(nr_stage["date"].as_str()?, "%d.%m.%Y")
+            .ok()
+            ?;
 
         let br_date = if let Some(br_stage) = stages.get(1) {
-            Some(            NaiveDateTime::parse_from_str(
-                br_stage["date"].as_str()?, "%Y-%m-%dT%H:%M:%S",
-            ).ok()?)
+            Some(
+                NaiveDate::parse_from_str(br_stage["date"].as_str()?, "%d.%m.%Y")
+                    .ok()
+                    ?,
+            )
         } else {
             None
         };
-    
+
         let legislative_initiative = self.get_legis_init(legis_init_path).await.ok()?;
         Some(Enactment {
             nr_date,
             br_date,
-            legislative_initiative
+            legislative_initiative,
         })
     }
 
@@ -108,10 +101,11 @@ impl EnactmentScraper for AustriaScraper {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::{AustriaScraper, enactment::EnactmentScraper};
+    use chrono::NaiveDate;
+
+    use crate::{enactment::EnactmentScraper, AustriaScraper};
 
     #[tokio::test]
     async fn test_scrape_enactments() {
@@ -126,5 +120,19 @@ mod tests {
             };
             println!("{legis_init:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_xxvii_bnr_746() {
+        let scraper = AustriaScraper::default();
+
+        let enactment = scraper
+            .get_enactment("/gegenstand/XXVII/BNR/746")
+            .await
+            .unwrap();
+
+        assert_eq!(enactment.nr_date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
+        assert_eq!(enactment.br_date, NaiveDate::from_ymd_opt(2023, 6, 7));
+        assert_eq!(enactment.legislative_initiative.id, "XXVII/A/3427".to_string())
     }
 }

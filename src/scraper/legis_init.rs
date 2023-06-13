@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, NaiveDate};
 use common_scrapes::{LegislativeInitiative, Vote};
 use serde_json::{json, Value};
 
@@ -56,16 +56,6 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let inr = legis_content["inr"].as_u64()?;
-
-        let date = NaiveDateTime::parse_from_str(
-            legis_content
-                .get("update")
-                .unwrap_or(&legis_content["einlangen"])
-                .as_str()?,
-            "%Y-%m-%dT%H:%M:%S",
-        )
-        .ok()?;
-
         let gp = legis_content["gp_code"].as_str()?.to_string();
 
         let raw_documents = if let Some(preconst) = legis_content.get("preconst") {
@@ -88,6 +78,9 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let votes = extract_votes(legis_content)?;
         let speeches = extract_speeches(legis_content).unwrap_or_default();
+        let date = extract_date(legis_content)?;
+
+        let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
         let accepted = legis_content["vote"]["infavor"].as_bool()?;
 
@@ -121,8 +114,39 @@ impl LegislativeInitiatives for AustriaScraper {
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError> {
         self.gegenstand_paths(initiatives, 12)
-            .ok_or(ScraperError::ProposalParseError)
+            .ok_or(ScraperError::LegisInitParseError)
     }
+}
+
+pub fn extract_date(legis_content: &Value) -> Option<&str> {
+    let mut most_fitting_date = None;
+    for phase in legis_content.get("phase")?.as_array()? {
+        let Some(stages) = phase.get("stages") else {
+            continue;
+        };
+
+        if !phase["name"].as_str()?.contains("NR") {
+            continue;
+        }
+
+        // extract_speeches_from_stages(stages, &mut speeches);
+        most_fitting_date = extract_most_fitting_date(stages);
+    }
+    most_fitting_date
+}
+
+fn extract_most_fitting_date<'a>(raw_stages: &'a Value) -> Option<&'a str> {
+    let mut fitting_date = None;
+    for raw_stage in raw_stages.as_array()? {
+        if raw_stage.get("priority").is_none() {
+            continue;
+        }
+        let Some(date) = raw_stage["date"].as_str() else {
+            continue;
+        };
+        fitting_date = Some(date)
+    }
+    fitting_date
 }
 
 fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
@@ -143,6 +167,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::NaiveDate;
     use common_scrapes::Opinion;
 
     use crate::{
@@ -184,7 +209,6 @@ mod tests {
             let Ok(init) = scraper.get_legis_init(&path).await else {
                 continue;
             };
-
             println!("id: {}, title: {}", init.id, init.title);
         }
 
@@ -212,8 +236,10 @@ mod tests {
             .unwrap();
         println!("init: {init:?}");
 
+        assert_eq!(init.date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
+
         assert_eq!(
-            init.title,
+            init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
     }

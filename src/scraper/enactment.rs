@@ -20,7 +20,7 @@ pub struct Enactment {
 pub trait EnactmentScraper: Scraper {
     const FILTER_PATH: &'static str;
 
-    async fn post_enacment_payload(&self) -> Result<Value, ScraperError> {
+    async fn post_enactment_payload(&self) -> Result<Value, ScraperError> {
         self.post_payload_filter(self.enactment_payload(), Self::FILTER_PATH)
             .await
     }
@@ -74,16 +74,16 @@ impl EnactmentScraper for AustriaScraper {
 
         let stages = &content["stages"].as_array()?;
         let nr_stage = &stages[0];
-        let nr_date = NaiveDate::parse_from_str(nr_stage["date"].as_str()?, "%d.%m.%Y")
-            .ok()
-            ?;
+        let nr_date = NaiveDate::parse_from_str(
+            nr_stage["date"]
+                .as_str()
+                .expect("BNR should be passing the nr stage"),
+            "%d.%m.%Y",
+        )
+        .ok()?;
 
         let br_date = if let Some(br_stage) = stages.get(1) {
-            Some(
-                NaiveDate::parse_from_str(br_stage["date"].as_str()?, "%d.%m.%Y")
-                    .ok()
-                    ?,
-            )
+            Some(NaiveDate::parse_from_str(br_stage["date"].as_str()?, "%d.%m.%Y").ok()?)
         } else {
             None
         };
@@ -111,14 +111,16 @@ mod tests {
     async fn test_scrape_enactments() {
         let scraper = AustriaScraper::default();
 
-        let raw_enactments = scraper.post_enacment_payload().await.unwrap();
+        let raw_enactments = scraper.post_enactment_payload().await.unwrap();
         for path in scraper.enactment_paths(raw_enactments).unwrap() {
-            println!("path: {path}");
+            // println!("path: {path}");
             let Ok(legis_init) = scraper.get_enactment(&path).await else {
                 println!("not processable");
                 continue;
             };
-            println!("{legis_init:?}");
+            if !legis_init.legislative_initiative.accepted {
+                println!("{legis_init:?}");
+            }
         }
     }
 
@@ -131,8 +133,14 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(enactment.nr_date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
+        assert_eq!(
+            enactment.nr_date,
+            NaiveDate::from_ymd_opt(2023, 6, 1).unwrap()
+        );
         assert_eq!(enactment.br_date, NaiveDate::from_ymd_opt(2023, 6, 7));
-        assert_eq!(enactment.legislative_initiative.id, "XXVII/A/3427".to_string())
+        assert_eq!(
+            enactment.legislative_initiative.id,
+            "XXVII/A/3427".to_string()
+        )
     }
 }

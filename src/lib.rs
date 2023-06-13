@@ -4,7 +4,7 @@ use ::scraper::{ElementRef, Html, Selector};
 
 mod config;
 mod document;
-mod error;
+pub mod error;
 mod request;
 mod scraper;
 mod speeches;

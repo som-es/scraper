@@ -89,7 +89,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
             let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
-            let teil2 = extract_text_from_html(shortinfo["teil2"].as_str()?);
+            let teil2 = extract_text_from_html(shortinfo["teil2"].as_str().unwrap_or_default());
             Some(format!("{teil1} {teil2}"))
         } else {
             None
@@ -186,6 +186,33 @@ mod tests {
         }
 
         println!("elapsed: {:?}", start.elapsed());
+    }
+
+    #[tokio::test]
+    async fn test_get_legis_init_xxvii_a_3373_path() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3373")
+            .await
+            .unwrap();
+        println!("init: {init:?}");
+    }
+
+    #[tokio::test]
+    async fn test_get_legis_init_xxvii_i_1774_path() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/I/1774")
+            .await
+            .unwrap();
+        println!("init: {init:?}");
+
+        assert_eq!(
+            init.title,
+            "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
+        );
     }
 
     #[tokio::test]

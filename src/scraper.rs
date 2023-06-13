@@ -11,6 +11,7 @@ use crate::{error::ScraperError, request::request};
 
 pub mod call_to_order;
 pub mod delegates;
+pub mod enactment;
 pub mod gov_officials;
 pub mod legis_init;
 pub mod plenar;

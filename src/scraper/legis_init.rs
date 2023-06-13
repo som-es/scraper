@@ -58,9 +58,13 @@ impl LegislativeInitiatives for AustriaScraper {
         let inr = legis_content["inr"].as_u64()?;
 
         let date = NaiveDateTime::parse_from_str(
-            legis_content["einlangen"].as_str()?,
+            legis_content
+                .get("update")
+                .unwrap_or(&legis_content["einlangen"])
+                .as_str()?,
             "%Y-%m-%dT%H:%M:%S",
-        ).ok()?;
+        )
+        .ok()?;
 
         let gp = legis_content["gp_code"].as_str()?.to_string();
 
@@ -139,7 +143,6 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDateTime;
     use common_scrapes::Opinion;
 
     use crate::{
@@ -223,7 +226,7 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/1954")
             .await
             .unwrap();
-        
+
         assert_eq!(
             init.title,
             "Kraftfahrgesetz, Änderung (41. KFG-Novelle) (1954 d.B.) | Parlament Österreich"

@@ -76,12 +76,9 @@ impl DelegateScraper for AustriaScraper {
         // choose newest mandate
         let newest_mandate = mandates.get(0);
 
-        let party = newest_mandate
-            .and_then(|mandate| mandate.party.clone());
+        let party = newest_mandate.and_then(|mandate| mandate.party.clone());
         let gender_indicator = newest_mandate.map(|mandate| mandate.name.as_str());
-        let constituency = newest_mandate
-            .and_then(|mandate| mandate.constituency.clone());
-
+        let constituency = newest_mandate.and_then(|mandate| mandate.constituency.clone());
 
         let phone_number = api_contact_info
             .get("telefonnr")
@@ -268,7 +265,9 @@ mod tests {
                 Mandate {
                     name: "Mitglied des Bundesrates".into(),
                     party: Some("ÖVP".into()),
-                    constituency: Some("In den Bundesrat entsendet vom Niederösterreichischen Landtag".into()),
+                    constituency: Some(
+                        "In den Bundesrat entsendet vom Niederösterreichischen Landtag".into()
+                    ),
                     start: NaiveDate::from_ymd_opt(2003, 4, 24).unwrap(),
                     end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
                 },

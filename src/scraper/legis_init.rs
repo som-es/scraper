@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::NaiveDateTime;
 use common_scrapes::{LegislativeInitiative, Vote};
 use serde_json::{json, Value};
 
@@ -56,11 +57,10 @@ impl LegislativeInitiatives for AustriaScraper {
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let inr = legis_content["inr"].as_u64()?;
 
-        let date = legis_content
-            .get("update")
-            .unwrap_or(&legis_content["einlangen"])
-            .as_str()?
-            .to_string();
+        let date = NaiveDateTime::parse_from_str(
+            legis_content["einlangen"].as_str()?,
+            "%Y-%m-%dT%H:%M:%S",
+        ).ok()?;
 
         let gp = legis_content["gp_code"].as_str()?.to_string();
 
@@ -101,6 +101,7 @@ impl LegislativeInitiatives for AustriaScraper {
             title,
             description,
             emphasis,
+            inr,
             // council: todo!(),
             gp,
             ityp,
@@ -138,6 +139,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::NaiveDateTime;
     use common_scrapes::Opinion;
 
     use crate::{
@@ -194,7 +196,7 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/1954")
             .await
             .unwrap();
-
+        
         assert_eq!(
             init.title,
             "Kraftfahrgesetz, Änderung (41. KFG-Novelle) (1954 d.B.) | Parlament Österreich"

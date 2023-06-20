@@ -77,7 +77,9 @@ impl DelegateScraper for AustriaScraper {
         let newest_mandate = mandates.get(0);
 
         let party = newest_mandate.and_then(|mandate| mandate.party.clone());
-        let gender_indicator = newest_mandate.map(|mandate| mandate.name.as_str());
+
+        let gender_indicators = mandates.iter().map(|mandate| mandate.name.as_str());
+
         let constituency = newest_mandate.and_then(|mandate| mandate.constituency.clone());
 
         let phone_number = api_contact_info
@@ -119,7 +121,7 @@ impl DelegateScraper for AustriaScraper {
             constituency,
             council: council.as_str().map(|council| council.to_string()),
             seat,
-            gender: Gender::from(gender_indicator),
+            gender: Gender::from_indicators(gender_indicators),
             mandates,
             contact: Contact {
                 mail,
@@ -376,6 +378,13 @@ mod tests {
         assert_eq!(delegate.gender, Gender::Male);
 
         Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_gender_of_previously_unknown() {
+        let scraper = AustriaScraper::default();
+        let delegate = scraper.get_delegate("/person/2814").await.unwrap();
+        assert_eq!(Gender::Female, delegate.gender)
     }
 }
 

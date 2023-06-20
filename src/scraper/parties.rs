@@ -72,7 +72,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_parties_xx() {
+    async fn test_get_parties_xxiii() {
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXIII".to_string()];
 
@@ -108,5 +108,15 @@ mod tests {
                 }
             ]
         )
+    }
+
+    #[tokio::test]
+    async fn test_get_parties_xxii() {
+        let mut scraper = AustriaScraper::default();
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
+            let parties = scraper.get_parties().await.unwrap();
+            println!("parties: {parties:?}");
+        }
     }
 }

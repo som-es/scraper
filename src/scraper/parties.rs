@@ -15,7 +15,7 @@ impl Parties for AustriaScraper {
         let enactment_paths = self
             .enactment_paths(raw_enactment_paths)
             .ok_or(ScraperError::NoEnactmentError)?;
-        let enactment = self.get_enactment(&enactment_paths[0]).await?;
+        let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;
 
         Ok(enactment
             .legislative_initiative

@@ -49,4 +49,7 @@ pub enum ScraperError {
 
     #[error("Could not parse enactment")]
     NoEnactmentError,
+
+    #[error("No vote found")]
+    NoVoteFound,
 }

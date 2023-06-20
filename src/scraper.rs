@@ -14,9 +14,9 @@ pub mod delegates;
 pub mod enactment;
 pub mod gov_officials;
 pub mod legis_init;
+pub mod parties;
 pub mod plenar;
 pub mod proposals;
-pub mod parties;
 
 #[async_trait]
 pub trait Scraper {

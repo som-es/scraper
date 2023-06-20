@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use common_scrapes::{LegislativeInitiative, Vote, Party};
+use common_scrapes::{LegislativeInitiative, Party, Vote};
 use serde_json::{json, Value};
 
 use crate::{
@@ -159,8 +159,8 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
                     party: Party {
                         name: vote["text"].as_str()?.to_string(),
                         color: vote["color"].as_str()?.to_string(),
+                        fraction: vote["fraction"].as_u64()? as u32,
                     },
-                    fraction: vote["fraction"].as_u64()? as u32,
                     infavor: vote["infavor"].as_bool()?,
                 })
             })
@@ -273,32 +273,41 @@ mod tests {
                 Vote {
                     party: Party {
                         name: "ÖVP".to_string(),
-                        color: "#62C3D0".to_string()
+                        color: "#62C3D0".to_string(),
+                        fraction: 71,
                     },
-                    fraction: 71,
                     infavor: true
                 },
                 Vote {
                     party: Party {
                         name: "SPÖ".to_string(),
-                        color: "#FF0000".to_string()
+                        color: "#FF0000".to_string(),
+                        fraction: 40,
                     },
-                    fraction: 40,
                     infavor: false
                 },
                 Vote {
-                    party: Party { name: "FPÖ".to_string(), color: "#0052FB".to_string() },
-                    fraction: 30,
+                    party: Party {
+                        name: "FPÖ".to_string(),
+                        color: "#0052FB".to_string(),
+                        fraction: 30,
+                    },
                     infavor: false
                 },
                 Vote {
-                    party: Party { name: "GRÜNE".to_string(), color: "#69B12E".to_string() },
-                    fraction: 26,
+                    party: Party {
+                        name: "GRÜNE".to_string(),
+                        color: "#69B12E".to_string(),
+                        fraction: 26,
+                    },
                     infavor: true
                 },
                 Vote {
-                    party: Party { name: "NEOS".to_string(), color: "#E3257B".to_string() },
-                    fraction: 15,
+                    party: Party {
+                        name: "NEOS".to_string(),
+                        color: "#E3257B".to_string(),
+                        fraction: 15,
+                    },
                     infavor: true
                 }
             ]
@@ -352,28 +361,43 @@ mod tests {
             init.votes,
             [
                 Vote {
-                    party: Party { name: "ÖVP".to_string(), color: "#62C3D0".to_string() },
-                    fraction: 71,
+                    party: Party {
+                        name: "ÖVP".to_string(),
+                        color: "#62C3D0".to_string(),
+                        fraction: 71,
+                    },
                     infavor: true
                 },
                 Vote {
-                    party: Party { name: "SPÖ".to_string(), color: "#FF0000".to_string() },
-                    fraction: 40,
+                    party: Party {
+                        name: "SPÖ".to_string(),
+                        color: "#FF0000".to_string(),
+                        fraction: 40,
+                    },
                     infavor: true
                 },
                 Vote {
-                    party: Party { name: "FPÖ".to_string(), color: "#0052FB".to_string() },
-                    fraction: 30,
+                    party: Party {
+                        name: "FPÖ".to_string(),
+                        color: "#0052FB".to_string(),
+                        fraction: 30,
+                    },
                     infavor: true
                 },
                 Vote {
-                    party: Party { name: "GRÜNE".to_string(), color: "#69B12E".to_string() },
-                    fraction: 26,
+                    party: Party {
+                        name: "GRÜNE".to_string(),
+                        color: "#69B12E".to_string(),
+                        fraction: 26,
+                    },
                     infavor: true
                 },
                 Vote {
-                    party: Party { name: "NEOS".to_string(), color: "#E3257B".to_string() },
-                    fraction: 15,
+                    party: Party {
+                        name: "NEOS".to_string(),
+                        color: "#E3257B".to_string(),
+                        fraction: 15,
+                    },
                     infavor: false
                 }
             ]

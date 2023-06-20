@@ -160,7 +160,9 @@ fn combine_speech_info(
         let speeches_len = speeches.len();
         for (speech, doc_link_speech) in speeches.iter_mut().zip(
             // potentially broken
-            document_link_speeches.get(end_idx..end_idx + speeches_len).unwrap_or_default()
+            document_link_speeches
+                .get(end_idx..end_idx + speeches_len)
+                .unwrap_or_default()
                 .iter()
                 .cloned(),
         ) {

@@ -1,7 +1,12 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use common_scrapes::Party;
 
-use crate::{enactment::EnactmentScraper, error::ScraperError, AustriaScraper, Scraper};
+use crate::{
+    enactment::EnactmentScraper, error::ScraperError, legis_init::LegislativeInitiatives,
+    AustriaScraper, Scraper,
+};
 
 #[async_trait]
 pub trait Parties: Scraper {
@@ -11,18 +16,39 @@ pub trait Parties: Scraper {
 #[async_trait]
 impl Parties for AustriaScraper {
     async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
-        let raw_enactment_paths = self.post_enactment_payload().await?;
+        /*let raw_enactment_paths = self.post_enactment_payload().await?;
         let enactment_paths = self
             .enactment_paths(raw_enactment_paths)
             .ok_or(ScraperError::NoEnactmentError)?;
-        let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;
+        let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;*/
 
-        Ok(enactment
-            .legislative_initiative
-            .votes
-            .into_iter()
-            .map(|vote| vote.party)
-            .collect())
+        let raw = self.post_legis_payload().await.unwrap();
+        for path in self.legis_paths(raw).unwrap() {
+            // println!("path: {path}");
+            let Ok(legis_init) = self.get_legis_init(&path).await else {
+                continue;
+            };
+            return Ok(legis_init
+                .votes
+                .into_iter()
+                .map(|vote| vote.party)
+                .collect());
+        }
+        let legis_init = self
+            .get_legis_init(&format!("/gegenstand/{}/I/1", self.scrape_info.gp[0]))
+            .await?;
+
+        // let parties = HashSet::new();
+
+        Ok(
+            //enactment
+            // .legislative_initiative
+            legis_init
+                .votes
+                .into_iter()
+                .map(|vote| vote.party)
+                .collect(),
+        )
     }
 }
 
@@ -100,7 +126,6 @@ mod tests {
                     color: "#0052FB".to_string(),
                     fraction: 21,
                 },
-                
                 Party {
                     name: "BZÖ".to_string(),
                     color: "#FECB56".to_string(),

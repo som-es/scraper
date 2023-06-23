@@ -403,4 +403,12 @@ mod tests {
             ]
         )
     }
+
+    #[tokio::test]
+    async fn test_xx_legis_init() {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XX".into()];
+
+        let res = scraper.get_legis_init("/gegenstand/XX/I/1").await.unwrap();
+    }
 }

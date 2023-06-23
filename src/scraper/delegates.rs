@@ -137,6 +137,10 @@ impl DelegateScraper for AustriaScraper {
     }
 }
 
+/*pub fn extract_party() -> Option<Party> {
+
+}*/
+
 pub fn extract_mandates(raw_mandates: &Value) -> Option<Vec<Mandate>> {
     Some(
         raw_mandates["mandate"]

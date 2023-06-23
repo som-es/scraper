@@ -338,4 +338,30 @@ mod tests {
         assert_eq!(next_debate_speech.opinion, Opinion::Against);
         assert_eq!(next_debate_speech.duration_in_seconds, 4 * 60 + 28);
     }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xx() {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XX".into()];
+
+        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+
+        let paths = scraper
+            .plenar_paths(plenar_infos)
+            .expect("Failed to get paths");
+
+        for path in paths {
+            println!("path: {path} ---");
+            let plenar = scraper.get_plenar(&path).await.unwrap();
+
+            let Some(debates) = plenar.debates.get(0) else {
+                println!("empty speeches");
+                continue;
+            };
+
+            if debates.speeches.is_empty() {
+                println!("empty speeches")
+            }
+        }
+    }
 }

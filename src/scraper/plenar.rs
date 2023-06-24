@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
@@ -111,15 +111,38 @@ impl Plenar for AustriaScraper {
         };
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
+        
         let debates_with_speeches = extract_speeches(past_debates);
+        // mind clone
+        //let debates = combine_speech_info2(debates_with_speeches.clone(), &document_link_speeches);
 
-        println!("LEN {} {}", document_link_speeches.len(), debates_with_speeches.len());
+        let mut document_link_speeches = document_link_speeches.into_iter().map(|speeches| {
+            (crate::key_from_speeches!(speeches), speeches)
+        }).collect::<BTreeMap<_, _>>();
+
+        let mut debates_with_speeches_keys = debates_with_speeches.into_iter().map(|(about, speeches)| {
+            println!("about: {about}");
+            (crate::key_from_speeches!(speeches), about, speeches)}).collect::<Vec<_>>();
+
+        let mut debates = vec![];
+        for (debates_key, about, mut debate_speeches) in debates_with_speeches_keys {
+            let document_link_speeches = document_link_speeches.get(&debates_key).unwrap();
+            for (debate_speech, document_link_speech) in debate_speeches.iter_mut().zip(document_link_speeches) {
+                debate_speech.opinion = document_link_speech.opinion.clone();
+                debate_speech.spoken_text_html_urls = document_link_speech.spoken_text_html_urls.clone();                
+            }
+            debates.push(Debate { about, speeches: debate_speeches });
+        }
+
+        /*println!(
+            "LEN {} {}",
+            document_link_speeches.len(),
+            debates_with_speeches.len()
+        );
         for (doc, sus) in document_link_speeches.iter().zip(&debates_with_speeches) {
             // println!("doc: {:?}, sus: {:?}", doc.delegate_id, sus.delegate_id)
             println!("{} {}={}", doc.len(), &sus.0[..15], sus.1.len());
-        }
-
-        let debates = combine_speech_info2(debates_with_speeches, &document_link_speeches);
+        }*/
 
         Some(PlenarInfo {
             title,
@@ -159,11 +182,20 @@ fn extract_call_to_order_info_from_stages(
     call_to_orders
 }
 
+#[macro_export]
+macro_rules! key_from_speeches {
+    ($speeches:ident) => {
+        $speeches
+            .iter()
+            .map(|speech| speech.delegate_id)
+            .collect::<Vec<u64>>()    
+    };
+}
+
 fn combine_speech_info2(
     debates_with_speeches: Vec<(String, Vec<PlenarSpeech>)>,
     document_link_speeches: &Vec<Vec<Speech>>,
 ) -> Vec<Debate> {
-
     todo!()
     /*// for multiple speeches of a single delegate in a single debate (strolz?)
     // let mut delegates_by_combined_speeches: HashMap<(String, u32), Vec<PlenarSpeech>> = HashMap::new();

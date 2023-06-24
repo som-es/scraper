@@ -22,23 +22,37 @@ fn extract_person_id_from_a_tag(a_tag_delegate_url: &str) -> Option<u64> {
 }
 
 pub fn extract_speeches_from_reden(rows_reden: &Value) -> Option<Vec<Speech>> {
-    Some(rows_reden["data"]["rows"].as_array()?.into_iter().flat_map(extract_speech).inspect(|x| println!("speech: {x:?}")).collect())
+    Some(
+        rows_reden["data"]["rows"]
+            .as_array()?
+            .into_iter()
+            .flat_map(extract_speech)
+            .collect(),
+    )
 }
 pub fn extract_speeches_from_stages(stages: &Value) -> Option<Vec<Vec<Speech>>> {
-    Some(stages.as_array()?.into_iter()
-        .flat_map(|stage| stage.get("reden"))
-        .flat_map(extract_speeches_from_reden)
-        .collect())
+    Some(
+        stages
+            .as_array()?
+            .into_iter()
+            .flat_map(|stage| stage.get("reden"))
+            .flat_map(extract_speeches_from_reden)
+            .collect(),
+    )
 }
 
 pub fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
-    Some(legis_content.get("phase")?.as_array()?
-        .into_iter()
-        .flat_map(|phase| phase.get("stages"))
-        .flat_map(extract_speeches_from_stages)
-        .flatten()
-        .flatten()
-        .collect())
+    Some(
+        legis_content
+            .get("phase")?
+            .as_array()?
+            .into_iter()
+            .flat_map(|phase| phase.get("stages"))
+            .flat_map(extract_speeches_from_stages)
+            .flatten()
+            .flatten()
+            .collect(),
+    )
 }
 
 pub fn extract_speech(speech: &Value) -> Option<Speech> {

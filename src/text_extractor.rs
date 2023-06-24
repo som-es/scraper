@@ -34,6 +34,15 @@ impl HasHTMLUrl for &PlenarSpeech {
     }
 }
 
+impl HasHTMLUrl for PlenarSpeech {
+    fn html_url(&self) -> &str {
+        self.spoken_text_html_urls
+            .first()
+            .expect("PlenarSpeech has no HTML URL")
+    }
+}
+
+
 enum State {
     /// The extractor is in a state where it has no cached HTML
     NoCache,
@@ -69,13 +78,14 @@ impl TextExtractor {
         html.replace_range(start..end, "");
 
         if let Some(key) = key {
-            self.cached_html = Some(html.clone());
             self.state = State::Cached(Some(key.to_string()));
-
-            return extract_text_from_html_via_name_attribute(
+            
+            let text = extract_text_from_html_via_name_attribute(
                 &html,
                 url.split('#').nth(1).unwrap(),
             );
+            self.cached_html = Some(html);
+            return text;
         }
         extract_text_from_html(&html)
     }
@@ -110,7 +120,7 @@ impl TextExtractor {
 #[cfg(test)]
 mod tests {
     use crate::{
-        legis_init::LegislativeInitiatives, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
+        legis_init::LegislativeInitiatives, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor, extract_text_from_html_via_name_attribute, plenar::Plenar,
     };
 
     #[tokio::test]
@@ -128,6 +138,32 @@ mod tests {
             let text = extractor.extract_text_from_url(&speech).await;
             println!("{}", text);
         }
+    }
+
+    #[tokio::test]
+    async fn test_text_extractor_missing_text() {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let res = extractor.extract_text_from_url(&"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145").await;
+        println!("res: {res:?}");
+    }
+
+    #[tokio::test]
+    async fn test_text_extractor_wrong_text() {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper.get_plenar("/gegenstand/XXVII/NRSITZ/117").await.unwrap();
+        for debate in plenar.debates {
+            for speech in debate.speeches {
+                if speech.delegate_id != 72959 {
+                    continue;
+                }
+                let text = extractor.extract_text_from_url(&speech).await;
+                println!("{}", text);
+            }
+        }
+
     }
 
     #[tokio::test]

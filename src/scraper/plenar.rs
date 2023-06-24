@@ -109,8 +109,15 @@ impl Plenar for AustriaScraper {
         };
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
-        let debate_with_speeches = extract_speeches(past_debates);
-        let debates = combine_speech_info(debate_with_speeches, &document_link_speeches);
+        let debates_with_speeches = extract_speeches(past_debates);
+        let sus = debates_with_speeches.iter().map(|dws| dws.1.clone()).flatten().collect::<Vec<_>>();
+        
+        for (doc, sus) in document_link_speeches.iter().zip(&sus) {
+            println!("doc: {:?}, sus: {:?}", doc.delegate_id, sus.delegate_id)
+        }
+
+
+        let debates = combine_speech_info(debates_with_speeches, &document_link_speeches);
 
         Some(PlenarInfo {
             title,
@@ -361,6 +368,23 @@ mod tests {
 
             if debates.speeches.is_empty() {
                 println!("empty speeches")
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_plenar_speech_and_legis_init_speech_mapping() {
+        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper.get_plenar("/gegenstand/XXVII/NRSITZ/117").await.unwrap();
+        for debate in plenar.debates {
+            for speech in debate.speeches {
+                if speech.delegate_id != 72959 {
+                    continue;
+                }
+                // let text = extractor.extract_text_from_url(&speech).await;
+                // println!("{}", text);
             }
         }
     }

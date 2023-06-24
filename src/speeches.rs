@@ -21,36 +21,24 @@ fn extract_person_id_from_a_tag(a_tag_delegate_url: &str) -> Option<u64> {
         .and_then(|id| id.split('"').next()?.parse::<u64>().ok())
 }
 
-pub fn extract_speeches_from_reden(rows_reden: &Value, speeches: &mut Vec<Speech>) -> Option<()> {
-    for speech in rows_reden["data"]["rows"].as_array()? {
-        let Some(speech) = extract_speech(speech) else {
-            continue;
-        };
-        speeches.push(speech);
-    }
-    Some(())
+pub fn extract_speeches_from_reden(rows_reden: &Value) -> Option<Vec<Speech>> {
+    Some(rows_reden["data"]["rows"].as_array()?.into_iter().flat_map(extract_speech).inspect(|x| println!("speech: {x:?}")).collect())
 }
-pub fn extract_speeches_from_stages(stages: &Value, speeches: &mut Vec<Speech>) -> Option<()> {
-    for stage in stages.as_array()? {
-        let Some(reden) = stage.get("reden") else {
-            continue;
-        };
-        // let before_speeches_len = speeches.len();
-        extract_speeches_from_reden(reden, speeches)?;
-        // println!("doc_link_speech_len: {}", speeches.len() - before_speeches_len)
-    }
-    Some(())
+pub fn extract_speeches_from_stages(stages: &Value) -> Option<Vec<Vec<Speech>>> {
+    Some(stages.as_array()?.into_iter()
+        .flat_map(|stage| stage.get("reden"))
+        .flat_map(extract_speeches_from_reden)
+        .collect())
 }
 
 pub fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
-    let mut speeches = vec![];
-    for phase in legis_content.get("phase")?.as_array()? {
-        let Some(stages) = phase.get("stages") else {
-            continue;
-        };
-        extract_speeches_from_stages(stages, &mut speeches);
-    }
-    Some(speeches)
+    Some(legis_content.get("phase")?.as_array()?
+        .into_iter()
+        .flat_map(|phase| phase.get("stages"))
+        .flat_map(extract_speeches_from_stages)
+        .flatten()
+        .flatten()
+        .collect())
 }
 
 pub fn extract_speech(speech: &Value) -> Option<Speech> {

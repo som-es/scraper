@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use common_scrapes::{Opinion, PlenarSpeech, Speech};
@@ -94,7 +96,7 @@ impl Plenar for AustriaScraper {
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];
         if let Some(stages) = plenar_content_0.get("stages") {
-            extract_speeches_from_stages(stages, &mut document_link_speeches);
+            document_link_speeches = extract_speeches_from_stages(stages).unwrap_or_default();
             call_to_orders = extract_call_to_order_info_from_stages(&ityp, inr, stages);
         }
 
@@ -110,14 +112,14 @@ impl Plenar for AustriaScraper {
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);
-        let sus = debates_with_speeches.iter().map(|dws| dws.1.clone()).flatten().collect::<Vec<_>>();
-        
-        for (doc, sus) in document_link_speeches.iter().zip(&sus) {
-            println!("doc: {:?}, sus: {:?}", doc.delegate_id, sus.delegate_id)
+
+        println!("LEN {} {}", document_link_speeches.len(), debates_with_speeches.len());
+        for (doc, sus) in document_link_speeches.iter().zip(&debates_with_speeches) {
+            // println!("doc: {:?}, sus: {:?}", doc.delegate_id, sus.delegate_id)
+            println!("{} {}={}", doc.len(), &sus.0[..15], sus.1.len());
         }
 
-
-        let debates = combine_speech_info(debates_with_speeches, &document_link_speeches);
+        let debates = combine_speech_info2(debates_with_speeches, &document_link_speeches);
 
         Some(PlenarInfo {
             title,
@@ -157,6 +159,60 @@ fn extract_call_to_order_info_from_stages(
     call_to_orders
 }
 
+fn combine_speech_info2(
+    debates_with_speeches: Vec<(String, Vec<PlenarSpeech>)>,
+    document_link_speeches: &Vec<Vec<Speech>>,
+) -> Vec<Debate> {
+
+    todo!()
+    /*// for multiple speeches of a single delegate in a single debate (strolz?)
+    // let mut delegates_by_combined_speeches: HashMap<(String, u32), Vec<PlenarSpeech>> = HashMap::new();
+    let mut delegates_by_combined_speeches: HashMap<(String, u64), PlenarSpeech> = HashMap::new();
+
+    let mut about_order = vec![];
+    let mut end_idx = 0;
+
+    for (about, speeches) in &debates_with_speeches {
+        for speech in speeches {
+            if speech.delegate_id == 80479 {
+                println!("yes: {about}");
+            }
+            delegates_by_combined_speeches.insert((about.clone(), speech.delegate_id), speech.clone());
+        }
+        about_order.push(about.clone());
+    }
+
+    for (about, speeches) in debates_with_speeches {
+        let speeches_len = speeches.len();
+
+        for speech in &document_link_speeches[end_idx..end_idx + speeches_len] {
+
+            let plenar_speech = delegates_by_combined_speeches
+                .get_mut(&(about.clone(), speech.delegate_id))
+                .expect(&format!("{} does not exist! :({about})", speech.delegate_id));
+            plenar_speech.opinion = speech.opinion.clone();
+            plenar_speech.spoken_text_html_urls = speech.spoken_text_html_urls.clone();
+        }
+
+        end_idx += speeches_len;
+    }
+
+    let mut debates = vec![];
+
+    'outer: for about in about_order {
+        let mut speeches = vec![];
+        for ((map_about, _), speech) in delegates_by_combined_speeches.iter() {
+            if &about == map_about {
+                speeches.push(speech.clone());
+            } else {
+                debates.push(Debate { about, speeches });
+                continue 'outer;
+            }
+        }
+    }
+    debates*/
+}
+
 fn combine_speech_info(
     debate_with_speeches: Vec<(String, Vec<PlenarSpeech>)>,
     document_link_speeches: &[Speech],
@@ -170,6 +226,7 @@ fn combine_speech_info(
             document_link_speeches
                 .get(end_idx..end_idx + speeches_len)
                 .unwrap_or_default()
+                // .expect("no")
                 .iter()
                 .cloned(),
         ) {
@@ -197,6 +254,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
                 past_debate["speeches"].as_array()?,
             ))
         })
+        .filter(|(_, speeches)| !speeches.is_empty())
         .flat_map(|(text, speeches)| {
             debates.push(text.to_string());
             Some((
@@ -377,7 +435,10 @@ mod tests {
         // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let scraper = AustriaScraper::default();
-        let plenar = scraper.get_plenar("/gegenstand/XXVII/NRSITZ/117").await.unwrap();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/117")
+            .await
+            .unwrap();
         for debate in plenar.debates {
             for speech in debate.speeches {
                 if speech.delegate_id != 72959 {

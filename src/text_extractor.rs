@@ -42,7 +42,6 @@ impl HasHTMLUrl for PlenarSpeech {
     }
 }
 
-
 enum State {
     /// The extractor is in a state where it has no cached HTML
     NoCache,
@@ -79,11 +78,9 @@ impl TextExtractor {
 
         if let Some(key) = key {
             self.state = State::Cached(Some(key.to_string()));
-            
-            let text = extract_text_from_html_via_name_attribute(
-                &html,
-                url.split('#').nth(1).unwrap(),
-            );
+
+            let text =
+                extract_text_from_html_via_name_attribute(&html, url.split('#').nth(1).unwrap());
             self.cached_html = Some(html);
             return text;
         }
@@ -120,7 +117,8 @@ impl TextExtractor {
 #[cfg(test)]
 mod tests {
     use crate::{
-        legis_init::LegislativeInitiatives, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor, extract_text_from_html_via_name_attribute, plenar::Plenar,
+        extract_text_from_html_via_name_attribute, legis_init::LegislativeInitiatives,
+        plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
     };
 
     #[tokio::test]
@@ -144,7 +142,9 @@ mod tests {
     async fn test_text_extractor_missing_text() {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
-        let res = extractor.extract_text_from_url(&"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145").await;
+        let res = extractor
+            .extract_text_from_url(&"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145")
+            .await;
         println!("res: {res:?}");
     }
 
@@ -153,7 +153,10 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let scraper = AustriaScraper::default();
-        let plenar = scraper.get_plenar("/gegenstand/XXVII/NRSITZ/117").await.unwrap();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/117")
+            .await
+            .unwrap();
         for debate in plenar.debates {
             for speech in debate.speeches {
                 if speech.delegate_id != 72959 {
@@ -163,7 +166,6 @@ mod tests {
                 println!("{}", text);
             }
         }
-
     }
 
     #[tokio::test]

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
@@ -111,27 +111,34 @@ impl Plenar for AustriaScraper {
         };
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
-        
         let debates_with_speeches = extract_speeches(past_debates);
         // mind clone
         //let debates = combine_speech_info2(debates_with_speeches.clone(), &document_link_speeches);
 
-        let mut document_link_speeches = document_link_speeches.into_iter().map(|speeches| {
-            (crate::key_from_speeches!(speeches), speeches)
-        }).collect::<BTreeMap<_, _>>();
+        let document_link_speeches = document_link_speeches
+            .into_iter()
+            .map(|speeches| (crate::key_from_speeches!(speeches), speeches))
+            .collect::<BTreeMap<_, _>>();
 
-        let mut debates_with_speeches_keys = debates_with_speeches.into_iter().map(|(about, speeches)| {
-            println!("about: {about}");
-            (crate::key_from_speeches!(speeches), about, speeches)}).collect::<Vec<_>>();
+        let debates_with_speeches_keys = debates_with_speeches
+            .into_iter()
+            .map(|(about, speeches)| (crate::key_from_speeches!(speeches), about, speeches))
+            .collect::<Vec<_>>();
 
         let mut debates = vec![];
         for (debates_key, about, mut debate_speeches) in debates_with_speeches_keys {
             let document_link_speeches = document_link_speeches.get(&debates_key).unwrap();
-            for (debate_speech, document_link_speech) in debate_speeches.iter_mut().zip(document_link_speeches) {
+            for (debate_speech, document_link_speech) in
+                debate_speeches.iter_mut().zip(document_link_speeches)
+            {
                 debate_speech.opinion = document_link_speech.opinion.clone();
-                debate_speech.spoken_text_html_urls = document_link_speech.spoken_text_html_urls.clone();                
+                debate_speech.spoken_text_html_urls =
+                    document_link_speech.spoken_text_html_urls.clone();
             }
-            debates.push(Debate { about, speeches: debate_speeches });
+            debates.push(Debate {
+                about,
+                speeches: debate_speeches,
+            });
         }
 
         /*println!(
@@ -188,7 +195,7 @@ macro_rules! key_from_speeches {
         $speeches
             .iter()
             .map(|speech| speech.delegate_id)
-            .collect::<Vec<u64>>()    
+            .collect::<Vec<u64>>()
     };
 }
 
@@ -363,18 +370,18 @@ mod tests {
         assert_eq!(plenar.legislative_period, "XXVII");
         assert_eq!(plenar.ityp, "NRSITZ");
         assert_eq!(plenar.inr, 211);
-        assert_eq!(plenar.debates[1].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
+        assert_eq!(plenar.debates[0].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
         assert_eq!(
-            plenar.debates[1].speeches[0].spoken_text_html_urls[0],
+            plenar.debates[0].speeches[0].spoken_text_html_urls[0],
             "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html"
         );
-        assert_eq!(plenar.debates[1].speeches[0].duration_in_seconds, 831);
+        assert_eq!(plenar.debates[0].speeches[0].duration_in_seconds, 831);
         assert_eq!(
-            plenar.debates[2].speeches[plenar.debates[2].speeches.len() - 4].duration_in_seconds,
+            plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4].duration_in_seconds,
             300
         );
         assert_eq!(
-            plenar.debates[2].speeches[plenar.debates[2].speeches.len() - 4].spoken_text_html_urls
+            plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4].spoken_text_html_urls
                 [0],
             "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html"
         );

@@ -135,7 +135,7 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
     most_fitting_date
 }
 
-fn extract_most_fitting_date<'a>(raw_stages: &'a Value) -> Option<&'a str> {
+fn extract_most_fitting_date(raw_stages: &Value) -> Option<&str> {
     let mut fitting_date = None;
     for raw_stage in raw_stages.as_array()? {
         if raw_stage.get("priority").is_none() {
@@ -345,7 +345,7 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/3021")
             .await
             .unwrap();
-
+        
         assert_eq!(init.id, "XXVII/A/3021");
         assert_eq!(init.ityp, "A");
         assert_eq!(

@@ -57,6 +57,7 @@ enum State {
 pub struct TextExtractor {
     pub cached_html: Option<String>,
     state: State,
+    pub client: reqwest::Client,
     pub base_url: String,
 }
 
@@ -65,12 +66,13 @@ impl TextExtractor {
         Self {
             cached_html: None,
             state: State::NoCache,
+            client: reqwest::Client::new(),
             base_url: base_url.to_string(),
         }
     }
 
     pub async fn get_html(&mut self, url: &str, key: Option<&str>) -> String {
-        let response = reqwest::get(url).await.unwrap();
+        let response = self.client.get(url).send().await.unwrap();
         let mut html = response.text().await.unwrap();
         let start = html.find("<style>").unwrap_or_default();
         let end = html.find("</style>").unwrap_or_default();

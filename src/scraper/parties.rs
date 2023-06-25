@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+
 
 use async_trait::async_trait;
 use common_scrapes::Party;
 
 use crate::{
-    enactment::EnactmentScraper, error::ScraperError, legis_init::LegislativeInitiatives,
+    error::ScraperError, legis_init::LegislativeInitiatives,
     AustriaScraper, Scraper,
 };
 

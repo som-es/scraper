@@ -76,13 +76,15 @@ impl LegislativeInitiatives for AustriaScraper {
             .flat_map(|name| person_url_to_id(name["url"].as_str()?))
             .collect::<Vec<u64>>();
 
-        let votes = extract_votes(legis_content)?;
+        // let votes = extract_votes(legis_content)?;
+        let votes = extract_votes(legis_content).unwrap_or_default();
+
         let speeches = extract_speeches(legis_content).unwrap_or_default();
         let date = extract_date(legis_content)?;
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
-        let accepted = legis_content["vote"]["infavor"].as_bool()?;
+        let accepted = legis_content["vote"]["infavor"].as_bool();
 
         let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
             let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
@@ -176,7 +178,7 @@ mod tests {
     use crate::{
         extract_text_from_html,
         legis_init::{LegislativeInitiatives, Vote},
-        AustriaScraper,
+        AustriaScraper, Scraper,
     };
 
     #[test]
@@ -210,6 +212,7 @@ mod tests {
         for path in scraper.legis_paths(initiatives).unwrap() {
             //println!("path: {path:?}");
             let Ok(init) = scraper.get_legis_init(&path).await else {
+                println!("{}{path}", AustriaScraper::BASE_URL);
                 continue;
             };
             println!("id: {}, title: {}", init.id, init.title);
@@ -313,7 +316,7 @@ mod tests {
             ]
         );
 
-        assert!(init.accepted);
+        assert!(init.accepted.unwrap());
 
         assert_eq!(init.id, "XXVII/I/1954");
         assert_eq!(init.ityp, "I".to_string());
@@ -410,5 +413,13 @@ mod tests {
         scraper.scrape_info.gp = vec!["XX".into()];
 
         let res = scraper.get_legis_init("/gegenstand/XX/I/1").await.unwrap();
+    }
+
+    // test may get invalid -> legis init got voted on potentially
+    #[tokio::test]
+    async fn test_orf_gesetz_no_vote_at_some_point_xxvii_i_2082() {
+        let scraper = AustriaScraper::default();
+        let res = scraper.get_legis_init("/gegenstand/XXVII/I/2082").await.unwrap();
+        println!("res: {res:?}");
     }
 }

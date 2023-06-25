@@ -118,7 +118,7 @@ mod tests {
                 println!("not processable");
                 continue;
             };
-            if !legis_init.legislative_initiative.accepted {
+            if !legis_init.legislative_initiative.accepted.unwrap_or_default() {
                 println!("{legis_init:?}");
             }
         }

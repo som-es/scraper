@@ -84,8 +84,12 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
-        let accepted = legis_content["vote"]["infavor"].as_bool();
-
+        let accepted = if votes.is_empty() {
+            legis_content["vote"]["infavor"].as_bool()
+        } else {
+            None
+        };
+        
         let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
             let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
             let teil2 = extract_text_from_html(shortinfo["teil2"].as_str().unwrap_or_default());
@@ -421,5 +425,6 @@ mod tests {
         let scraper = AustriaScraper::default();
         let res = scraper.get_legis_init("/gegenstand/XXVII/I/2082").await.unwrap();
         println!("res: {res:?}");
+        println!("acc: {:?}", res.accepted)
     }
 }

@@ -22,8 +22,8 @@ impl Parties for AustriaScraper {
             .ok_or(ScraperError::NoEnactmentError)?;
         let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;*/
 
-        let raw = self.post_legis_payload().await.unwrap();
-        for path in self.legis_paths(raw).unwrap() {
+        let raw = self.post_legis_payload().await?;
+        for path in self.legis_paths(raw)? {
             // println!("path: {path}");
             let Ok(legis_init) = self.get_legis_init(&path).await else {
                 continue;

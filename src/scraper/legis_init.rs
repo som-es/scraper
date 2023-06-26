@@ -85,9 +85,9 @@ impl LegislativeInitiatives for AustriaScraper {
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
         let accepted = if votes.is_empty() {
-            legis_content["vote"]["infavor"].as_bool()
-        } else {
             None
+        } else {
+            legis_content["vote"]["infavor"].as_bool()
         };
         
         let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
@@ -353,6 +353,7 @@ mod tests {
             .await
             .unwrap();
         
+        assert_eq!(init.accepted, Some(true));
         assert_eq!(init.id, "XXVII/A/3021");
         assert_eq!(init.ityp, "A");
         assert_eq!(

@@ -1,12 +1,7 @@
-
-
 use async_trait::async_trait;
 use common_scrapes::Party;
 
-use crate::{
-    error::ScraperError, legis_init::LegislativeInitiatives,
-    AustriaScraper, Scraper,
-};
+use crate::{error::ScraperError, legis_init::LegislativeInitiatives, AustriaScraper, Scraper};
 
 #[async_trait]
 pub trait Parties: Scraper {

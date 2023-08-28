@@ -74,7 +74,8 @@ impl DelegateScraper for AustriaScraper {
 
         let mandates = extract_mandates(&person_info["content"]["biografie"]["mandatefunktionen"])?;
 
-        let birthdate = extract_birthdate(&person_info["content"]["biografie"]["kurzbiografie"]["gebtext"]);
+        let birthdate =
+            extract_birthdate(&person_info["content"]["biografie"]["kurzbiografie"]["gebtext"]);
 
         // choose newest mandate
         let newest_mandate = mandates.get(0);
@@ -205,20 +206,16 @@ pub fn extract_social_medium(raw_medium: &Value) -> Option<SocialMedium> {
     Some(SocialMedium { url, channel })
 }
 
-pub fn extract_birthdate(raw_birthinfo: &Value) -> Option<String> {
+pub fn extract_birthdate(raw_birthinfo: &Value) -> Option<NaiveDate> {
     if raw_birthinfo.is_null() {
         return None;
     }
 
     // dd.mm.yyyy
-    let date_matcher: Regex = Regex::new("(\\d{2}\\.){2}\\d{4}").unwrap();
-    let date = date_matcher.find(raw_birthinfo.as_str().unwrap());
-    
-    if date.is_none() {
-        return None;
-    }
+    let date_matcher: Regex = Regex::new("(\\d{2}\\.){2}\\d{4}").ok()?;
+    let date = date_matcher.find(raw_birthinfo.as_str()?)?;
 
-    Some(date.unwrap().as_str().to_string())
+    Some(NaiveDate::parse_from_str(&date.as_str(), "%d.%m.%Y").ok()?)
 }
 
 #[cfg(test)]
@@ -268,9 +265,11 @@ mod tests {
 
         assert_eq!(res.name, "Diesner-Wais Martina");
         assert_eq!(res.party.unwrap(), "ÖVP");
+        // subject to change in coming elections
         assert_eq!(res.council.unwrap(), "nr");
 
-        // subject to change in coming elections
+        assert_eq!(res.birthdate.unwrap().to_string(), "1968-02-10");
+
         assert_eq!(res.contact.phone_number, Some("+43 1 401 10-4687".into()));
         assert_eq!(
             res.contact.mail,
@@ -400,6 +399,11 @@ mod tests {
         );
         assert!(delegate.is_active);
         assert_eq!(delegate.gender, Gender::Male);
+
+        assert_eq!(
+            delegate.birthdate,
+            Some(NaiveDate::parse_from_str("1959-04-24", "%Y-%m-%d").unwrap())
+        );
 
         Ok(())
     }

@@ -4,6 +4,7 @@ use common_scrapes::{
     Contact, Delegate, Gender, Mandate, Seat, SocialMedia, SocialMedium, SocialMediumChannel,
 };
 
+use regex::Regex;
 use reqwest::Method;
 use serde_json::{json, Value};
 
@@ -73,6 +74,8 @@ impl DelegateScraper for AustriaScraper {
 
         let mandates = extract_mandates(&person_info["content"]["biografie"]["mandatefunktionen"])?;
 
+        let birthdate = extract_birthdate(&person_info["content"]["biografie"]["kurzbiografie"]["gebtext"]);
+
         // choose newest mandate
         let newest_mandate = mandates.get(0);
 
@@ -122,6 +125,7 @@ impl DelegateScraper for AustriaScraper {
             council: council.as_str().map(|council| council.to_string()),
             seat,
             gender: Gender::from_indicators(gender_indicators),
+            birthdate,
             mandates,
             contact: Contact {
                 mail,
@@ -199,6 +203,22 @@ pub fn extract_social_medium(raw_medium: &Value) -> Option<SocialMedium> {
     };
 
     Some(SocialMedium { url, channel })
+}
+
+pub fn extract_birthdate(raw_birthinfo: &Value) -> Option<String> {
+    if raw_birthinfo.is_null() {
+        return None;
+    }
+
+    // dd.mm.yyyy
+    let date_matcher: Regex = Regex::new("(\\d{2}\\.){2}\\d{4}").unwrap();
+    let date = date_matcher.find(raw_birthinfo.as_str().unwrap());
+    
+    if date.is_none() {
+        return None;
+    }
+
+    Some(date.unwrap().as_str().to_string())
 }
 
 #[cfg(test)]

@@ -68,6 +68,7 @@ pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
             mandates: todo!(),
             contact: todo!(), // from delegate call
             gender: todo!(),
+            birthdate: todo!(),
         },
     })
 }

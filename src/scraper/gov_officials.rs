@@ -24,7 +24,7 @@ pub fn extract_gov_from_html(gov_html: &str) -> String {
     extract_text_from_html(gov_html)
 }
 
-// /WWER/PAD_18140/index.shtml => 18140
+// /WWER/PAD_18140/index.shtml => 18140 (could use regex)
 pub fn extract_id_from_unnecessary_link(link_containing_id: &str) -> Option<u64> {
     let start_idx = link_containing_id.find('_')? + 1;
 

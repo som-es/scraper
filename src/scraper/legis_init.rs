@@ -78,6 +78,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         // let votes = extract_votes(legis_content)?;
         let votes = extract_votes(legis_content).unwrap_or_default();
+        let topics = extract_topics(legis_content).unwrap_or_default();
 
         let speeches = extract_speeches(legis_content).unwrap_or_default();
         let date = extract_date(legis_content)?;
@@ -115,6 +116,7 @@ impl LegislativeInitiatives for AustriaScraper {
             accepted,
             date,
             speeches,
+            topics,
         })
     }
 
@@ -153,6 +155,16 @@ fn extract_most_fitting_date(raw_stages: &Value) -> Option<&str> {
         fitting_date = Some(date)
     }
     fitting_date
+}
+
+fn extract_topics(legis_content: &Value) -> Option<Vec<String>> {
+    Some(
+        legis_content["topics"]["data"]["bubbles"]
+            .as_array()?
+            .iter()
+            .flat_map(|topic| topic["label"].as_str().map(|topic| topic.to_string()))
+            .collect(),
+    )
 }
 
 fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
@@ -219,7 +231,8 @@ mod tests {
                 println!("{}{path}", AustriaScraper::BASE_URL);
                 continue;
             };
-            println!("id: {}, title: {}", init.id, init.title);
+            println!("topics: {:?}", init.topics);
+            // println!("id: {}, title: {}", init.id, init.title);
         }
 
         println!("elapsed: {:?}", start.elapsed());
@@ -262,6 +275,8 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/1954")
             .await
             .unwrap();
+
+        assert_eq!(init.topics, vec!["Verkehr und Infrastruktur".to_string()]);
 
         assert_eq!(
             init.title,
@@ -352,6 +367,8 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/3021")
             .await
             .unwrap();
+
+        assert_eq!(init.topics, vec!["Arbeit".to_string()]);
 
         assert_eq!(init.accepted, Some(true));
         assert_eq!(init.id, "XXVII/A/3021");

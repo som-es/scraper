@@ -120,42 +120,59 @@ impl ProposalScraper for AustriaScraper {
         //     println!("{json}");
         // }
         
-        // weird AB: ityp AB inr 13696 gp XXVII, has no delegates associated with AB, no fitting title
-        // https://www.parlament.gv.at/gegenstand/XXVII/AB/13696
-        let names = raw_proposal_content["names"].as_array()?;
-
-        let issuer_ids = names
-            .iter()
-            .filter(|name| name["funktext"] == "Eingebracht von")
-            .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
-            .collect::<Vec<u64>>();
-
         let ityp = raw_proposal_content["ityp"].as_str().unwrap().to_string();
 
-        let receiver_text = if ityp == "AB" {
-            "Beantwortet durch"
+        // weird AB: ityp AB inr 13696 gp XXVII, has no delegates associated with AB, no fitting title
+        // https://www.parlament.gv.at/gegenstand/XXVII/AB/13696
+
+        let issuer_ids;
+        let receiver_ids;
+        if let Some(names) = raw_proposal_content["names"].as_array() {
+            issuer_ids = names
+                .iter()
+                .filter(|name| name["funktext"] == "Eingebracht von")
+                .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
+                .collect::<Vec<u64>>();
+
+
+            let receiver_text = if ityp == "AB" {
+                "Beantwortet durch"
+            } else {
+                "Eingebracht an"
+            };
+
+            receiver_ids = names
+                .iter()
+                .filter(|name| name["funktext"] == receiver_text)
+                .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
+                .collect::<Vec<u64>>();
         } else {
-            "Eingebracht an"
+            issuer_ids = vec![];
+            receiver_ids = vec![];
+        }
+
+        let description = raw_proposal_content["description"].as_str()?.to_string();
+        let raw_documents = raw_proposal_content["documents"].as_array().cloned().unwrap_or_default();
+
+        let documents = match documents(&raw_documents) {
+            Some(d) => d,
+            None => {
+                // "Dieses Dokument ist nicht öffentlich zugänglich"
+                // if !raw_documents.is_empty() {
+                //     log::error!("Raw documents are not empty, but documents could not be processed?: {:?}", serde_json::to_string_pretty(&raw_documents));
+                // }
+                return None
+            },
         };
 
-        let receiver_ids = names
-            .iter()
-            .filter(|name| name["funktext"] == receiver_text)
-            .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
-            .collect::<Vec<u64>>();
-
-        let description = raw_proposal_content["description"].as_str().unwrap().to_string();
-        let raw_documents = raw_proposal_content["documents"].as_array().cloned().unwrap_or_default();
-        let documents = documents(&raw_documents).unwrap();
-
-        let title = raw_proposal["meta"]["title"].as_str().unwrap().to_string();
-        let inr = raw_proposal_content["inr"].as_u64().unwrap();
+        let title = raw_proposal["meta"]["title"].as_str()?.to_string();
+        let inr = raw_proposal_content["inr"].as_u64()?;
 
         let id = format!("{ityp}/{inr}");
 
-        let gp = raw_proposal_content["gp_code"].as_str().unwrap().to_string();
+        let gp = raw_proposal_content["gp_code"].as_str()?.to_string();
 
-        let proposal_type = ProposalType::from_str(&ityp, raw_proposal_content).unwrap();
+        let proposal_type = ProposalType::from_str(&ityp, raw_proposal_content)?;
 
         Some(Proposal {
             id,
@@ -219,15 +236,19 @@ mod tests {
         // let out = serde_json::to_string(&proposal_paths).unwrap();
         // std::fs::write("prop-paths", out).unwrap();
         println!("props: {}", proposal_paths.len());
-        for proposal_path in &proposal_paths[200..800] {
-            if !proposal_path.contains("J") {
+        for proposal_path in &proposal_paths {
+            if proposal_path.contains("A") {
                 continue;
             }
             println!("proposal_path: {}", proposal_path);
-            let proposal = scraper.get_proposal(proposal_path).await?;
-            // println!("proposal: {proposal:?}");
-            if proposal.ityp == "J" {
-                println!("anfrage {:?}", proposal.issuer_ids);
+            match scraper.get_proposal(proposal_path).await {
+                Ok(proposal) => {
+                    // println!("proposal: {proposal:?}");
+                    if proposal.ityp == "J" {
+                        println!("anfrage {:?}", proposal.issuer_ids);
+                    }
+                }
+                Err(_) => println!("could not parse: {proposal_path}"),
             }
         }
         Ok(())

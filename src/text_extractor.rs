@@ -171,6 +171,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_text_extractor_fail() {
+        // /dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let res = extractor
+            .extract_text_from_url(&"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870")
+            .await;
+        println!("res: {res:?}");
+    }
+
+    #[tokio::test]
     async fn test_text_extractor_changing_cache() {
         let scraper = AustriaScraper::default();
 

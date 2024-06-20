@@ -115,18 +115,22 @@ impl ProposalScraper for AustriaScraper {
 
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
         let raw_proposal_content = &raw_proposal["content"];
-        // let json = serde_json::to_string_pretty(raw_proposal_content).unwrap();
-        // println!("{json}");
-
+        // if raw_proposal_content["names"].as_array().is_none() {
+        //     let json = serde_json::to_string_pretty(raw_proposal_content).unwrap();
+        //     println!("{json}");
+        // }
+        
+        // weird AB: ityp AB inr 13696 gp XXVII, has no delegates associated with AB, no fitting title
+        // https://www.parlament.gv.at/gegenstand/XXVII/AB/13696
         let names = raw_proposal_content["names"].as_array()?;
 
         let issuer_ids = names
             .iter()
             .filter(|name| name["funktext"] == "Eingebracht von")
-            .flat_map(|name| person_url_to_id(name["url"].as_str()?))
+            .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
             .collect::<Vec<u64>>();
 
-        let ityp = raw_proposal_content["ityp"].as_str()?.to_string();
+        let ityp = raw_proposal_content["ityp"].as_str().unwrap().to_string();
 
         let receiver_text = if ityp == "AB" {
             "Beantwortet durch"
@@ -137,21 +141,21 @@ impl ProposalScraper for AustriaScraper {
         let receiver_ids = names
             .iter()
             .filter(|name| name["funktext"] == receiver_text)
-            .flat_map(|name| person_url_to_id(name["url"].as_str()?))
+            .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
             .collect::<Vec<u64>>();
 
-        let description = raw_proposal_content["description"].as_str()?.to_string();
-        let raw_documents = raw_proposal_content["documents"].as_array()?;
-        let documents = documents(raw_documents)?;
+        let description = raw_proposal_content["description"].as_str().unwrap().to_string();
+        let raw_documents = raw_proposal_content["documents"].as_array().cloned().unwrap_or_default();
+        let documents = documents(&raw_documents).unwrap();
 
-        let title = raw_proposal["meta"]["title"].as_str()?.to_string();
-        let inr = raw_proposal_content["inr"].as_u64()?;
+        let title = raw_proposal["meta"]["title"].as_str().unwrap().to_string();
+        let inr = raw_proposal_content["inr"].as_u64().unwrap();
 
         let id = format!("{ityp}/{inr}");
 
-        let gp = raw_proposal_content["gp_code"].as_str()?.to_string();
+        let gp = raw_proposal_content["gp_code"].as_str().unwrap().to_string();
 
-        let proposal_type = ProposalType::from_str(&ityp, raw_proposal_content)?;
+        let proposal_type = ProposalType::from_str(&ityp, raw_proposal_content).unwrap();
 
         Some(Proposal {
             id,
@@ -196,16 +200,35 @@ mod tests {
     #[tokio::test]
     async fn test_get_all_proposals() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
+    
+        let proposal_paths = match std::fs::read_to_string("prop-paths") {
+            Ok(p) => {
+                println!("read");
+                serde_json::from_str(&p).unwrap()
+            },
+            Err(e) => {
+                println!("e: {e:?}");
+                let proposal_payload = ProposalsPayload::default();
+                let proposals = scraper.post_proposals_payload(proposal_payload).await?;
 
-        let proposal_payload = ProposalsPayload::default();
-        let proposals = scraper.post_proposals_payload(proposal_payload).await?;
+                scraper.proposal_paths(proposals).unwrap()
+            },
+        };
+        println!("scraped paths");
 
-        let proposal_paths = scraper.proposal_paths(proposals).unwrap();
-
-        for proposal_path in &proposal_paths[600..800] {
+        // let out = serde_json::to_string(&proposal_paths).unwrap();
+        // std::fs::write("prop-paths", out).unwrap();
+        println!("props: {}", proposal_paths.len());
+        for proposal_path in &proposal_paths[200..800] {
+            if !proposal_path.contains("J") {
+                continue;
+            }
             println!("proposal_path: {}", proposal_path);
             let proposal = scraper.get_proposal(proposal_path).await?;
-            println!("proposal: {proposal:?}");
+            // println!("proposal: {proposal:?}");
+            if proposal.ityp == "J" {
+                println!("anfrage {:?}", proposal.issuer_ids);
+            }
         }
         Ok(())
     }

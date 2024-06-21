@@ -161,7 +161,7 @@ impl ProposalScraper for AustriaScraper {
                 // if !raw_documents.is_empty() {
                 //     log::error!("Raw documents are not empty, but documents could not be processed?: {:?}", serde_json::to_string_pretty(&raw_documents));
                 // }
-                return None
+                vec![]
             },
         };
 

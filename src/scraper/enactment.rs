@@ -70,7 +70,7 @@ impl EnactmentScraper for AustriaScraper {
     async fn raw_enactment_into_enactment(&self, raw_enactment: &Value) -> Option<Enactment> {
         let content = &raw_enactment["content"];
         let reference = &content["reference"].as_array()?[0];
-        let legis_init_path = reference["url"].as_str()?;
+        let legis_init_path = reference["url"].as_str().unwrap();
 
         let stages = &content["stages"].as_array()?;
         let nr_stage = &stages[0];
@@ -115,7 +115,7 @@ mod tests {
         for path in scraper.enactment_paths(raw_enactments).unwrap() {
             // println!("path: {path}");
             let Ok(legis_init) = scraper.get_enactment(&path).await else {
-                println!("not processable");
+                println!("not processable {path}");
                 continue;
             };
             if !legis_init

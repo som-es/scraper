@@ -78,7 +78,9 @@ impl LegislativeInitiatives for AustriaScraper {
 
         // let votes = extract_votes(legis_content)?;
         let votes = extract_votes(legis_content).unwrap_or_default();
-        let topics = extract_topics(legis_content).unwrap_or_default();
+        let topics = extract_topics(legis_content, "topics").unwrap_or_default();
+        let eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
+        let other_keyword_topics = extract_topics(legis_content, "headwords").unwrap_or_default();
 
         let speeches = extract_speeches(legis_content).unwrap_or_default();
         let date = extract_date(legis_content)?;
@@ -117,6 +119,8 @@ impl LegislativeInitiatives for AustriaScraper {
             date,
             speeches,
             topics,
+            eurovoc_topics,
+            other_keyword_topics,
         })
     }
 
@@ -157,9 +161,9 @@ fn extract_most_fitting_date(raw_stages: &Value) -> Option<&str> {
     fitting_date
 }
 
-fn extract_topics(legis_content: &Value) -> Option<Vec<String>> {
+fn extract_topics(legis_content: &Value, topics_name: &str) -> Option<Vec<String>> {
     Some(
-        legis_content["topics"]["data"]["bubbles"]
+        legis_content[topics_name]["data"]["bubbles"]
             .as_array()?
             .iter()
             .flat_map(|topic| topic["label"].as_str().map(|topic| topic.to_string()))
@@ -426,7 +430,11 @@ mod tests {
                     infavor: false
                 }
             ]
-        )
+        );
+        let et = init.eurovoc_topics;
+        assert_eq!(et, vec!["Arbeitsrecht"]);
+        let et = init.other_keyword_topics;
+        assert_eq!(et, vec!["Arbeitsrecht I. österreichisches"]);
     }
 
     #[tokio::test]

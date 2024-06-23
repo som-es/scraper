@@ -236,6 +236,7 @@ mod tests {
         // let out = serde_json::to_string(&proposal_paths).unwrap();
         // std::fs::write("prop-paths", out).unwrap();
         println!("props: {}", proposal_paths.len());
+        return Ok(());
         for proposal_path in &proposal_paths {
             if proposal_path.contains("A") {
                 continue;

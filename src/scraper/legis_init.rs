@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{LegislativeInitiative, Party, Vote};
 use serde_json::{json, Value};
 
@@ -52,6 +52,9 @@ impl LegislativeInitiatives for AustriaScraper {
         let description = raw_legis["meta"]["description"].as_str()?.to_string();
         let title = raw_legis["meta"]["title"].as_str()?.to_string();
 
+        // let json = serde_json::to_string_pretty(&raw_legis).unwrap();
+        // println!("{json}");
+
         let legis_content = &raw_legis["content"];
 
         let ityp = legis_content["ityp"].as_str()?.to_string();
@@ -100,6 +103,14 @@ impl LegislativeInitiatives for AustriaScraper {
         } else {
             None
         };
+        
+        let created_at = legis_content["einlangen"].as_str()?;
+        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?;
+        
+        let updated_at = legis_content["update"].as_str();
+        let updated_at = updated_at.map(|updated_at| {
+            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
+        });
 
         let id = format!("{gp}/{ityp}/{inr}");
 
@@ -121,6 +132,8 @@ impl LegislativeInitiatives for AustriaScraper {
             topics,
             eurovoc_topics,
             other_keyword_topics,
+            created_at,
+            updated_at,
         })
     }
 

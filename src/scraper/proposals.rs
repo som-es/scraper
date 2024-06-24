@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::Document;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -96,6 +96,8 @@ pub struct Proposal {
     pub issuer_ids: Vec<u64>,
     pub receiver_ids: Vec<u64>,
     pub documents: Vec<Document>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: Option<NaiveDateTime>,
 }
 
 impl ProposalScraper for AustriaScraper {
@@ -116,10 +118,10 @@ impl ProposalScraper for AustriaScraper {
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
         let raw_proposal_content = &raw_proposal["content"];
         // if raw_proposal_content["names"].as_array().is_none() {
-        //     let json = serde_json::to_string_pretty(raw_proposal_content).unwrap();
-        //     println!("{json}");
         // }
-        
+
+        // let json = serde_json::to_string_pretty(raw_proposal_content).unwrap();
+        // println!("{json}");
         let ityp = raw_proposal_content["ityp"].as_str().unwrap().to_string();
 
         // weird AB: ityp AB inr 13696 gp XXVII, has no delegates associated with AB, no fitting title
@@ -133,7 +135,6 @@ impl ProposalScraper for AustriaScraper {
                 .filter(|name| name["funktext"] == "Eingebracht von")
                 .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
                 .collect::<Vec<u64>>();
-
 
             let receiver_text = if ityp == "AB" {
                 "Beantwortet durch"
@@ -152,7 +153,10 @@ impl ProposalScraper for AustriaScraper {
         }
 
         let description = raw_proposal_content["description"].as_str()?.to_string();
-        let raw_documents = raw_proposal_content["documents"].as_array().cloned().unwrap_or_default();
+        let raw_documents = raw_proposal_content["documents"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
 
         let documents = match documents(&raw_documents) {
             Some(d) => d,
@@ -162,11 +166,19 @@ impl ProposalScraper for AustriaScraper {
                 //     log::error!("Raw documents are not empty, but documents could not be processed?: {:?}", serde_json::to_string_pretty(&raw_documents));
                 // }
                 vec![]
-            },
+            }
         };
 
         let title = raw_proposal["meta"]["title"].as_str()?.to_string();
         let inr = raw_proposal_content["inr"].as_u64()?;
+
+        let created_at = raw_proposal_content["einlangen"].as_str()?;
+        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?;
+
+        let updated_at = raw_proposal_content["update"].as_str();
+        let updated_at = updated_at.map(|updated_at| {
+            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
+        });
 
         let id = format!("{ityp}/{inr}");
 
@@ -184,6 +196,8 @@ impl ProposalScraper for AustriaScraper {
             receiver_ids,
             documents,
             proposal_type,
+            created_at,
+            updated_at,
         })
     }
 }
@@ -217,19 +231,19 @@ mod tests {
     #[tokio::test]
     async fn test_get_all_proposals() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
-    
+
         let proposal_paths = match std::fs::read_to_string("prop-paths") {
             Ok(p) => {
                 println!("read");
                 serde_json::from_str(&p).unwrap()
-            },
+            }
             Err(e) => {
                 println!("e: {e:?}");
                 let proposal_payload = ProposalsPayload::default();
                 let proposals = scraper.post_proposals_payload(proposal_payload).await?;
 
                 scraper.proposal_paths(proposals).unwrap()
-            },
+            }
         };
         println!("scraped paths");
 

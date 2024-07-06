@@ -281,6 +281,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_minister_entwurf() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/ME/232").await?;
+        println!("proposal: {proposal:?}");
+        Ok(())
+    }
+// /gegenstand/XXVII/ME/232
+    #[tokio::test]
     async fn test_get_proposal_from_path_with_issuer_and_receiver(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();

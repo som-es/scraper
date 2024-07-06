@@ -462,6 +462,10 @@ mod tests {
     #[tokio::test]
     async fn test_orf_gesetz_no_vote_at_some_point_xxvii_i_2082() {
         let scraper = AustriaScraper::default();
+
+        // let out = scraper.get_gegenstand_info("/gegenstand/XXVII/I/2082").await.unwrap();
+        let out = scraper.get_gegenstand_info("/gegenstand/XXVII/A/4070").await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&out).unwrap());
         let res = scraper
             .get_legis_init("/gegenstand/XXVII/I/2082")
             .await

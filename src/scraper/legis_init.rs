@@ -103,10 +103,10 @@ impl LegislativeInitiatives for AustriaScraper {
         } else {
             None
         };
-        
+
         let created_at = legis_content["einlangen"].as_str()?;
         let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?;
-        
+
         let updated_at = legis_content["update"].as_str();
         let updated_at = updated_at.map(|updated_at| {
             NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
@@ -174,7 +174,7 @@ fn extract_most_fitting_date(raw_stages: &Value) -> Option<&str> {
     fitting_date
 }
 
-fn extract_topics(legis_content: &Value, topics_name: &str) -> Option<Vec<String>> {
+pub fn extract_topics(legis_content: &Value, topics_name: &str) -> Option<Vec<String>> {
     Some(
         legis_content[topics_name]["data"]["bubbles"]
             .as_array()?
@@ -464,7 +464,10 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         // let out = scraper.get_gegenstand_info("/gegenstand/XXVII/I/2082").await.unwrap();
-        let out = scraper.get_gegenstand_info("/gegenstand/XXVII/A/4070").await.unwrap();
+        let out = scraper
+            .get_gegenstand_info("/gegenstand/XXVII/A/4070")
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&out).unwrap());
         let res = scraper
             .get_legis_init("/gegenstand/XXVII/I/2082")

@@ -421,10 +421,11 @@ mod tests {
         let delegate = scraper.get_delegate("/person/5682").await.unwrap();
         assert_eq!(Gender::Male, delegate.gender);
         let delegate = scraper.get_gegenstand_info("/person/5682").await.unwrap();
-        println!("delegate: {}", serde_json::to_string_pretty(&delegate).unwrap());
+        println!(
+            "delegate: {}",
+            serde_json::to_string_pretty(&delegate).unwrap()
+        );
     }
-
-
 }
 
 //   curl -s \

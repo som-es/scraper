@@ -1,0 +1,283 @@
+{
+  "content": {
+    "approvalstate": "9 Keine Zustimmung bei dem Doktyp \"MEG\" möglich",
+    "breadcrumbs": [
+      {
+        "title": "Start",
+        "url": "/"
+      },
+      {
+        "title": "Ministerialentwürfe",
+        "url": "/recherchieren/gegenstaende/ministerialentwuerfe/"
+      },
+      {
+        "title": "Nationalrat - XXVII. GP",
+        "url": "/recherchieren/gegenstaende/ministerialentwuerfe/?GP_CODE=XXVII"
+      },
+      {
+        "title": "Ministerialentwurf Gesetz",
+        "url": "/recherchieren/gegenstaende/ministerialentwuerfe/?GP_CODE=XXVII&DOKTYP=MEG"
+      },
+      {
+        "title": "232/ME"
+      }
+    ],
+    "deleted": false,
+    "description": "Ministerialentwurf betreffend Bundesgesetz, mit dem das Schulunterrichtsgesetz, das Hochschulgesetz 2005, das Bildungsdokumentationsgesetz 2020, das IQS-Gesetz, das Anstellungserfordernisse-Grundsatzgesetz und das Prüfungstaxengesetz geändert werden",
+    "documents": [
+      {
+        "documents": [
+          {
+            "link": "/dokument/XXVII/ME/232/imfname_1478600.pdf",
+            "type": "PDF"
+          }
+        ],
+        "title": "Kurzinformation"
+      },
+      {
+        "documents": [
+          {
+            "link": "/dokument/XXVII/ME/232/imfname_1478574.pdf",
+            "type": "PDF"
+          }
+        ],
+        "title": "Begleitschreiben"
+      },
+      {
+        "documents": [
+          {
+            "link": "/dokument/XXVII/ME/232/fname_1478575.pdf",
+            "type": "PDF"
+          },
+          {
+            "link": "/dokument/XXVII/ME/232/fnameorig_1478575.html",
+            "type": "HTML"
+          }
+        ],
+        "title": "Gesetzestext"
+      },
+      {
+        "documents": [
+          {
+            "link": "/dokument/XXVII/ME/232/fname_1478576.pdf",
+            "type": "PDF"
+          },
+          {
+            "link": "/dokument/XXVII/ME/232/fnameorig_1478576.html",
+            "type": "HTML"
+          }
+        ],
+        "title": "Vorblatt und Wirkungsorientierte Folgenabschätzung"
+      },
+      {
+        "documents": [
+          {
+            "link": "/dokument/XXVII/ME/232/fname_1478577.pdf",
+            "type": "PDF"
+          },
+          {
+            "link": "/dokument/XXVII/ME/232/fnameorig_1478577.html",
+            "type": "HTML"
+          }
+        ],
+        "title": "Erläuterungen"
+      },
+      {
+        "documents": [
+          {
+            "link": "/dokument/XXVII/ME/232/fname_1478578.pdf",
+            "type": "PDF"
+          },
+          {
+            "link": "/dokument/XXVII/ME/232/fnameorig_1478578.html",
+            "type": "HTML"
+          }
+        ],
+        "title": "Textgegenüberstellung"
+      }
+    ],
+    "doktyp": "MEG",
+    "einlangen": "2022-10-28T00:00:00",
+    "eurovoc": {
+      "data": {
+        "bubbles": [
+          {
+            "label": "Bildung",
+            "link": "/recherchieren/gegenstaende/?NRBR=NR&GP_CODE=XXVII&EUROVOC=Bildung"
+          },
+          {
+            "label": "Organisation des Unterrichtswesens",
+            "link": "/recherchieren/gegenstaende/?NRBR=NR&GP_CODE=XXVII&EUROVOC=Organisation des Unterrichtswesens"
+          }
+        ],
+        "title": ""
+      },
+      "rendertype": "bubbles"
+    },
+    "gp_code": "XXVII",
+    "group": "1",
+    "headwords": {
+      "data": {
+        "bubbles": [
+          {
+            "label": "Bildungswesen VIII. Sonstiges",
+            "link": "/recherchieren/gegenstaende/?NRBR=NR&GP_CODE=XXVII&SW=BILDUNGSWESEN VIII"
+          }
+        ],
+        "title": ""
+      },
+      "rendertype": "bubbles"
+    },
+    "history_ind": 1.1,
+    "inr": 232,
+    "intranet": "N",
+    "ityp": "ME",
+    "names": [
+      {
+        "frak_code": null,
+        "funktext": "Übermittelt von",
+        "ltext": "Bundesministerium für Bildung, Wissenschaft und Forschung",
+        "name": "Dr. Martin Polaschek",
+        "portrait": {
+          "data": {
+            "alt": "Portraitfoto von Dr. Martin Polaschek",
+            "bildId": 20069283,
+            "copyright": "BKA/Andy Wenzel",
+            "src": "/dokument/bild/200692/20069283_384.jpg"
+          },
+          "rendertype": "image"
+        },
+        "url": "/person/20449"
+      }
+    ],
+    "nr_gp_code": "XXVII",
+    "process": "N",
+    "shortinfo": {
+      "stand": "28.10.2022",
+      "teil1": "<h4>Ziele</h4>\n\n<ul class=\"unordered-list\">\n\t<li>Weiterentwicklung der Kompetenzorientierung im Bereich F&ouml;rderung und Unterricht auf Basis standardisierter Leistungsinformationen</li>\n\t<li>Erweiterung der Informationsgrundlagen f&uuml;r eine datengest&uuml;tzte Schul und Qualit&auml;tsentwicklung sowie f&uuml;r die Bildungssteuerung</li>\n\t<li>Abgeltung der Erh&ouml;hten Belastung der Pr&uuml;ferinnen/Pr&uuml;fer bei Pr&uuml;fungen gem&auml;&szlig; &sect; 11 Abs. 4 und 5 SchPflG</li>\n</ul>\n\n<h4>Inhalt</h4>\n\n<ul class=\"unordered-list\">\n\t<li>Erweiterung der Kompetenzerhebungen und der daraus verf&uuml;gbaren Informationen</li>\n</ul>\n",
+      "teil2": "<h4>Hauptgesichtspunkte des Entwurfes</h4>\nMit vorliegendem Entwurf soll\n\n<ul class=\"unordered-list\">\n\t<li>die Grundlage f&uuml;r die stufenweise Ausrollung der Individuellen Kompetenzmessung PLUS (iKMPLUS) - einem Instrument der p&auml;dagogischen Diagnostik - geschaffen werden,</li>\n\t<li>die M&ouml;glichkeit des Austausches sch&uuml;lerbezogener Daten zur Teilnahme an der Sommerschule zwischen Schulbeh&ouml;rde, Sommerschule und Stammschule geschaffen werden,</li>\n\t<li>die Abfrage des Finanzamtes &Ouml;sterreich aus den lokalen Evidenzen zu Zwecken der Pr&uuml;fung der Bezugsberechtigung der Familienbeihilfe legitimiert werden,</li>\n\t<li>eine Erweiterung der bisherigen Ausbildungsabschl&uuml;sse f&uuml;r Elementarp&auml;dagoginnen/Elementarp&auml;dagogen um den Abschluss des &quot;Hochschullehrganges Quereinstieg Elementarp&auml;dagogik&quot; an den P&auml;dagogischen Hochschulen sowie um den Abschluss eines ordentlichen oder au&szlig;erordentlichen Masterstudiums &quot;Elementarp&auml;dagogik&quot; an einer Universit&auml;t erreicht werden, sowie</li>\n\t<li>eine Abgeltung der steigenden Mehrbelastung der Lehrpersonen als Pr&uuml;ferinnen/Pr&uuml;fer bei Externistenpr&uuml;fungen sowie eine Abgeltung der Mitwirkung der Mitglieder der Zertifizierungskommission am Eignungsfeststellungsverfahren zum Quereinstieg in den Lehrberuf im Bereich der Allgemeinbildung erfolgen.</li>\n</ul>\n",
+      "titel": "Schulunterrichtsgesetz, Hochschulgesetz 2005, Bildungsdokumentationsgesetz 2020, Änderung (232/ME)"
+    },
+    "sntype": "Ministerialentwurf Gesetz",
+    "stages": [
+      {
+        "date": "28.10.2022",
+        "priority": 1,
+        "text": "Einlangen im Nationalrat"
+      },
+      {
+        "date": "28.10.2022",
+        "priority": 1,
+        "text": "Ende der Begutachtungsfrist 08.11.2022"
+      },
+      {
+        "date": "09.11.2022",
+        "text": "Übermittlung an das Bundesministerium für Bildung, Wissenschaft und Forschung"
+      },
+      {
+        "date": "16.11.2022",
+        "text": "Regierungsvorlage (<a href=\"/gegenstand/XXVII/I/1791\">1791 d.B.</a>)"
+      }
+    ],
+    "statements": {
+      "documents": [
+        {
+          "documents": [
+            {
+              "link": "/dokument/XXVII/I/1791/fname_1482146.pdf",
+              "type": "PDF"
+            },
+            {
+              "link": "/dokument/XXVII/I/1791/fnameorig_1482146.html",
+              "type": "HTML"
+            }
+          ],
+          "title": "Gesetzestext"
+        }
+      ],
+      "filter": {
+        "data": {
+          "definition": {
+            "ascDesc": "DESC",
+            "bez": "FP_142_vhg",
+            "fixedParams": {
+              "BEZUG_GP_CODE": [
+                "XXVII"
+              ],
+              "BEZUG_INR": [
+                232
+              ],
+              "BEZUG_ITYP": [
+                "ME"
+              ]
+            },
+            "hideColumns": [
+              "16",
+              "17"
+            ],
+            "hideDimensions": [
+              "BEZUG_GP_CODE",
+              "BEZUG_ITYP",
+              "BEZUG_INR"
+            ],
+            "listeId": 142,
+            "params": {
+              "BEZUG_GP_CODE": [
+                "XXVII"
+              ],
+              "BEZUG_INR": [
+                232
+              ],
+              "BEZUG_ITYP": [
+                "ME"
+              ]
+            },
+            "sortrnr": 5
+          },
+          "hasForm": true,
+          "hasList": true,
+          "label": "Stellungnahmen",
+          "pagesize": 20,
+          "resultLayout": "TABLE",
+          "type": "FILTER"
+        },
+        "rendertype": "filter"
+      },
+      "new": 0
+    },
+    "statementsstate": "0",
+    "title": "Schulunterrichtsgesetz, Hochschulgesetz u.a., Änderung",
+    "topics": {
+      "data": {
+        "bubbles": [
+          {
+            "label": "Bildung",
+            "link": "/recherchieren/gegenstaende/?GP_CODE=XXVII&THEMEN=Bildung"
+          }
+        ],
+        "title": ""
+      },
+      "rendertype": "bubbles"
+    },
+    "type": "Ministerialentwurf Gesetz",
+    "update": "2024-04-27T04:07:54",
+    "vhg_fertig": "J",
+    "vhg_fertig_docs": "J",
+    "zitation": "232/ME"
+  },
+  "meta": {
+    "description": "Schulunterrichtsgesetz, Hochschulgesetz u.a., Änderung (232/ME)",
+    "generationTime": "Sat Apr 27 04:07:55 CEST 2024",
+    "keywords": "\"Bildungswesen VIII. Sonstiges\"",
+    "lang": "de",
+    "openGraph": {
+      "description": "232/ME",
+      "image": "https://www.parlament.gv.at/static/img/og.png",
+      "title": "Schulunterrichtsgesetz, Hochschulgesetz u.a., Änderung | Parlament Österreich"
+    },
+    "scripts": [],
+    "styles": [],
+    "title": "Schulunterrichtsgesetz, Hochschulgesetz u.a., Änderung (232/ME) | Parlament Österreich"
+  },
+  "pagetype": "geschichtsseite"
+}

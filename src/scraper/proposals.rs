@@ -5,7 +5,10 @@ use common_scrapes::Document;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::{documents, error::ScraperError, person_url_to_id, DatePayload, GeneralScrapeInfo};
+use crate::{
+    documents, error::ScraperError, legis_init::extract_topics, person_url_to_id, DatePayload,
+    GeneralScrapeInfo,
+};
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
 
@@ -96,6 +99,9 @@ pub struct Proposal {
     pub issuer_ids: Vec<u64>,
     pub receiver_ids: Vec<u64>,
     pub documents: Vec<Document>,
+    pub topics: Vec<String>,
+    pub eurovoc_topics: Vec<String>,
+    pub other_keyword_topics: Vec<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
 }
@@ -186,6 +192,11 @@ impl ProposalScraper for AustriaScraper {
 
         let proposal_type = ProposalType::from_str(&ityp, raw_proposal_content)?;
 
+        let topics = extract_topics(raw_proposal_content, "topics").unwrap_or_default();
+        let eurovoc_topics = extract_topics(raw_proposal_content, "eurovoc").unwrap_or_default();
+        let other_keyword_topics =
+            extract_topics(raw_proposal_content, "headwords").unwrap_or_default();
+
         Some(Proposal {
             id,
             ityp,
@@ -198,6 +209,9 @@ impl ProposalScraper for AustriaScraper {
             proposal_type,
             created_at,
             updated_at,
+            topics,
+            eurovoc_topics,
+            other_keyword_topics,
         })
     }
 }
@@ -275,21 +289,21 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/UEA/568").await?;
+        // println!("proposal: {:?}", proposal.eurovoc_topics);
         assert_eq!(proposal.issuer_ids, [83153, 5679]);
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_minister_entwurf() -> Result<(), Box<dyn std::error::Error>>
-    {
+    async fn test_minister_entwurf() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
         let proposal = scraper.get_proposal("/gegenstand/XXVII/ME/232").await?;
         println!("proposal: {proposal:?}");
         Ok(())
     }
-// /gegenstand/XXVII/ME/232
+    // /gegenstand/XXVII/ME/232
     #[tokio::test]
     async fn test_get_proposal_from_path_with_issuer_and_receiver(
     ) -> Result<(), Box<dyn std::error::Error>> {

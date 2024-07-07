@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use common_scrapes::{Delegate, GovOfficial};
+use common_scrapes::GovOfficial;
 use serde_json::{json, Value};
 
-use crate::{error::ScraperError, extract_text_from_html, AustriaScraper, Scraper};
+use crate::{delegates::DelegateScraper, error::ScraperError, extract_text_from_html, AustriaScraper, Scraper};
 
 #[async_trait]
 pub trait GovOfficials: Scraper {
@@ -36,40 +36,28 @@ pub fn extract_id_from_unnecessary_link(link_containing_id: &str) -> Option<u64>
         .ok()
 }
 
-pub fn extract_gov_official(raw_official: &Value) -> Option<GovOfficial> {
+pub async fn extract_gov_official(raw_official: &Value, delegate_scraper: &(impl DelegateScraper + Sync)) -> Option<GovOfficial> {
+    println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
     let raw_official = raw_official.as_array()?;
     let function_and_dates = extract_function_and_dates(raw_official[2].as_str()?)?;
 
-    let name = raw_official[1].as_str()?.to_string();
     let id = extract_id_from_unnecessary_link(raw_official[9].as_str()?)?;
 
-    let joined =
-        chrono::NaiveDate::parse_from_str(function_and_dates.start_date, "%d.%m.%Y").ok()?;
+    let start_date =
+        chrono::NaiveDate::parse_from_str(&function_and_dates.start_date, "%d.%m.%Y").ok()?;
 
-    let left = function_and_dates
+    let end_date = function_and_dates
         .end_date
-        .and_then(|end_date| chrono::NaiveDate::parse_from_str(end_date, "%d.%m.%Y").ok());
+        .and_then(|end_date| chrono::NaiveDate::parse_from_str(&end_date, "%d.%m.%Y").ok());
 
+    let delegate = delegate_scraper.get_delegate(&format!("/person/{id}")).await.ok()?;
     Some(GovOfficial {
         government: extract_gov_from_html(raw_official[0].as_str()?),
         function: function_and_dates.function.to_string(),
         ministry: raw_official[7].as_str()?.to_string(),
-        joined,
-        left,
-        delegate: Delegate {
-            id,
-            name,
-            is_active: left.is_none(),
-            image_url: None, // from delegate call
-            party: None,
-            constituency: None,
-            council: None,
-            seat: None,
-            mandates: todo!(),
-            contact: todo!(), // from delegate call
-            gender: todo!(),
-            birthdate: todo!(),
-        },
+        start_date,
+        end_date,
+        delegate,
     })
 }
 
@@ -80,15 +68,15 @@ impl GovOfficials for AustriaScraper {
 
     async fn gov_officials(&self) -> Option<Vec<GovOfficial>> {
         Some(
-            self.post_gov_officials_payload()
+            futures::future::join_all(self.post_gov_officials_payload()
                 .await
                 .ok()?
                 .get("rows")?
                 .as_array()?
                 .iter()
-                .flat_map(extract_gov_official)
-                .collect(),
-        )
+                .map(|raw| extract_gov_official(raw, self) )
+                .collect::<Vec<_>>(),
+        ).await.into_iter().flatten().collect::<Vec<_>>())
     }
 
     #[inline]
@@ -105,10 +93,10 @@ impl GovOfficials for AustriaScraper {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct FunctionAndDates<'a> {
-    function: &'a str,
-    start_date: &'a str,
-    end_date: Option<&'a str>,
+pub struct FunctionAndDates<'a> {
+    pub function: &'a str,
+    pub start_date: &'a str,
+    pub end_date: Option<&'a str>,
 }
 
 fn extract_function_and_dates(function_text: &str) -> Option<FunctionAndDates> {
@@ -145,8 +133,8 @@ mod tests {
         println!("gov_officials: {gov_officials:?}");
     }
 
-    #[test]
-    fn test_extract_single_gov_official_from_json() {
+    #[tokio::test]
+    async fn test_extract_single_gov_official_from_json() {
         let raw_gov = json!([
             r#"<span title="06.12.2021 - " class="zeigeTooltip">Nehammer</span>"#,
             "Mag. Werner Kogler",
@@ -159,7 +147,8 @@ mod tests {
             "10.05.2023",
             "/WWER/PAD_08242/index.shtml"
         ]);
-        let gov_official = super::extract_gov_official(&raw_gov).unwrap();
+        let scraper = AustriaScraper::default();
+        let gov_official = super::extract_gov_official(&raw_gov, &scraper).await.unwrap();
         assert_eq!(gov_official.government, "Nehammer");
         assert_eq!(gov_official.function, "Bundesminister");
         assert_eq!(
@@ -167,12 +156,12 @@ mod tests {
             "Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport"
         );
         assert_eq!(
-            gov_official.joined,
+            gov_official.start_date,
             chrono::NaiveDate::from_ymd_opt(2021, 12, 6).unwrap()
         );
-        assert_eq!(gov_official.left, None);
+        assert_eq!(gov_official.end_date, None);
         assert_eq!(gov_official.delegate.id, 8242);
-        assert_eq!(gov_official.delegate.name, "Mag. Werner Kogler");
+        assert_eq!(gov_official.delegate.name, "Kogler Werner, Mag.");
         assert!(gov_official.delegate.is_active);
     }
 

@@ -95,7 +95,7 @@ pub struct Proposal {
     pub gp: String,
     pub title: String,
     pub proposal_type: ProposalType,
-    pub description: String,
+    pub description: Option<String>,
     pub issuer_ids: Vec<u64>,
     pub receiver_ids: Vec<u64>,
     pub documents: Vec<Document>,
@@ -158,7 +158,7 @@ impl ProposalScraper for AustriaScraper {
             receiver_ids = vec![];
         }
 
-        let description = raw_proposal_content["description"].as_str()?.to_string();
+        let description = raw_proposal_content["description"].as_str().map(|x| x.to_string());
         let raw_documents = raw_proposal_content["documents"]
             .as_array()
             .cloned()
@@ -355,6 +355,15 @@ mod tests {
         Ok(())
     }
 
+
+    // /gegenstand/XXVII/GO/1731
+     #[tokio::test]
+    async fn test_get_go_1731_proposal() -> Result<(), Box<dyn std::error::Error>> {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/GO/1731").await?;
+        Ok(())
+    }
     #[tokio::test]
     async fn test_get_proposal_as_answer() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();

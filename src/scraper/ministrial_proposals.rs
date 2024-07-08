@@ -74,7 +74,7 @@ pub trait MinistrialProposalScraper: Scraper {
 }
 
 const GEGENSTAND_PATH_IDX: usize = 7;
-const RESSORT_SHORTFORM_IDX: usize = 7;
+const RESSORT_SHORTFORM_IDX: usize = 6;
 const RESSORT_IDX: usize = 16;
 const DUE_TO_IDX: usize = 8;
 
@@ -249,9 +249,10 @@ mod tests {
             .await
             .unwrap();
         for path in scraper.ministrial_prop_paths(proposals).unwrap() {
-            println!("path: {path:?}");
+            // println!("path: {path:?}");
             let ministrial = scraper.get_ministrial_proposal(path).await.unwrap();
-            println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);
+            println!("shortform: {}", ministrial.gegenstand_info.ressort_shortform);
+            // println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);
         }
 
         // println!("ministrial: {ministrial:?}");

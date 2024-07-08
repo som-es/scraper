@@ -119,7 +119,7 @@ impl TextExtractor {
 #[cfg(test)]
 mod tests {
     use crate::{
-        extract_text_from_html_via_name_attribute, legis_init::LegislativeInitiatives,
+        legis_init::LegislativeInitiatives,
         plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
     };
 

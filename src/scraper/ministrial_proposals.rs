@@ -15,6 +15,7 @@ use super::{AustriaScraper, Scraper};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MinistrialProposal {
     pub id: u64,
+    pub inr: u64,
     pub delegate_ids: Vec<u64>,
     pub ityp: String,
     pub gp: String,
@@ -28,6 +29,9 @@ pub struct MinistrialProposal {
     pub eurovoc_topics: Vec<String>,
     pub other_keyword_topics: Vec<String>,
     pub gegenstand_info: GegenstandInfo,
+    pub legis_gp: Option<String>,
+    pub legis_init_inr: Option<u32>,
+    pub legis_init_ityp: Option<String>,
 }
 
 #[async_trait]
@@ -81,6 +85,7 @@ pub struct GegenstandInfo {
     pub ressort_shortform: String,
     pub due_to: NaiveDate,
 }
+
 
 impl AustriaScraper {
     pub fn ministiral_paths(&self, gegenstaende: Value) -> Option<Vec<GegenstandInfo>> {
@@ -181,8 +186,20 @@ impl MinistrialProposalScraper for AustriaScraper {
             .flat_map(|name| person_url_to_id(name["url"].as_str()?))
             .collect::<Vec<u64>>();
 
+        let (mut legis_gp, mut legis_init_inr, mut legis_init_ityp) = (None, None, None);
+        if let Some(entry) = raw_ministrial_content["stages"].as_array().cloned().unwrap_or_default().last() {
+            let text = entry["text"].as_str().unwrap();
+            if text.contains("Regierungsvorlage") {
+                let rv = extract_regierungsvorlage_id(text);
+                legis_gp = Some(rv.0);
+                legis_init_ityp = Some(rv.1);
+                legis_init_inr = Some(rv.2.unwrap());
+            }
+        }
+
         Some(MinistrialProposal {
             id,
+            inr,
             ityp,
             gp,
             title,
@@ -196,8 +213,22 @@ impl MinistrialProposalScraper for AustriaScraper {
             eurovoc_topics,
             other_keyword_topics,
             gegenstand_info,
+            legis_gp,
+            legis_init_inr,
+            legis_init_ityp
         })
     }
+}
+
+fn extract_regierungsvorlage_id(text: &str) -> (String, String, Option<u32>) {
+    let start = text.find('"').unwrap();
+    let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"').unwrap();
+    let mut gegenstand_url = text[start+2..end].split('/');
+    gegenstand_url.next();
+    let gp = gegenstand_url.next().unwrap().to_string();
+    let ityp = gegenstand_url.next().unwrap().to_string();
+    let inr = gegenstand_url.next().unwrap().to_string();
+    (gp, ityp, inr.parse::<u32>().ok())
 }
 
 #[cfg(test)]
@@ -210,6 +241,8 @@ mod tests {
     async fn test_ministrial_prop_me_343() {
         let scraper = AustriaScraper::default();
 
+        // scraper.get_ministrial_proposal("/gegenstand/XXVII/ME/248");
+
         let proposal_payload = ProposalsPayload::default();
         let proposals = scraper
             .post_ministrial_proposals_payload(proposal_payload)
@@ -218,6 +251,7 @@ mod tests {
         for path in scraper.ministrial_prop_paths(proposals).unwrap() {
             println!("path: {path:?}");
             let ministrial = scraper.get_ministrial_proposal(path).await.unwrap();
+            println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);
         }
 
         // println!("ministrial: {ministrial:?}");

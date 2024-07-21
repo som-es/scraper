@@ -6,8 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_text_from_html, legis_init::extract_topics,
-    person_url_to_id, proposals::ProposalsPayload,
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html, legis_init::extract_topics, person_url_to_id, proposals::ProposalsPayload
 };
 
 use super::{AustriaScraper, Scraper};
@@ -190,7 +189,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         if let Some(entry) = raw_ministrial_content["stages"].as_array().cloned().unwrap_or_default().last() {
             let text = entry["text"].as_str().unwrap();
             if text.contains("Regierungsvorlage") {
-                let rv = extract_regierungsvorlage_id(text);
+                let rv = extract_from_gegenstand_url(text);
                 legis_gp = Some(rv.0);
                 legis_init_ityp = Some(rv.1);
                 legis_init_inr = Some(rv.2.unwrap());
@@ -218,17 +217,6 @@ impl MinistrialProposalScraper for AustriaScraper {
             legis_init_ityp
         })
     }
-}
-
-fn extract_regierungsvorlage_id(text: &str) -> (String, String, Option<u32>) {
-    let start = text.find('"').unwrap();
-    let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"').unwrap();
-    let mut gegenstand_url = text[start+2..end].split('/');
-    gegenstand_url.next();
-    let gp = gegenstand_url.next().unwrap().to_string();
-    let ityp = gegenstand_url.next().unwrap().to_string();
-    let inr = gegenstand_url.next().unwrap().to_string();
-    (gp, ityp, inr.parse::<u32>().ok())
 }
 
 #[cfg(test)]

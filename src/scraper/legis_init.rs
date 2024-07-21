@@ -4,8 +4,7 @@ use common_scrapes::{LegislativeInitiative, Party, Vote};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_text_from_html, person_url_to_id,
-    speeches::extract_speeches, AustriaScraper, GegenstandPaths, Scraper,
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html, person_url_to_id, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper
 };
 
 #[async_trait]
@@ -113,6 +112,7 @@ impl LegislativeInitiatives for AustriaScraper {
         });
 
         let requires_simple_majority = extract_majority_on_indicators(legis_content).unwrap_or(true);
+        let invisible_declined = extract_invisibly_declined(legis_content);
 
         let id = format!("{gp}/{ityp}/{inr}");
 
@@ -137,6 +137,7 @@ impl LegislativeInitiatives for AustriaScraper {
             created_at,
             updated_at,
             requires_simple_majority,
+            was_invisibly_declined: invisible_declined.map(|i_d| i_d.0)
         })
     }
 
@@ -144,6 +145,15 @@ impl LegislativeInitiatives for AustriaScraper {
         self.gegenstand_paths(initiatives, 12)
             .ok_or(ScraperError::LegisInitParseError)
     }
+}
+
+pub fn extract_invisibly_declined(legis_content: &Value) -> Option<(bool, DeclineUrlGegenstand)> {
+    let status_description = legis_content["status"]["description"].as_str()?;
+    if status_description.contains("abgelehnt") {
+        return Some((true, extract_from_gegenstand_url(status_description)));
+    }
+
+    None
 }
 
 pub fn extract_date(legis_content: &Value) -> Option<&str> {

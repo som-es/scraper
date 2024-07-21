@@ -364,6 +364,47 @@ mod tests {
         let proposal = scraper.get_proposal("/gegenstand/XXVII/GO/1731").await?;
         Ok(())
     }
+    
+     #[tokio::test]
+    async fn test_get_uea_1040_proposal() -> Result<(), Box<dyn std::error::Error>> {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/UEA/1040").await?;
+        println!("proposal: {:?}", proposal.eurovoc_topics);
+        Ok(())
+    }
+
+
+    // why?
+    /*
+    
+    2024-07-09T14:53:40.567Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/J/19155
+2024-07-09T14:53:40.567Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/J/19157
+2024-07-09T14:53:40.567Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/J/19164
+2024-07-09T14:53:40.567Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/J/19166
+2024-07-09T14:53:40.567Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/J/19168
+2024-07-09T14:53:40.567Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/J/19176
+
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/156
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/157
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/159
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/168
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/199
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/203
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/205
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/207
+2024-07-09T14:53:41.188Z ERROR [dataservice::services::proposals] CANNOT PROCESS /gegenstand/XXVII/A/236
+     */
+
+    #[tokio::test]
+    async fn test_get_a_236_proposal() -> Result<(), Box<dyn std::error::Error>> {
+        let scraper = AustriaScraper::default();
+
+        let proposal = scraper.get_proposal("/gegenstand/XXVII/A/236").await?;
+        println!("proposal: {:?}", proposal.eurovoc_topics);
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_get_proposal_as_answer() -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();

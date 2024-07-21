@@ -112,6 +112,8 @@ impl LegislativeInitiatives for AustriaScraper {
             NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
         });
 
+        let requires_simple_majority = extract_majority_on_indicators(legis_content).unwrap_or(true);
+
         let id = format!("{gp}/{ityp}/{inr}");
 
         Some(LegislativeInitiative {
@@ -134,6 +136,7 @@ impl LegislativeInitiatives for AustriaScraper {
             other_keyword_topics,
             created_at,
             updated_at,
+            requires_simple_majority,
         })
     }
 
@@ -158,6 +161,26 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
         most_fitting_date = extract_most_fitting_date(stages);
     }
     most_fitting_date
+}
+
+fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
+    let mut is_simple_majority = true;
+    
+    'outer: for phase in legis_content.get("phase")?.as_array()?.iter() {
+        let Some(stages) = phase.get("stages") else {
+            continue;
+        };
+        for stage in stages.as_array()? {
+            if let Some(text) = stage.get("text") {
+                if text.as_str()?.contains("Mehrheit von zwei Dritteln") || text.as_str()?.contains("Bundesverfassungsgesetz") {
+                    is_simple_majority = false;
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    Some(is_simple_majority)
 }
 
 fn extract_most_fitting_date(raw_stages: &Value) -> Option<&str> {
@@ -245,10 +268,21 @@ mod tests {
         for path in scraper.legis_paths(initiatives).unwrap() {
             //println!("path: {path:?}");
             let Ok(init) = scraper.get_legis_init(&path).await else {
-                println!("{}{path}", AustriaScraper::BASE_URL);
+                println!("error {}{path}", AustriaScraper::BASE_URL);
                 continue;
             };
-            println!("topics: {:?}", init.topics);
+            // if init.accepted == Some(false) {
+            // println!("{:?} 1/2 majority?: {} {}{path}", init.accepted,init.requires_simple_majority, AustriaScraper::BASE_URL);
+            if !init.requires_simple_majority {
+                println!("---------------------------------");
+            }
+            println!("1/2 majority?: {} {}{path}", init.requires_simple_majority, AustriaScraper::BASE_URL);
+            if !init.requires_simple_majority {
+                println!("---------------------------------");
+            }
+            // }
+            // println!("{:?} {}{path}", init.accepted, AustriaScraper::BASE_URL);
+            // println!("topics: {:?}", init.topics);
             // println!("id: {}, title: {}", init.id, init.title);
         }
 
@@ -473,7 +507,18 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/2082")
             .await
             .unwrap();
+
         println!("res: {res:?}");
-        println!("acc: {:?}", res.accepted)
+        println!("acc: {:?}", res.accepted);
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/2269")
+            .await
+            .unwrap();
+
+        println!("acc: {:?}", res.accepted);
+
+
+        // gegenstand/XXVII/I/2269
     }
 }

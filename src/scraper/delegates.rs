@@ -416,6 +416,13 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_bundesrat_to_nr_switcher() {
+        let scraper = AustriaScraper::default();
+        let delegate = scraper.get_delegate("/person/6407").await.unwrap();
+        println!("delegate: {delegate:?}");
+    }
+
+    #[tokio::test]
     pub async fn test_seat_lost() {
         let scraper = AustriaScraper::default();
         let delegate = scraper.get_delegate("/person/5682").await.unwrap();

@@ -28,15 +28,15 @@ fn person_url_to_id(url: &str) -> Option<u64> {
 }
 
 pub type DeclineUrlGegenstand = (String, String, Option<u32>);
-fn extract_from_gegenstand_url(text: &str) -> DeclineUrlGegenstand {
-    let start = text.find('"').unwrap();
-    let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"').unwrap();
+fn extract_from_gegenstand_url(text: &str) -> Option<DeclineUrlGegenstand> {
+    let start = text.find('"')?;
+    let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"')?;
     let mut gegenstand_url = text[start+2..end].split('/');
     gegenstand_url.next();
-    let gp = gegenstand_url.next().unwrap().to_string();
-    let ityp = gegenstand_url.next().unwrap().to_string();
-    let inr = gegenstand_url.next().unwrap().to_string();
-    (gp, ityp, inr.parse::<u32>().ok())
+    let gp = gegenstand_url.next()?.to_string();
+    let ityp = gegenstand_url.next()?.to_string();
+    let inr = gegenstand_url.next()?.to_string();
+    Some((gp, ityp, inr.parse::<u32>().ok()))
 }
 
 pub fn extract_text_from_html(html: &str) -> String {

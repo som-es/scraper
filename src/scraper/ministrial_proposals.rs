@@ -189,7 +189,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         if let Some(entry) = raw_ministrial_content["stages"].as_array().cloned().unwrap_or_default().last() {
             let text = entry["text"].as_str().unwrap();
             if text.contains("Regierungsvorlage") {
-                let rv = extract_from_gegenstand_url(text);
+                let rv = extract_from_gegenstand_url(text).unwrap();
                 legis_gp = Some(rv.0);
                 legis_init_ityp = Some(rv.1);
                 legis_init_inr = Some(rv.2.unwrap());

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::Document;
+use common_scrapes::{Document, Proposal, ProposalType};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -32,29 +32,6 @@ impl ProposalsPayload {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ProposalType {
-    /// String in points to the answered proposals
-    AB(Vec<String>),
-    /// String in this enum is the type of proposal!
-    Other(String),
-}
-
-impl ProposalType {
-    pub fn from_str(ityp: &str, raw_proposal_content: &Value) -> Option<Self> {
-        Some(match ityp {
-            "AB" => {
-                let answered_ids = raw_proposal_content["reference"]
-                    .as_array()?
-                    .iter()
-                    .flat_map(|reference| Some(reference["zitation"].as_str()?.to_string()))
-                    .collect::<Vec<String>>();
-                ProposalType::AB(answered_ids)
-            }
-            _ => ProposalType::Other(ityp.to_string()),
-        })
-    }
-}
 
 #[async_trait]
 pub trait ProposalScraper: Scraper {
@@ -86,24 +63,6 @@ pub trait ProposalScraper: Scraper {
         let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
         Self::raw_proposal_into_proposal(raw_proposal).ok_or(ScraperError::InvalidProposalInfoError)
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Proposal {
-    pub id: String,
-    pub ityp: String,
-    pub gp: String,
-    pub title: String,
-    pub proposal_type: ProposalType,
-    pub description: Option<String>,
-    pub issuer_ids: Vec<u64>,
-    pub receiver_ids: Vec<u64>,
-    pub documents: Vec<Document>,
-    pub topics: Vec<String>,
-    pub eurovoc_topics: Vec<String>,
-    pub other_keyword_topics: Vec<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: Option<NaiveDateTime>,
 }
 
 impl ProposalScraper for AustriaScraper {

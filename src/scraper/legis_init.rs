@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{LegislativeInitiative, Party, Vote};
+use common_scrapes::{LegislativeInitiative, Party, Proposal, Vote};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html, person_url_to_id, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper
 };
 
 #[async_trait]
@@ -112,9 +112,11 @@ impl LegislativeInitiatives for AustriaScraper {
         });
 
         let requires_simple_majority = extract_majority_on_indicators(legis_content).unwrap_or(true);
-        let invisible_declined = extract_invisibly_declined(legis_content);
+        let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
         let id = format!("{gp}/{ityp}/{inr}");
+
+        let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
         Some(LegislativeInitiative {
             title,
@@ -137,7 +139,8 @@ impl LegislativeInitiatives for AustriaScraper {
             created_at,
             updated_at,
             requires_simple_majority,
-            was_invisibly_declined: invisible_declined.map(|i_d| i_d.0)
+            was_invisibly_declined,
+            proposal,
         })
     }
 
@@ -147,13 +150,13 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 }
 
-pub fn extract_invisibly_declined(legis_content: &Value) -> Option<(bool, DeclineUrlGegenstand)> {
+pub fn extract_invisibly_declined(legis_content: &Value) -> Option<(bool, Option<DeclineUrlGegenstand>)> {
     let status_description = legis_content["status"]["description"].as_str()?;
     if status_description.contains("abgelehnt") {
         return Some((true, extract_from_gegenstand_url(status_description)));
     }
 
-    None
+    Some((false, None))
 }
 
 pub fn extract_date(legis_content: &Value) -> Option<&str> {
@@ -188,6 +191,10 @@ fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
                 }
             }
         }
+    }
+
+    if legis_content["status"]["description"].as_str()?.contains("nicht die erforderliche 2/3 Mehrheit") {
+        is_simple_majority = false
     }
 
     Some(is_simple_majority)
@@ -268,8 +275,39 @@ mod tests {
         println!("paths: {}", paths.len());
     }
 
+    // /gegenstand/XXVII/A/4129
+ 
     #[tokio::test]
-    async fn test_get_legis_init() {
+    async fn test_get_legis_init_invisibly_declined_2_3_majority() {
+        let scraper = AustriaScraper::default();
+        let legis_init = scraper.get_legis_init("/gegenstand/XXVII/A/4129").await.unwrap();
+        assert_eq!(legis_init.delegate_ids, vec![5439, 87001]);
+        assert!(!legis_init.requires_simple_majority);
+        assert!(legis_init.was_invisibly_declined)
+    }
+
+    
+    #[tokio::test]
+    async fn test_get_legis_init_was_invisibly_declined() {
+        let scraper = AustriaScraper::default();
+
+        let start = std::time::Instant::now();
+
+        let initiatives = scraper.post_legis_payload().await.unwrap();
+        for path in scraper.legis_paths(initiatives).unwrap() {
+            println!("path: {path:?}");
+            let Ok(init) = scraper.get_legis_init(&path).await else {
+                println!("error {}{path}", AustriaScraper::BASE_URL);
+                continue;
+            };
+            println!("was_invisible_declined: {} {}{path}", init.was_invisibly_declined, AustriaScraper::BASE_URL);
+        }
+
+        println!("elapsed: {:?}", start.elapsed());
+    }
+
+    #[tokio::test]
+    async fn test_get_legis_init_majority() {
         let scraper = AustriaScraper::default();
 
         let start = std::time::Instant::now();

@@ -2,7 +2,10 @@ use async_trait::async_trait;
 use common_scrapes::GovOfficial;
 use serde_json::{json, Value};
 
-use crate::{delegates::DelegateScraper, error::ScraperError, extract_text_from_html, AustriaScraper, Scraper};
+use crate::{
+    delegates::DelegateScraper, error::ScraperError, extract_text_from_html, AustriaScraper,
+    Scraper,
+};
 
 #[async_trait]
 pub trait GovOfficials: Scraper {
@@ -36,7 +39,10 @@ pub fn extract_id_from_unnecessary_link(link_containing_id: &str) -> Option<u64>
         .ok()
 }
 
-pub async fn extract_gov_official(raw_official: &Value, delegate_scraper: &(impl DelegateScraper + Sync)) -> Option<GovOfficial> {
+pub async fn extract_gov_official(
+    raw_official: &Value,
+    delegate_scraper: &(impl DelegateScraper + Sync),
+) -> Option<GovOfficial> {
     println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
     let raw_official = raw_official.as_array()?;
     let function_and_dates = extract_function_and_dates(raw_official[2].as_str()?)?;
@@ -50,7 +56,10 @@ pub async fn extract_gov_official(raw_official: &Value, delegate_scraper: &(impl
         .end_date
         .and_then(|end_date| chrono::NaiveDate::parse_from_str(&end_date, "%d.%m.%Y").ok());
 
-    let delegate = delegate_scraper.get_delegate(&format!("/person/{id}")).await.ok()?;
+    let delegate = delegate_scraper
+        .get_delegate(format!("/person/{id}").as_str().into())
+        .await
+        .ok()?;
     Some(GovOfficial {
         government: extract_gov_from_html(raw_official[0].as_str()?),
         function: function_and_dates.function.to_string(),
@@ -68,15 +77,21 @@ impl GovOfficials for AustriaScraper {
 
     async fn gov_officials(&self) -> Option<Vec<GovOfficial>> {
         Some(
-            futures::future::join_all(self.post_gov_officials_payload()
-                .await
-                .ok()?
-                .get("rows")?
-                .as_array()?
-                .iter()
-                .map(|raw| extract_gov_official(raw, self) )
-                .collect::<Vec<_>>(),
-        ).await.into_iter().flatten().collect::<Vec<_>>())
+            futures::future::join_all(
+                self.post_gov_officials_payload()
+                    .await
+                    .ok()?
+                    .get("rows")?
+                    .as_array()?
+                    .iter()
+                    .map(|raw| extract_gov_official(raw, self))
+                    .collect::<Vec<_>>(),
+            )
+            .await
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
+        )
     }
 
     #[inline]
@@ -148,7 +163,9 @@ mod tests {
             "/WWER/PAD_08242/index.shtml"
         ]);
         let scraper = AustriaScraper::default();
-        let gov_official = super::extract_gov_official(&raw_gov, &scraper).await.unwrap();
+        let gov_official = super::extract_gov_official(&raw_gov, &scraper)
+            .await
+            .unwrap();
         assert_eq!(gov_official.government, "Nehammer");
         assert_eq!(gov_official.function, "Bundesminister");
         assert_eq!(

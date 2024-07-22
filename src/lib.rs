@@ -31,7 +31,7 @@ pub type DeclineUrlGegenstand = (String, String, Option<u32>);
 fn extract_from_gegenstand_url(text: &str) -> Option<DeclineUrlGegenstand> {
     let start = text.find('"')?;
     let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"')?;
-    let mut gegenstand_url = text[start+2..end].split('/');
+    let mut gegenstand_url = text[start + 2..end].split('/');
     gegenstand_url.next();
     let gp = gegenstand_url.next()?.to_string();
     let ityp = gegenstand_url.next()?.to_string();

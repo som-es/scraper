@@ -12,11 +12,89 @@ use crate::{error::ScraperError, request::request};
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
 
+pub const PERSON_PATH_IDX: usize = 4;
+pub const BEREICHE_IDX: usize = 6;
+
+pub struct BereichsprecherInfo {
+    pub path: String,
+    pub bereiche: Vec<String>,
+}
+
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct DelegateInfo {
+    pub path: String,
+    pub gender: String
+}
+
+impl From<&str> for DelegateInfo {
+    fn from(value: &str) -> Self {
+        DelegateInfo { path: value.to_string(), gender: "".to_string() }
+    }
+}
+
+impl AustriaScraper {
+    pub fn bereichsprecher_info(&self, gegenstaende: Value) -> Option<Vec<BereichsprecherInfo>> {
+        Some(
+            gegenstaende[Self::LIST_ENTRIES]
+                .as_array()?
+                .iter()
+                .flat_map(|gegenstand| {
+                    let geg = gegenstand.as_array()?;
+                    let path = geg[PERSON_PATH_IDX].as_str()?.to_string();
+                    let bereiche = serde_json::from_str::<Vec<Value>>(geg[BEREICHE_IDX].as_str()?).ok()?
+                        .iter()
+                        .flat_map(Value::as_str)
+                        .map(ToString::to_string)
+                        .collect();
+
+                    println!("path: {path}");
+                    Some(BereichsprecherInfo { path, bereiche })
+                })
+                .collect(),
+        )
+    }
+    
+    pub fn delegate_info(&self, gegenstaende: Value) -> Option<Vec<DelegateInfo>> {
+        Some(
+            gegenstaende[Self::LIST_ENTRIES]
+                .as_array()?
+                .iter()
+                .flat_map(|gegenstand| {
+                    let geg = gegenstand.as_array()?;
+                    let path = geg[4].as_str()?.to_string();
+                    let gender = geg[5].as_str()?.to_string();
+                    Some(DelegateInfo { path, gender })
+                })
+                .collect(),
+        )
+    }
+}
+
 #[async_trait]
 pub trait DelegateScraper: Scraper {
     const DELEGATE_FILTER_PATH: &'static str;
+    const DELEGATE_BS_FILTER_PATH: &'static str;
 
     fn persons_payload(&self) -> Self::Payload;
+    
+    async fn post_persons_payload_bs(&self) -> Result<Value, ScraperError> {
+        request(
+            Method::POST,
+            self.client(),
+            json!({
+                "CODE": [
+                  "BS"
+                ]
+              }),
+            format!(
+                "{base_url}{filter}",
+                base_url = Self::BASE_URL,
+                filter = Self::DELEGATE_BS_FILTER_PATH
+            ),
+        )
+        .await
+    }
 
     async fn post_persons_payload(&self) -> Result<Value, ScraperError> {
         let payload = self.persons_payload();
@@ -33,13 +111,30 @@ pub trait DelegateScraper: Scraper {
         .await
     }
 
-    fn person_paths(&self, persons: Value) -> Option<GegenstandPaths>;
+    fn person_paths(&self, persons: Value) -> Option<Vec<DelegateInfo>>;
+    fn person_paths_bs(&self, persons: Value) -> Option<Vec<BereichsprecherInfo>>;
 
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate>;
 
-    async fn get_delegate(&self, person_path: &str) -> Result<Delegate, ScraperError> {
-        let person_info = self.get_gegenstand_info(person_path).await?;
-        Self::person_info_into_delegate(person_info).ok_or(ScraperError::InvalidDelegateInfoError)
+    async fn get_delegate(&self, info: DelegateInfo) -> Result<Delegate, ScraperError> {
+        let person_info = self.get_gegenstand_info(&info.path).await?;
+        let mut delegate = Self::person_info_into_delegate(person_info)
+            .ok_or(ScraperError::InvalidDelegateInfoError)?;
+        let new_gender = Gender::from_indicators([info.gender.as_str()].into_iter());
+        if new_gender != Gender::Unknown {
+            if delegate.gender != Gender::Unknown {
+                assert_eq!(delegate.gender, new_gender)
+            }
+            delegate.gender = new_gender;
+        }
+        Ok(delegate)
+    }
+    async fn get_delegate_bs(&self, bs_info: BereichsprecherInfo) -> Result<Delegate, ScraperError> {
+        let person_info = self.get_gegenstand_info(&bs_info.path).await?;
+        let mut delegate = Self::person_info_into_delegate(person_info)
+            .ok_or(ScraperError::InvalidDelegateInfoError)?;
+        delegate.divisions = Some(bs_info.bereiche);
+        Ok(delegate)
     }
 }
 
@@ -47,6 +142,9 @@ impl DelegateScraper for AustriaScraper {
     const DELEGATE_FILTER_PATH: &'static str =
         // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_008&listeId=10008&showAll=true";
         "/Filter/api/filter/data/10400?js=eval&showAll=true";
+
+    const DELEGATE_BS_FILTER_PATH: &'static str =
+    "/Filter/api/filter/data/403?js=eval&showAll=true&export=true";
 
     #[inline]
     fn persons_payload(&self) -> Value {
@@ -122,6 +220,7 @@ impl DelegateScraper for AustriaScraper {
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
             party,
+            divisions: None,
             constituency,
             council: council.as_str().map(|council| council.to_string()),
             seat,
@@ -136,9 +235,12 @@ impl DelegateScraper for AustriaScraper {
         })
     }
 
-    fn person_paths(&self, persons: Value) -> Option<GegenstandPaths> {
-        // use idx 8 for delegates in parlament
-        self.gegenstand_paths(persons, 4)
+    fn person_paths(&self, persons: Value) -> Option<Vec<DelegateInfo>> {
+        self.delegate_info(persons)
+    }
+    
+    fn person_paths_bs(&self,persons:Value) -> Option<Vec<BereichsprecherInfo>>  {
+        self.bereichsprecher_info(persons)
     }
 }
 
@@ -231,6 +333,18 @@ mod tests {
     use super::AustriaScraper;
 
     #[tokio::test]
+    async fn test_division_delegate_scraper() {
+        let scraper = AustriaScraper::default();
+
+        let info = scraper.post_persons_payload_bs().await.unwrap();
+        for path in scraper.person_paths_bs(info).unwrap() {
+            let delegate = scraper.get_delegate_bs(path).await.unwrap();
+            println!("delegate: {}, divs: {:?}", delegate.name, delegate.divisions)
+        }
+
+    }
+
+    #[tokio::test]
     async fn test_austria_person_info_scraper() {
         let scraper = AustriaScraper::default();
         let val = scraper.get_gegenstand_info("/person/16218").await.unwrap();
@@ -260,7 +374,7 @@ mod tests {
     async fn test_get_delegate() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
 
-        let res = scraper.get_delegate("/person/16218").await?;
+        let res = scraper.get_delegate("/person/16218".into()).await?;
         println!("res: {res:?}");
 
         assert_eq!(res.name, "Diesner-Wais Martina");
@@ -320,7 +434,7 @@ mod tests {
     async fn test_delegate_84060() {
         let scraper = AustriaScraper::default();
 
-        let res = scraper.get_delegate("/person/84060").await.unwrap();
+        let res = scraper.get_delegate("/person/84060".into()).await.unwrap();
         println!("res: {res:?}");
     }
 
@@ -332,7 +446,7 @@ mod tests {
 
         let persons = scraper.post_persons_payload().await?;
         for person_path in scraper.person_paths(persons).unwrap_or_default() {
-            let Ok(delegate) = scraper.get_delegate(&person_path).await else {
+            let Ok(delegate) = scraper.get_delegate(person_path).await else {
                 continue;
             };
             println!("del: {delegate:?}");
@@ -353,7 +467,7 @@ mod tests {
         let person_paths = scraper.person_paths(persons).unwrap();
 
         for person in person_paths {
-            println!("{person}");
+            println!("{person:?}");
         }
 
         Ok(())
@@ -362,7 +476,7 @@ mod tests {
     #[tokio::test]
     async fn test_person_special() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
-        let res = scraper.get_delegate("/person/55727").await?;
+        let res = scraper.get_delegate("/person/55727".into()).await?;
         println!("res: {res:?}");
 
         Ok(())
@@ -371,7 +485,7 @@ mod tests {
     #[tokio::test]
     async fn test_person_next_check_contacts_72959() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
-        let res = scraper.get_delegate("/person/72959").await?;
+        let res = scraper.get_delegate("/person/72959".into()).await?;
         println!("res: {res:?}");
         Ok(())
     }
@@ -379,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn test_person_special2() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
-        let delegate = scraper.get_delegate("/person/21029").await?;
+        let delegate = scraper.get_delegate("/person/21029".into()).await?;
         assert_eq!(delegate.name, "Rauch Johannes");
         assert_eq!(
             delegate.contact.mail,
@@ -411,21 +525,21 @@ mod tests {
     #[tokio::test]
     pub async fn test_gender_of_previously_unknown() {
         let scraper = AustriaScraper::default();
-        let delegate = scraper.get_delegate("/person/2814").await.unwrap();
+        let delegate = scraper.get_delegate("/person/2814".into()).await.unwrap();
         assert_eq!(Gender::Female, delegate.gender)
     }
 
     #[tokio::test]
     async fn test_bundesrat_to_nr_switcher() {
         let scraper = AustriaScraper::default();
-        let delegate = scraper.get_delegate("/person/6407").await.unwrap();
+        let delegate = scraper.get_delegate("/person/6407".into()).await.unwrap();
         println!("delegate: {delegate:?}");
     }
 
     #[tokio::test]
     pub async fn test_seat_lost() {
         let scraper = AustriaScraper::default();
-        let delegate = scraper.get_delegate("/person/5682").await.unwrap();
+        let delegate = scraper.get_delegate("/person/5682".into()).await.unwrap();
         assert_eq!(Gender::Male, delegate.gender);
         let delegate = scraper.get_gegenstand_info("/person/5682").await.unwrap();
         println!(

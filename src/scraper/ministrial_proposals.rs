@@ -6,7 +6,8 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html, legis_init::extract_topics, person_url_to_id, proposals::ProposalsPayload
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html,
+    legis_init::extract_topics, person_url_to_id, proposals::ProposalsPayload,
 };
 
 use super::{AustriaScraper, Scraper};
@@ -84,7 +85,6 @@ pub struct GegenstandInfo {
     pub ressort_shortform: String,
     pub due_to: NaiveDate,
 }
-
 
 impl AustriaScraper {
     pub fn ministiral_paths(&self, gegenstaende: Value) -> Option<Vec<GegenstandInfo>> {
@@ -186,7 +186,12 @@ impl MinistrialProposalScraper for AustriaScraper {
             .collect::<Vec<u64>>();
 
         let (mut legis_gp, mut legis_init_inr, mut legis_init_ityp) = (None, None, None);
-        if let Some(entry) = raw_ministrial_content["stages"].as_array().cloned().unwrap_or_default().last() {
+        if let Some(entry) = raw_ministrial_content["stages"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .last()
+        {
             let text = entry["text"].as_str().unwrap();
             if text.contains("Regierungsvorlage") {
                 let rv = extract_from_gegenstand_url(text).unwrap();
@@ -214,7 +219,7 @@ impl MinistrialProposalScraper for AustriaScraper {
             gegenstand_info,
             legis_gp,
             legis_init_inr,
-            legis_init_ityp
+            legis_init_ityp,
         })
     }
 }
@@ -239,7 +244,10 @@ mod tests {
         for path in scraper.ministrial_prop_paths(proposals).unwrap() {
             // println!("path: {path:?}");
             let ministrial = scraper.get_ministrial_proposal(path).await.unwrap();
-            println!("shortform: {}", ministrial.gegenstand_info.ressort_shortform);
+            println!(
+                "shortform: {}",
+                ministrial.gegenstand_info.ressort_shortform
+            );
             // println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);
         }
 

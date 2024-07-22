@@ -4,7 +4,9 @@ use common_scrapes::{LegislativeInitiative, Party, Proposal, Vote};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html,
+    person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper,
+    DeclineUrlGegenstand, GegenstandPaths, Scraper,
 };
 
 #[async_trait]
@@ -111,7 +113,8 @@ impl LegislativeInitiatives for AustriaScraper {
             NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
         });
 
-        let requires_simple_majority = extract_majority_on_indicators(legis_content).unwrap_or(true);
+        let requires_simple_majority =
+            extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
         let id = format!("{gp}/{ityp}/{inr}");
@@ -150,7 +153,9 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 }
 
-pub fn extract_invisibly_declined(legis_content: &Value) -> Option<(bool, Option<DeclineUrlGegenstand>)> {
+pub fn extract_invisibly_declined(
+    legis_content: &Value,
+) -> Option<(bool, Option<DeclineUrlGegenstand>)> {
     let status_description = legis_content["status"]["description"].as_str()?;
     if status_description.contains("abgelehnt") {
         return Some((true, extract_from_gegenstand_url(status_description)));
@@ -178,14 +183,16 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
 
 fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
     let mut is_simple_majority = true;
-    
+
     'outer: for phase in legis_content.get("phase")?.as_array()?.iter() {
         let Some(stages) = phase.get("stages") else {
             continue;
         };
         for stage in stages.as_array()? {
             if let Some(text) = stage.get("text") {
-                if text.as_str()?.contains("Mehrheit von zwei Dritteln") || text.as_str()?.contains("Bundesverfassungsgesetz") {
+                if text.as_str()?.contains("Mehrheit von zwei Dritteln")
+                    || text.as_str()?.contains("Bundesverfassungsgesetz")
+                {
                     is_simple_majority = false;
                     break 'outer;
                 }
@@ -193,7 +200,10 @@ fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
         }
     }
 
-    if legis_content["status"]["description"].as_str()?.contains("nicht die erforderliche 2/3 Mehrheit") {
+    if legis_content["status"]["description"]
+        .as_str()?
+        .contains("nicht die erforderliche 2/3 Mehrheit")
+    {
         is_simple_majority = false
     }
 
@@ -276,17 +286,20 @@ mod tests {
     }
 
     // /gegenstand/XXVII/A/4129
- 
+
     #[tokio::test]
     async fn test_get_legis_init_invisibly_declined_2_3_majority() {
         let scraper = AustriaScraper::default();
-        let legis_init = scraper.get_legis_init("/gegenstand/XXVII/A/4129").await.unwrap();
+        let legis_init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/4129")
+            .await
+            .unwrap();
         assert_eq!(legis_init.delegate_ids, vec![5439, 87001]);
         assert!(!legis_init.requires_simple_majority);
-        assert!(legis_init.was_invisibly_declined)
+        assert!(legis_init.was_invisibly_declined);
+        assert!(legis_init.speeches.len() > 0);
     }
 
-    
     #[tokio::test]
     async fn test_get_legis_init_was_invisibly_declined() {
         let scraper = AustriaScraper::default();
@@ -300,7 +313,11 @@ mod tests {
                 println!("error {}{path}", AustriaScraper::BASE_URL);
                 continue;
             };
-            println!("was_invisible_declined: {} {}{path}", init.was_invisibly_declined, AustriaScraper::BASE_URL);
+            println!(
+                "was_invisibly_declined: {} {}{path}",
+                init.was_invisibly_declined,
+                AustriaScraper::BASE_URL
+            );
         }
 
         println!("elapsed: {:?}", start.elapsed());
@@ -324,7 +341,11 @@ mod tests {
             if !init.requires_simple_majority {
                 println!("---------------------------------");
             }
-            println!("1/2 majority?: {} {}{path}", init.requires_simple_majority, AustriaScraper::BASE_URL);
+            println!(
+                "1/2 majority?: {} {}{path}",
+                init.requires_simple_majority,
+                AustriaScraper::BASE_URL
+            );
             if !init.requires_simple_majority {
                 println!("---------------------------------");
             }
@@ -565,7 +586,6 @@ mod tests {
             .unwrap();
 
         println!("acc: {:?}", res.accepted);
-
 
         // gegenstand/XXVII/I/2269
     }

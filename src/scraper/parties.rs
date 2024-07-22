@@ -23,6 +23,9 @@ impl Parties for AustriaScraper {
             let Ok(legis_init) = self.get_legis_init(&path).await else {
                 continue;
             };
+            if legis_init.votes.is_empty() {
+                continue;
+            }
             return Ok(legis_init
                 .votes
                 .into_iter()

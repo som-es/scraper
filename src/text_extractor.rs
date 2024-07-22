@@ -119,8 +119,8 @@ impl TextExtractor {
 #[cfg(test)]
 mod tests {
     use crate::{
-        legis_init::LegislativeInitiatives,
-        plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
+        legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper,
+        TextExtractor,
     };
 
     #[tokio::test]

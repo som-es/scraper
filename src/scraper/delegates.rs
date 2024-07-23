@@ -48,7 +48,6 @@ impl AustriaScraper {
                         .map(ToString::to_string)
                         .collect();
 
-                    println!("path: {path}");
                     Some(BereichsprecherInfo { path, bereiche })
                 })
                 .collect(),
@@ -122,10 +121,13 @@ pub trait DelegateScraper: Scraper {
             .ok_or(ScraperError::InvalidDelegateInfoError)?;
         let new_gender = Gender::from_indicators([info.gender.as_str()].into_iter());
         if new_gender != Gender::Unknown {
-            if delegate.gender != Gender::Unknown {
-                assert_eq!(delegate.gender, new_gender)
+            if delegate.gender == Gender::Unknown {
+                delegate.gender = new_gender;
+            } else {
+                // should work HOWEVER they sometimes used the wrong gender e.g. for Dipl.-Kfm. Ruth Feldgrill-Zankel
+                // /person/64401
+                // assert_eq!(delegate.gender, new_gender)
             }
-            delegate.gender = new_gender;
         }
         Ok(delegate)
     }

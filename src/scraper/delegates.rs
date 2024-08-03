@@ -20,16 +20,18 @@ pub struct BereichsprecherInfo {
     pub bereiche: Vec<String>,
 }
 
-
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct DelegateInfo {
     pub path: String,
-    pub gender: String
+    pub gender: String,
 }
 
 impl From<&str> for DelegateInfo {
     fn from(value: &str) -> Self {
-        DelegateInfo { path: value.to_string(), gender: "".to_string() }
+        DelegateInfo {
+            path: value.to_string(),
+            gender: "".to_string(),
+        }
     }
 }
 
@@ -42,7 +44,8 @@ impl AustriaScraper {
                 .flat_map(|gegenstand| {
                     let geg = gegenstand.as_array()?;
                     let path = geg[PERSON_PATH_IDX].as_str()?.to_string();
-                    let bereiche = serde_json::from_str::<Vec<Value>>(geg[BEREICHE_IDX].as_str()?).ok()?
+                    let bereiche = serde_json::from_str::<Vec<Value>>(geg[BEREICHE_IDX].as_str()?)
+                        .ok()?
                         .iter()
                         .flat_map(Value::as_str)
                         .map(ToString::to_string)
@@ -53,7 +56,7 @@ impl AustriaScraper {
                 .collect(),
         )
     }
-    
+
     pub fn delegate_info(&self, gegenstaende: Value) -> Option<Vec<DelegateInfo>> {
         Some(
             gegenstaende[Self::LIST_ENTRIES]
@@ -76,16 +79,16 @@ pub trait DelegateScraper: Scraper {
     const DELEGATE_BS_FILTER_PATH: &'static str;
 
     fn persons_payload(&self) -> Self::Payload;
-    
+
     async fn post_persons_payload_bs(&self) -> Result<Value, ScraperError> {
         request(
             Method::POST,
             self.client(),
             json!({
-                "CODE": [
-                  "BS"
-                ]
-              }),
+              "CODE": [
+                "BS"
+              ]
+            }),
             format!(
                 "{base_url}{filter}",
                 base_url = Self::BASE_URL,
@@ -131,7 +134,10 @@ pub trait DelegateScraper: Scraper {
         }
         Ok(delegate)
     }
-    async fn get_delegate_bs(&self, bs_info: BereichsprecherInfo) -> Result<Delegate, ScraperError> {
+    async fn get_delegate_bs(
+        &self,
+        bs_info: BereichsprecherInfo,
+    ) -> Result<Delegate, ScraperError> {
         let person_info = self.get_gegenstand_info(&bs_info.path).await?;
         let mut delegate = Self::person_info_into_delegate(person_info)
             .ok_or(ScraperError::InvalidDelegateInfoError)?;
@@ -146,7 +152,7 @@ impl DelegateScraper for AustriaScraper {
         "/Filter/api/filter/data/10400?js=eval&showAll=true";
 
     const DELEGATE_BS_FILTER_PATH: &'static str =
-    "/Filter/api/filter/data/403?js=eval&showAll=true&export=true";
+        "/Filter/api/filter/data/403?js=eval&showAll=true&export=true";
 
     #[inline]
     fn persons_payload(&self) -> Value {
@@ -240,8 +246,8 @@ impl DelegateScraper for AustriaScraper {
     fn person_paths(&self, persons: Value) -> Option<Vec<DelegateInfo>> {
         self.delegate_info(persons)
     }
-    
-    fn person_paths_bs(&self,persons:Value) -> Option<Vec<BereichsprecherInfo>>  {
+
+    fn person_paths_bs(&self, persons: Value) -> Option<Vec<BereichsprecherInfo>> {
         self.bereichsprecher_info(persons)
     }
 }
@@ -341,9 +347,11 @@ mod tests {
         let info = scraper.post_persons_payload_bs().await.unwrap();
         for path in scraper.person_paths_bs(info).unwrap() {
             let delegate = scraper.get_delegate_bs(path).await.unwrap();
-            println!("delegate: {}, divs: {:?}", delegate.name, delegate.divisions)
+            println!(
+                "delegate: {}, divs: {:?}",
+                delegate.name, delegate.divisions
+            )
         }
-
     }
 
     #[tokio::test]

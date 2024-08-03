@@ -116,6 +116,11 @@ impl LegislativeInitiatives for AustriaScraper {
         let requires_simple_majority =
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
+        let was_invisibly_declined = if accepted.is_some() {
+            false
+        } else {
+            was_invisibly_declined
+        };
 
         let id = format!("{gp}/{ityp}/{inr}");
 
@@ -307,12 +312,16 @@ mod tests {
         let start = std::time::Instant::now();
 
         let initiatives = scraper.post_legis_payload().await.unwrap();
+        let mut count = 0;
         for path in scraper.legis_paths(initiatives).unwrap() {
             println!("path: {path:?}");
             let Ok(init) = scraper.get_legis_init(&path).await else {
                 println!("error {}{path}", AustriaScraper::BASE_URL);
                 continue;
             };
+            if init.was_invisibly_declined {
+                count += 1;
+            }
             println!(
                 "was_invisibly_declined: {} {}{path}",
                 init.was_invisibly_declined,
@@ -321,6 +330,7 @@ mod tests {
         }
 
         println!("elapsed: {:?}", start.elapsed());
+        println!("count: {count:?}");
     }
 
     #[tokio::test]

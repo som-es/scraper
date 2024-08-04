@@ -104,6 +104,7 @@ impl EnactmentScraper for AustriaScraper {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
+    use common_scrapes::AcceptedState;
 
     use crate::{enactment::EnactmentScraper, AustriaScraper};
 
@@ -118,10 +119,10 @@ mod tests {
                 println!("not processable {path}");
                 continue;
             };
-            if !legis_init
+            if legis_init
                 .legislative_initiative
                 .accepted
-                .unwrap_or_default()
+                .unwrap_or_default() == AcceptedState::Declined
             {
                 println!("{legis_init:?}");
             }

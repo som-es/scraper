@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{LegislativeInitiative, Party, Proposal, Vote};
+use common_scrapes::{AcceptedState, LegislativeInitiative, Party, Proposal, Vote};
 use serde_json::{json, Value};
 
 use crate::{
@@ -91,11 +91,11 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
-        let accepted = if votes.is_empty() {
+        let mut accepted = if votes.is_empty() {
             None
         } else {
             legis_content["vote"]["infavor"].as_bool()
-        };
+        }.map(|x| if x { AcceptedState::Accepted } else { AcceptedState::Declined} );
 
         let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
             let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
@@ -116,10 +116,8 @@ impl LegislativeInitiatives for AustriaScraper {
         let requires_simple_majority =
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
-        let was_invisibly_declined = if accepted.is_some() {
-            false
-        } else {
-            was_invisibly_declined
+        if accepted.is_none() && was_invisibly_declined {
+            accepted = Some(AcceptedState::PreDeclined)
         };
 
         let id = format!("{gp}/{ityp}/{inr}");
@@ -147,7 +145,6 @@ impl LegislativeInitiatives for AustriaScraper {
             created_at,
             updated_at,
             requires_simple_majority,
-            was_invisibly_declined,
             proposal,
         })
     }
@@ -261,7 +258,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use common_scrapes::{Opinion, Party};
+    use common_scrapes::{AcceptedState, Opinion, Party};
 
     use crate::{
         extract_text_from_html,
@@ -301,7 +298,7 @@ mod tests {
             .unwrap();
         assert_eq!(legis_init.delegate_ids, vec![5439, 87001]);
         assert!(!legis_init.requires_simple_majority);
-        assert!(legis_init.was_invisibly_declined);
+        assert_eq!(legis_init.accepted.unwrap(), AcceptedState::PreDeclined);
         assert!(legis_init.speeches.len() > 0);
     }
 
@@ -319,12 +316,12 @@ mod tests {
                 println!("error {}{path}", AustriaScraper::BASE_URL);
                 continue;
             };
-            if init.was_invisibly_declined {
+            if init.accepted == Some(AcceptedState::PreDeclined) {
                 count += 1;
             }
             println!(
-                "was_invisibly_declined: {} {}{path}",
-                init.was_invisibly_declined,
+                "was_invisibly_declined: {:?} {}{path}",
+                init.accepted,
                 AustriaScraper::BASE_URL
             );
         }
@@ -465,7 +462,7 @@ mod tests {
             ]
         );
 
-        assert!(init.accepted.unwrap());
+        assert_eq!(init.accepted.unwrap(), AcceptedState::Accepted);
 
         assert_eq!(init.id, "XXVII/I/1954");
         assert_eq!(init.ityp, "I".to_string());
@@ -500,7 +497,7 @@ mod tests {
 
         assert_eq!(init.topics, vec!["Arbeit".to_string()]);
 
-        assert_eq!(init.accepted, Some(true));
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
         assert_eq!(init.id, "XXVII/A/3021");
         assert_eq!(init.ityp, "A");
         assert_eq!(
@@ -570,6 +567,16 @@ mod tests {
 
         let res = scraper.get_legis_init("/gegenstand/XX/I/1").await.unwrap();
     }
+
+    #[tokio::test]
+    async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {
+        let mut scraper = AustriaScraper::default();
+
+        let res = scraper.get_legis_init("/gegenstand/XXVII/I/2269").await.unwrap();
+        assert_ne!(res.accepted, Some(AcceptedState::PreDeclined));
+    }
+
+
 
     // test may get invalid -> legis init got voted on potentially
     #[tokio::test]

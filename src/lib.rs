@@ -136,11 +136,6 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
         .collect::<String>()
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct ProContra {
-    pro: Vec<String>,
-    contra: Vec<String>,
-}
 
 pub fn convert_party_code_list_to_vec(party_list: &str) -> Vec<String> {
     party_list
@@ -172,10 +167,10 @@ pub fn convert_party_code_list_to_vec_open_ended(party_list_open_ended: &str) ->
 }
 
 pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Option<ProContra> {
-    let pro_start = pro_contra_str.find("Dafür")?;
-    let contra_start = pro_contra_str.find("Dagegen")?;
+    let pro_start = pro_contra_str.find("Dafür").unwrap();
+    let contra_start = pro_contra_str.find("Dagegen").unwrap();
 
-    let pro = &pro_contra_str[pro_start + 6..contra_start - 2];
+    let pro = &pro_contra_str[pro_start + 7..contra_start - 2];
     let pro = convert_party_code_list_to_vec(pro);
     let contra = convert_party_code_list_to_vec_open_ended(&pro_contra_str[contra_start + 8..]);
 
@@ -185,7 +180,7 @@ pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Optio
 #[cfg(test)]
 mod tests {
     use crate::{
-        extract_text_from_html_till_next_name_attribute, extract_text_from_html_via_name_attribute,
+        extract_pro_contra_party_codes_from_string, extract_text_from_html_till_next_name_attribute, extract_text_from_html_via_name_attribute
     };
 
     #[test]
@@ -212,4 +207,24 @@ mod tests {
         let text = extract_text_from_html_till_next_name_attribute(&html, "RU_173145");
         assert_eq!(text, "\nPräsident Ing.\u{a0}Norbert\u{a0}Hofer: Zu\nWort gelangt nun Frau Abgeordnete Himmelbauer.\u{a0}– Bitte, Frau\nAbgeordnete.\n\u{a0}\n\n\n\n\n14.48.00\nAbgeordnete Eva-Maria\u{a0}Himmelbauer,\u{a0}BSc (ÖVP): Herr\nPräsident! Mitglieder der Bun\u{ad}desregierung! Werte Kolleginnen\nund Kollegen! Es freut mich auch, dass es heute zu einer Einigung im\nBildungspaket gekommen ist, dass hier ein Kompromiss gefunden wurde, der auch\ndie Eltern und Lehrer in eine Entscheidung mit einbindet. Ich glaube, es ist\nganz besonders wichtig, noch einmal hervorzuheben, dass da auch Mitsprache\nsichergestellt wird und dass die Politik den Wunsch der Eltern respektiert,\nwenn es darum geht, in welcher Form und unter welchem Dach ihre Kinder\nausgebildet werden.\nVielleicht ist es kein großer Schritt, aber ich glaube\ndennoch, es ist ein Schritt in die richtige Richtung, wie auch viele andere\nSachen ein Schritt in die richtige Richtung wa\u{ad}ren, sei es die\nBildungsinnovationsstiftung, sei es die Open Innovation Strategie, sei es die\nVerbesserung im Übergang zwischen Kindergarten und Volksschule, sei es bei\nder Sprachförderung. Und da der Herr Bundeskanzler auch den Themenbereich\nDigitalisie\u{ad}rung heute angesprochen hat: Auch da hat er unsere\nUnterstützung, nicht nur von der ÖVP, sondern auch vom Hohen Haus,\ndenn dazu haben wir einen Entschließungsan\u{ad}trag eingebracht, der die\nInfrastruktur, die Geräteausstattung, WLAN bis hin zur digita\u{ad}len\nKompetenz im Unterricht beinhaltet.\nIch kann hier aber auch nicht die Finanzierung der Unis\nauslassen, denn wenn wir über Bildung sprechen, dann reden wir über\ndie ganze Kette im Bildungswesen, vom Kin\u{ad}dergarten über die Schule,\ndie Lehre bis hin zum Studium. Auch unser Regierungspro\u{ad}gramm, das ja eigentlich noch bis 15.\u{a0}Oktober\nGültigkeit hat, sieht vor, dass wir die Stu\u{ad}dienplatzfinanzierung umsetzen. Und selbst\nBundeskanzler Kern\u{a0}– der damals zwar nicht bei den\nVerhandlungen dabei war\u{a0}– hat im Jänner diese Zustimmung noch\neinmal be\u{ad}kräftigt und sich\ndarüber hinaus auch für Zugangsregelungen ausgesprochen, da es um\ndie Qualität, die Betreuungssituation an den österreichischen\nUniversitäten geht.\nIch will hier gar nicht den Plan\u{a0}A\nzitieren, aber ein wichtiger Satz, der da drinnen steht und den heute auch der\nBundeskanzler angesprochen hat, war: Es geht nicht um so\u{ad}ziale Selektion, sondern um Leistungsselektion.\u{a0}–\nDem können wir uns anschließen. (Bei\u{ad}fall bei\nder ÖVP.)\nJenen Kräften\nin der SPÖ, denen das nicht so taugt und die das am liebsten bis zum\nWahltag aussitzen würden, kann ich nur sagen, das wäre eine fatale\nEntscheidung, denn es würde nicht nur bis zum 15.\u{a0}Oktober nichts\npassieren, sondern es würde die nächsten\ndrei Jahre nichts passieren, da bis dahin auch die Finanzierungsvereinbarung\nnicht stattfinden wird. Ich kann also nur an die konstruktiven Kräfte in\nder SPÖ appellieren: Setzen wir die Studienplatzfinanzierung und die\nZugangsregelungen um! (Beifall bei der ÖVP.)\n14.51\n\n\n\n\nPräsident\nIng.\u{a0}Norbert\u{a0}Hofer: Nächster Redner\nist Herr Dr.\u{a0}Rosenkranz.\u{a0}– Bitte, Herr Abgeordneter.\n");
     }
+
+    #[test]
+    fn test_pro_contra_extraction_end_string() {
+        let text = "169. Sitzung des Nationalrates: Abstimmung: Antrag, den ablehnenden Ausschussbericht zur Kenntnis zu nehmen: <b>angenommen</b><br>Dafür: V, G. Dagegen: S, F, N";
+        let party_codes = extract_pro_contra_party_codes_from_string(text).unwrap();
+        assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
+        assert_eq!(party_codes.contra, vec!["S".to_string(), "F".to_string(),"N".to_string()]);
+    }
+
+    #[test]
+    fn test_pro_contra_extraction_2_3_string() {
+        let text = "
+270. Sitzung des Nationalrates: Gesetzesvorschlag in zweiter Lesung abgelehnt
+Dafür: V, G. Dagegen: S, F, N (Gesetzentwurf findet nicht die erforderliche 2/3 Mehrheit, somit kein Gesetzesbeschluss des NR im Sinne des § 82 Abs. 2 Z. 1 GOG)";
+
+        let party_codes = extract_pro_contra_party_codes_from_string(text).unwrap();
+        assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
+        assert_eq!(party_codes.contra, vec!["S".to_string(), "F".to_string(),"N".to_string()]);
+    }
+
 }

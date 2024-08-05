@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{AcceptedState, LegislativeInitiative, Party, Vote};
+use common_scrapes::{AcceptedState, LegislativeInitiative, Party, PreDeclinedType, Vote};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html,
-    person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper,
-    DeclineUrlGegenstand, GegenstandPaths, Scraper,
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -128,8 +126,12 @@ impl LegislativeInitiatives for AustriaScraper {
         let requires_simple_majority =
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
+
+        let mut pre_declined_type = None;
+        let mut hidden_votes_untranslated = None;
         if accepted.is_none() && was_invisibly_declined {
-            accepted = Some(AcceptedState::PreDeclined)
+            accepted = Some(AcceptedState::PreDeclined);
+            (pre_declined_type, hidden_votes_untranslated) = extract_hidden_votes(legis_content)?;
         };
 
         let id = format!("{gp}/{ityp}/{inr}");
@@ -146,6 +148,8 @@ impl LegislativeInitiatives for AustriaScraper {
             ityp,
             id,
             votes,
+            hidden_votes_untranslated,
+            pre_declined_type,
             documents,
             delegate_ids,
             accepted,
@@ -195,46 +199,51 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
     most_fitting_date
 }
 
-pub fn extract_hidden_votes(legis_content: &Value) -> Option<&str> {
+pub fn extract_hidden_votes(legis_content: &Value) -> Option<(Option<PreDeclinedType>, Option<ProContra>)> {
     let mut most_fitting_votes = None;
-    for phase in legis_content.get("phase")?.as_array()? {
+    for phase in legis_content.get("phase").unwrap().as_array().unwrap() {
         let Some(stages) = phase.get("stages") else {
             continue;
         };
 
-        if phase["name"].as_str()?.contains("Plenarberatungen NR") {
-            // most_fitting_votes
+        if phase["name"].as_str().unwrap().contains("Plenarberatungen NR") {
+            println!("nothing");
+            most_fitting_votes = extract_most_fitting_votes(stages);
             break;
         }
     }
     most_fitting_votes
 }
 
-pub fn extract_most_fitting_votes(stages: &Value) -> Option<()> {
+pub fn extract_most_fitting_votes(stages: &Value) -> Option<(Option<PreDeclinedType>, Option<ProContra>)> {
     let mut declined_type = None;
-    for stage in stages.as_array()?.iter().rev() {
+    let mut pro_contra = None;
+    for stage in stages.as_array().unwrap().iter().rev() {
         let Some(text) = stage["text"].as_str() else {
             continue;
         };
 
-        if !text.contains("Abstimmung")
-            || !text.contains("abgelehnt")
-            || !text.contains("angenommen")
+        if !(text.contains("Abstimmung")
+            || text.contains("abgelehnt")
+            || text.contains("angenommen")) 
         {
             // angenommen: weil "ablehnender antrag in kenntnis genommen"
             continue;
         }
-
-        if text.contains("Gesetzesvorschlag in zweiter Lesung abgelehnt") {
-            declined_type = Some('2')
-        } else if text.contains("erster Lesung abgelehnt") {
-            declined_type = Some('1')
+        if text.contains("Gesetzesvorschlag in zweiter Lesung") {
+            declined_type = Some(PreDeclinedType::Second)
+        } else if text.contains("erster Lesung") {
+            declined_type = Some(PreDeclinedType::First)
         } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
-            declined_type = Some('a')
+            declined_type = Some(PreDeclinedType::Proposal)
+        }
+        pro_contra = extract_pro_contra_party_codes_from_string(text);
+        if pro_contra.is_some() {
+            break;
         }
     }
 
-    None
+    Some((declined_type, pro_contra))
 }
 
 fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
@@ -313,7 +322,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use common_scrapes::{AcceptedState, Opinion, Party};
+    use common_scrapes::{AcceptedState, Opinion, Party, PreDeclinedType};
 
     use crate::{
         extract_text_from_html,
@@ -355,6 +364,11 @@ mod tests {
         assert!(!legis_init.requires_simple_majority);
         assert_eq!(legis_init.accepted.unwrap(), AcceptedState::PreDeclined);
         assert!(legis_init.speeches.len() > 0);
+        let party_codes = legis_init.hidden_votes_untranslated.unwrap();
+        assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
+        assert_eq!(party_codes.contra, vec!["S".to_string(), "F".to_string(),"N".to_string()]);
+        assert_eq!(legis_init.pre_declined_type.unwrap(), PreDeclinedType::Second);
+
     }
 
     #[tokio::test]
@@ -372,13 +386,16 @@ mod tests {
                 continue;
             };
             if init.accepted == Some(AcceptedState::PreDeclined) {
+            println!(
+                "{hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
+                init.accepted,
+                AustriaScraper::BASE_URL,
+                hidden = init.hidden_votes_untranslated,
+                ty = init.pre_declined_type
+            );
                 count += 1;
             }
-            println!(
-                "was_invisibly_declined: {:?} {}{path}",
-                init.accepted,
-                AustriaScraper::BASE_URL
-            );
+            
         }
 
         println!("elapsed: {:?}", start.elapsed());

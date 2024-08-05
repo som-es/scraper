@@ -130,7 +130,7 @@ impl LegislativeInitiatives for AustriaScraper {
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
-        let (vote_type, mut hidden_votes_untranslated, voted_by_name) = extract_hidden_votes(legis_content)?;
+        let (vote_type, mut hidden_votes_untranslated, voted_by_name) = extract_hidden_votes(legis_content).unwrap_or_default();
         if accepted.is_none() && was_invisibly_declined {
             accepted = Some(AcceptedState::PreDeclined);
 
@@ -272,7 +272,7 @@ pub fn extract_most_fitting_votes(
             continue;
         }
 
-        if text.contains("namentlich") {
+        if text.to_lowercase().contains("namentlich") {
             voted_by_name = true;
             break;
         }

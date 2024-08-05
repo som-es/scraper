@@ -1,10 +1,13 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{AcceptedState, LegislativeInitiative, Party, PreDeclinedType, Vote};
+use common_scrapes::{AcceptedState, LegislativeInitiative, Party, PreDeclinedType, Speech, Vote};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper
+    documents, error::ScraperError, extract_from_gegenstand_url,
+    extract_pro_contra_party_codes_from_string, extract_text_from_html, person_url_to_id,
+    proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand,
+    GegenstandPaths, ProContra, Scraper,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -89,7 +92,7 @@ impl LegislativeInitiatives for AustriaScraper {
         let eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
         let other_keyword_topics = extract_topics(legis_content, "headwords").unwrap_or_default();
 
-        let speeches = extract_speeches(legis_content).unwrap_or_default();
+        let mut speeches = extract_speeches(legis_content).unwrap_or_default();
         let date = extract_date(legis_content)?;
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
@@ -132,12 +135,26 @@ impl LegislativeInitiatives for AustriaScraper {
         if accepted.is_none() && was_invisibly_declined {
             accepted = Some(AcceptedState::PreDeclined);
             (pre_declined_type, hidden_votes_untranslated) = extract_hidden_votes(legis_content)?;
+
+            // proposals are inversed declined warum auch immer !
+            match (pre_declined_type, &mut hidden_votes_untranslated) {
+                (Some(PreDeclinedType::Proposal), Some(pro_contra)) => {
+                    core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
+                    speeches = speeches
+                        .into_iter()
+                        .map(|speech| Speech {
+                            delegate_id: speech.delegate_id,
+                            opinion: speech.opinion.invert(),
+                            spoken_text_html_urls: speech.spoken_text_html_urls,
+                        })
+                        .collect();
+                }
+                _ => {}
+            }
         };
 
         let voted_by_name = eurovoc_topics.contains(&"namentliche Abstimmung".to_string());
-        if voted_by_name {
-
-        }
+        if voted_by_name {}
 
         let id = format!("{gp}/{ityp}/{inr}");
 
@@ -205,14 +222,20 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
     most_fitting_date
 }
 
-pub fn extract_hidden_votes(legis_content: &Value) -> Option<(Option<PreDeclinedType>, Option<ProContra>)> {
+pub fn extract_hidden_votes(
+    legis_content: &Value,
+) -> Option<(Option<PreDeclinedType>, Option<ProContra>)> {
     let mut most_fitting_votes = None;
     for phase in legis_content.get("phase").unwrap().as_array().unwrap() {
         let Some(stages) = phase.get("stages") else {
             continue;
         };
 
-        if phase["name"].as_str().unwrap().contains("Plenarberatungen NR") {
+        if phase["name"]
+            .as_str()
+            .unwrap()
+            .contains("Plenarberatungen NR")
+        {
             most_fitting_votes = extract_most_fitting_votes(stages);
             break;
         }
@@ -220,7 +243,9 @@ pub fn extract_hidden_votes(legis_content: &Value) -> Option<(Option<PreDeclined
     most_fitting_votes
 }
 
-pub fn extract_most_fitting_votes(stages: &Value) -> Option<(Option<PreDeclinedType>, Option<ProContra>)> {
+pub fn extract_most_fitting_votes(
+    stages: &Value,
+) -> Option<(Option<PreDeclinedType>, Option<ProContra>)> {
     let mut declined_type = None;
     let mut pro_contra = None;
     for stage in stages.as_array().unwrap().iter().rev() {
@@ -230,7 +255,7 @@ pub fn extract_most_fitting_votes(stages: &Value) -> Option<(Option<PreDeclinedT
 
         if !(text.contains("Abstimmung")
             || text.contains("abgelehnt")
-            || text.contains("angenommen")) 
+            || text.contains("angenommen"))
         {
             // angenommen: weil "ablehnender antrag in kenntnis genommen"
             continue;
@@ -243,7 +268,7 @@ pub fn extract_most_fitting_votes(stages: &Value) -> Option<(Option<PreDeclinedT
             declined_type = Some(PreDeclinedType::Proposal)
         } else {
             // need to find fitting type, some stages are bs
-            continue
+            continue;
         }
         pro_contra = extract_pro_contra_party_codes_from_string(text);
         if pro_contra.is_some() {
@@ -374,9 +399,14 @@ mod tests {
         assert!(legis_init.speeches.len() > 0);
         let party_codes = legis_init.hidden_votes_untranslated.unwrap();
         assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
-        assert_eq!(party_codes.contra, vec!["S".to_string(), "F".to_string(),"N".to_string()]);
-        assert_eq!(legis_init.pre_declined_type.unwrap(), PreDeclinedType::Second);
-
+        assert_eq!(
+            party_codes.contra,
+            vec!["S".to_string(), "F".to_string(), "N".to_string()]
+        );
+        assert_eq!(
+            legis_init.pre_declined_type.unwrap(),
+            PreDeclinedType::Second
+        );
     }
 
     #[tokio::test]
@@ -394,17 +424,16 @@ mod tests {
                 continue;
             };
             if init.accepted == Some(AcceptedState::PreDeclined) {
-            println!(
-                "{}, {hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
-                init.voted_by_name,
-                init.accepted,
-                AustriaScraper::BASE_URL,
-                hidden = init.hidden_votes_untranslated,
-                ty = init.pre_declined_type
-            );
+                println!(
+                    "{}, {hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
+                    init.voted_by_name,
+                    init.accepted,
+                    AustriaScraper::BASE_URL,
+                    hidden = init.hidden_votes_untranslated,
+                    ty = init.pre_declined_type
+                );
                 count += 1;
             }
-            
         }
 
         println!("elapsed: {:?}", start.elapsed());

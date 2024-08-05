@@ -136,7 +136,6 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
         .collect::<String>()
 }
 
-
 pub fn convert_party_code_list_to_vec(party_list: &str) -> Vec<String> {
     party_list
         .split(',')
@@ -180,7 +179,8 @@ pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Optio
 #[cfg(test)]
 mod tests {
     use crate::{
-        extract_pro_contra_party_codes_from_string, extract_text_from_html_till_next_name_attribute, extract_text_from_html_via_name_attribute
+        extract_pro_contra_party_codes_from_string,
+        extract_text_from_html_till_next_name_attribute, extract_text_from_html_via_name_attribute,
     };
 
     #[test]
@@ -213,7 +213,10 @@ mod tests {
         let text = "169. Sitzung des Nationalrates: Abstimmung: Antrag, den ablehnenden Ausschussbericht zur Kenntnis zu nehmen: <b>angenommen</b><br>Dafür: V, G. Dagegen: S, F, N";
         let party_codes = extract_pro_contra_party_codes_from_string(text).unwrap();
         assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
-        assert_eq!(party_codes.contra, vec!["S".to_string(), "F".to_string(),"N".to_string()]);
+        assert_eq!(
+            party_codes.contra,
+            vec!["S".to_string(), "F".to_string(), "N".to_string()]
+        );
     }
 
     #[test]
@@ -224,7 +227,9 @@ Dafür: V, G. Dagegen: S, F, N (Gesetzentwurf findet nicht die erforderliche 2/3
 
         let party_codes = extract_pro_contra_party_codes_from_string(text).unwrap();
         assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
-        assert_eq!(party_codes.contra, vec!["S".to_string(), "F".to_string(),"N".to_string()]);
+        assert_eq!(
+            party_codes.contra,
+            vec!["S".to_string(), "F".to_string(), "N".to_string()]
+        );
     }
-
 }

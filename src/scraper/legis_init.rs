@@ -134,6 +134,11 @@ impl LegislativeInitiatives for AustriaScraper {
             (pre_declined_type, hidden_votes_untranslated) = extract_hidden_votes(legis_content)?;
         };
 
+        let voted_by_name = eurovoc_topics.contains(&"namentliche Abstimmung".to_string());
+        if voted_by_name {
+
+        }
+
         let id = format!("{gp}/{ityp}/{inr}");
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
@@ -162,6 +167,7 @@ impl LegislativeInitiatives for AustriaScraper {
             updated_at,
             requires_simple_majority,
             proposal,
+            voted_by_name,
         })
     }
 
@@ -207,7 +213,6 @@ pub fn extract_hidden_votes(legis_content: &Value) -> Option<(Option<PreDeclined
         };
 
         if phase["name"].as_str().unwrap().contains("Plenarberatungen NR") {
-            println!("nothing");
             most_fitting_votes = extract_most_fitting_votes(stages);
             break;
         }
@@ -236,6 +241,9 @@ pub fn extract_most_fitting_votes(stages: &Value) -> Option<(Option<PreDeclinedT
             declined_type = Some(PreDeclinedType::First)
         } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
             declined_type = Some(PreDeclinedType::Proposal)
+        } else {
+            // need to find fitting type, some stages are bs
+            continue
         }
         pro_contra = extract_pro_contra_party_codes_from_string(text);
         if pro_contra.is_some() {
@@ -387,7 +395,8 @@ mod tests {
             };
             if init.accepted == Some(AcceptedState::PreDeclined) {
             println!(
-                "{hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
+                "{}, {hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
+                init.voted_by_name,
                 init.accepted,
                 AustriaScraper::BASE_URL,
                 hidden = init.hidden_votes_untranslated,

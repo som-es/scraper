@@ -167,8 +167,8 @@ pub fn convert_party_code_list_to_vec_open_ended(party_list_open_ended: &str) ->
 }
 
 pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Option<ProContra> {
-    let pro_start = pro_contra_str.find("Dafür").unwrap();
-    let contra_start = pro_contra_str.find("Dagegen").unwrap();
+    let pro_start = pro_contra_str.find("Dafür")?;
+    let contra_start = pro_contra_str.find("Dagegen")?;
 
     let pro = &pro_contra_str[pro_start + 7..contra_start - 2];
     let pro = convert_party_code_list_to_vec(pro);

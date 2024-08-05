@@ -59,7 +59,7 @@ impl LegislativeInitiatives for AustriaScraper {
         let description = raw_legis["meta"]["description"].as_str()?.to_string();
         let title = raw_legis["meta"]["title"].as_str()?.to_string();
 
-        // let json = serde_json::to_string_pretty(&raw_legis).unwrap();
+        // let json = serde_json::to_string_pretty(&raw_legis)?;
         // println!("{json}");
 
         let legis_content = &raw_legis["content"];
@@ -83,7 +83,8 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let delegate_ids = names
             .iter()
-            .flat_map(|name| person_url_to_id(name["url"].as_str()?))
+            .flat_map(|name| name["url"].as_str().map(|url| person_url_to_id(url)))
+            .flatten()
             .collect::<Vec<u64>>();
 
         // let votes = extract_votes(legis_content)?;
@@ -111,9 +112,13 @@ impl LegislativeInitiatives for AustriaScraper {
         });
 
         let emphasis: Option<String> = if let Some(shortinfo) = legis_content.get("shortinfo") {
-            let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
+            let teil1 = extract_text_from_html(shortinfo["teil1"].as_str().unwrap_or_default());
             let teil2 = extract_text_from_html(shortinfo["teil2"].as_str().unwrap_or_default());
-            Some(format!("{teil1} {teil2}"))
+            if teil1.is_empty() && teil2.is_empty() {
+                None
+            } else {
+                Some(format!("{teil1} {teil2}"))
+            }
         } else {
             None
         };

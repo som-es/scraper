@@ -22,6 +22,8 @@ pub mod serde_json {
     pub use ::serde_json::*;
 }
 
+const PARTIES_IN_NR: usize = 5;
+
 /// /person/83153 -> 83153
 fn person_url_to_id(url: &str) -> Option<u64> {
     url.split('/').last().and_then(|id| id.parse::<u64>().ok())
@@ -132,6 +134,52 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
             )
         })
         .collect::<String>()
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct ProContra {
+    pro: Vec<String>,
+    contra: Vec<String>,
+}
+
+pub fn convert_party_code_list_to_vec(party_list: &str) -> Vec<String> {
+    party_list
+        .split(',')
+        .map(|party| party.trim_matches(' '))
+        .map(ToString::to_string)
+        .collect()
+}
+
+pub fn convert_party_code_list_to_vec_open_ended(party_list_open_ended: &str) -> Vec<String> {
+    let mut contra = vec![];
+
+    'outer: for maybe_party_split in party_list_open_ended.split(',') {
+        let mut party_code = String::new();
+        for char in maybe_party_split.chars() {
+            if char == ' ' || char == ',' {
+                continue;
+            }
+            if char.is_ascii_uppercase() {
+                party_code.push(char);
+            } else {
+                contra.push(party_code);
+                break 'outer;
+            }
+        }
+        contra.push(party_code);
+    }
+    contra
+}
+
+pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Option<ProContra> {
+    let pro_start = pro_contra_str.find("Dafür")?;
+    let contra_start = pro_contra_str.find("Dagegen")?;
+
+    let pro = &pro_contra_str[pro_start + 6..contra_start - 2];
+    let pro = convert_party_code_list_to_vec(pro);
+    let contra = convert_party_code_list_to_vec_open_ended(&pro_contra_str[contra_start + 8..]);
+
+    Some(ProContra { pro, contra })
 }
 
 #[cfg(test)]

@@ -122,7 +122,8 @@ mod tests {
             if legis_init
                 .legislative_initiative
                 .accepted
-                .unwrap_or_default() == AcceptedState::Declined
+                .unwrap_or_default()
+                == AcceptedState::Declined
             {
                 println!("{legis_init:?}");
             }

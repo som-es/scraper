@@ -70,26 +70,31 @@ mod tests {
                     name: "ÖVP".to_string(),
                     color: "#62C3D0".to_string(),
                     fraction: 71,
+                    code: "V".to_string(),
                 },
                 Party {
                     name: "SPÖ".to_string(),
                     color: "#FF0000".to_string(),
                     fraction: 40,
+                    code: "S".to_string(),
                 },
                 Party {
                     name: "FPÖ".to_string(),
                     color: "#0052FB".to_string(),
                     fraction: 30,
+                    code: "F".to_string(),
                 },
                 Party {
                     name: "GRÜNE".to_string(),
                     color: "#69B12E".to_string(),
                     fraction: 26,
+                    code: "G".to_string(),
                 },
                 Party {
                     name: "NEOS".to_string(),
                     color: "#E3257B".to_string(),
                     fraction: 15,
+                    code: "N".to_string(),
                 }
             ]
         )
@@ -108,26 +113,31 @@ mod tests {
                     name: "SPÖ".to_string(),
                     color: "#FF0000".to_string(),
                     fraction: 68,
+                    code: "S".to_string(),
                 },
                 Party {
                     name: "ÖVP".to_string(),
                     color: "#000000".to_string(),
                     fraction: 66,
+                    code: "V".to_string(),
                 },
                 Party {
                     name: "GRÜNE".to_string(),
                     color: "#69B12E".to_string(),
                     fraction: 21,
+                    code: "G".to_string(),
                 },
                 Party {
                     name: "FPÖ".to_string(),
                     color: "#0052FB".to_string(),
                     fraction: 21,
+                    code: "F".to_string(),
                 },
                 Party {
                     name: "BZÖ".to_string(),
                     color: "#FECB56".to_string(),
                     fraction: 7,
+                    code: "B".to_string(),
                 }
             ]
         )

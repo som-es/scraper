@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{AcceptedState, LegislativeInitiative, Party, Proposal, Vote};
+use common_scrapes::{AcceptedState, LegislativeInitiative, Party, Vote};
 use serde_json::{json, Value};
 
 use crate::{
@@ -8,6 +8,11 @@ use crate::{
     person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper,
     DeclineUrlGegenstand, GegenstandPaths, Scraper,
 };
+
+// const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
+//     let scraper = AustriaScraper::default();
+//     pollster::block_on(scraper.get_parties()).unwrap()
+// });
 
 #[async_trait]
 pub trait LegislativeInitiatives: Scraper {
@@ -95,9 +100,16 @@ impl LegislativeInitiatives for AustriaScraper {
             None
         } else {
             legis_content["vote"]["infavor"].as_bool()
-        }.map(|x| if x { AcceptedState::Accepted } else { AcceptedState::Declined} );
+        }
+        .map(|x| {
+            if x {
+                AcceptedState::Accepted
+            } else {
+                AcceptedState::Declined
+            }
+        });
 
-        let emphasis = if let Some(shortinfo) = legis_content.get("shortinfo") {
+        let emphasis: Option<String> = if let Some(shortinfo) = legis_content.get("shortinfo") {
             let teil1 = extract_text_from_html(shortinfo["teil1"].as_str()?);
             let teil2 = extract_text_from_html(shortinfo["teil2"].as_str().unwrap_or_default());
             Some(format!("{teil1} {teil2}"))
@@ -183,6 +195,48 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
     most_fitting_date
 }
 
+pub fn extract_hidden_votes(legis_content: &Value) -> Option<&str> {
+    let mut most_fitting_votes = None;
+    for phase in legis_content.get("phase")?.as_array()? {
+        let Some(stages) = phase.get("stages") else {
+            continue;
+        };
+
+        if phase["name"].as_str()?.contains("Plenarberatungen NR") {
+            // most_fitting_votes
+            break;
+        }
+    }
+    most_fitting_votes
+}
+
+pub fn extract_most_fitting_votes(stages: &Value) -> Option<()> {
+    let mut declined_type = None;
+    for stage in stages.as_array()?.iter().rev() {
+        let Some(text) = stage["text"].as_str() else {
+            continue;
+        };
+
+        if !text.contains("Abstimmung")
+            || !text.contains("abgelehnt")
+            || !text.contains("angenommen")
+        {
+            // angenommen: weil "ablehnender antrag in kenntnis genommen"
+            continue;
+        }
+
+        if text.contains("Gesetzesvorschlag in zweiter Lesung abgelehnt") {
+            declined_type = Some('2')
+        } else if text.contains("erster Lesung abgelehnt") {
+            declined_type = Some('1')
+        } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
+            declined_type = Some('a')
+        }
+    }
+
+    None
+}
+
 fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
     let mut is_simple_majority = true;
 
@@ -247,6 +301,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
                         name: vote["text"].as_str()?.to_string(),
                         color: vote["color"].as_str()?.to_string(),
                         fraction: vote["fraction"].as_u64()? as u32,
+                        code: vote["code"].as_str()?.to_string(),
                     },
                     infavor: vote["infavor"].as_bool()?,
                 })
@@ -424,6 +479,7 @@ mod tests {
                         name: "ÖVP".to_string(),
                         color: "#62C3D0".to_string(),
                         fraction: 71,
+                        code: "V".to_string(),
                     },
                     infavor: true
                 },
@@ -432,6 +488,7 @@ mod tests {
                         name: "SPÖ".to_string(),
                         color: "#FF0000".to_string(),
                         fraction: 40,
+                        code: "S".to_string(),
                     },
                     infavor: false
                 },
@@ -440,6 +497,7 @@ mod tests {
                         name: "FPÖ".to_string(),
                         color: "#0052FB".to_string(),
                         fraction: 30,
+                        code: "F".to_string(),
                     },
                     infavor: false
                 },
@@ -448,6 +506,7 @@ mod tests {
                         name: "GRÜNE".to_string(),
                         color: "#69B12E".to_string(),
                         fraction: 26,
+                        code: "G".to_string(),
                     },
                     infavor: true
                 },
@@ -456,6 +515,7 @@ mod tests {
                         name: "NEOS".to_string(),
                         color: "#E3257B".to_string(),
                         fraction: 15,
+                        code: "N".to_string(),
                     },
                     infavor: true
                 }
@@ -517,6 +577,7 @@ mod tests {
                         name: "ÖVP".to_string(),
                         color: "#62C3D0".to_string(),
                         fraction: 71,
+                        code: "V".to_string(),
                     },
                     infavor: true
                 },
@@ -525,6 +586,7 @@ mod tests {
                         name: "SPÖ".to_string(),
                         color: "#FF0000".to_string(),
                         fraction: 40,
+                        code: "S".to_string(),
                     },
                     infavor: true
                 },
@@ -533,6 +595,7 @@ mod tests {
                         name: "FPÖ".to_string(),
                         color: "#0052FB".to_string(),
                         fraction: 30,
+                        code: "F".to_string(),
                     },
                     infavor: true
                 },
@@ -541,6 +604,7 @@ mod tests {
                         name: "GRÜNE".to_string(),
                         color: "#69B12E".to_string(),
                         fraction: 26,
+                        code: "G".to_string(),
                     },
                     infavor: true
                 },
@@ -549,6 +613,7 @@ mod tests {
                         name: "NEOS".to_string(),
                         color: "#E3257B".to_string(),
                         fraction: 15,
+                        code: "N".to_string(),
                     },
                     infavor: false
                 }
@@ -572,11 +637,12 @@ mod tests {
     async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {
         let mut scraper = AustriaScraper::default();
 
-        let res = scraper.get_legis_init("/gegenstand/XXVII/I/2269").await.unwrap();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/2269")
+            .await
+            .unwrap();
         assert_ne!(res.accepted, Some(AcceptedState::PreDeclined));
     }
-
-
 
     // test may get invalid -> legis init got voted on potentially
     #[tokio::test]

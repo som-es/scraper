@@ -1,6 +1,8 @@
 use common_scrapes::{PlenarSpeech, Speech};
 
-use crate::{extract_text_from_html, extract_text_from_html_via_name_attribute};
+use crate::{
+    extract_text_from_html, extract_text_from_html_via_name_attribute, extract_text_from_html_via_name_attribute_finding_optimal_solution, extract_text_from_html_via_name_attribute_next_section
+};
 
 pub trait HasHTMLUrl {
     fn html_url(&self) -> &str;
@@ -81,8 +83,10 @@ impl TextExtractor {
         if let Some(key) = key {
             self.state = State::Cached(Some(key.to_string()));
 
-            let text =
-                extract_text_from_html_via_name_attribute(&html, url.split('#').nth(1).unwrap());
+            let text = extract_text_from_html_via_name_attribute_finding_optimal_solution(
+                &html,
+                url.split('#').nth(1).unwrap(),
+            );
             self.cached_html = Some(html);
             return text;
         }
@@ -102,7 +106,7 @@ impl TextExtractor {
             State::NoCache => self.get_html(&url, key).await,
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
-                    return extract_text_from_html_via_name_attribute(
+                    return extract_text_from_html_via_name_attribute_finding_optimal_solution(
                         self.cached_html.as_ref().unwrap(),
                         url.split('#').nth(1).unwrap(),
                     );
@@ -124,7 +128,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn test_text_extractor() {
+    async fn test_text_extractor_i_1954() {
         let scraper = AustriaScraper::default();
 
         let init = scraper
@@ -135,19 +139,29 @@ mod tests {
 
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         for speech in init.speeches {
+            println!("!!!!!!!! speech url {}", speech.html_url());
             let text = extractor.extract_text_from_url(&speech).await;
-            println!("{}", text);
+            println!("----------- text: {}", text);
         }
     }
 
     #[tokio::test]
-    async fn test_text_extractor_missing_text() {
+    async fn test_text_extractor_missing_text_not_anymore_since_optimal_check() {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let res = extractor
             .extract_text_from_url(&"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145")
             .await;
         println!("res: {res:?}");
+    }
+
+    #[tokio::test]
+    async fn test_text_extractor_on_votes_by_name() {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let url = "/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
+        let res = extractor.extract_text_from_url(&url).await;
+        println!("res: {res}");
     }
 
     #[tokio::test]
@@ -171,7 +185,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_text_extractor_fail() {
+    async fn test_text_extractor_fail_not_anymore() {
         // /dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 

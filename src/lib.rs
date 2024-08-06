@@ -136,6 +136,50 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
         .collect::<String>()
 }
 
+pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(html: &str, name_attribute: &str) -> String {
+    let first_variant = extract_text_from_html_via_name_attribute(html, name_attribute);
+    let second_variant = extract_text_from_html_via_name_attribute_next_section(html, name_attribute);
+    
+    if first_variant.len() > second_variant.len() {
+        first_variant
+    } else {
+        second_variant
+    }
+}
+
+fn extract_text_from_html_via_name_attribute_next_section(
+    html: &str,
+    name_attribute: &str,
+) -> String {
+    let document = Html::parse_document(html);
+
+    let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
+
+    document
+        .select(&selector)
+        .flat_map(|node| {
+            Some(
+                ElementRef::wrap(
+                    node.parent()?
+                        .parent()?
+                        .next_sibling()?
+                        .next_sibling()?
+                        .next_sibling()?
+                        .next_sibling()?,
+                )?
+                .text()
+                .collect::<String>(),
+            )
+            // Some(
+
+            //     ElementRef::wrap(node.parent()?.parent()?)?
+            //         .text()
+            //         .collect::<String>(),
+            // )
+        })
+        .collect::<String>()
+}
+
 pub fn convert_party_code_list_to_vec(party_list: &str) -> Vec<String> {
     party_list
         .split(',')

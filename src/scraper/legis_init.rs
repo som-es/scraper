@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{AcceptedState, LegislativeInitiative, Party, VoteType, Speech, Vote};
+use common_scrapes::{AcceptedState, LegislativeInitiative, Party, Speech, Vote, VoteType};
 use serde_json::{json, Value};
 
 use crate::{
@@ -135,7 +135,8 @@ impl LegislativeInitiatives for AustriaScraper {
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
-        let (vote_type, mut hidden_votes_untranslated, voted_by_name) = extract_hidden_votes(legis_content).unwrap_or_default();
+        let (vote_type, mut hidden_votes_untranslated, voted_by_name) =
+            extract_hidden_votes(legis_content).unwrap_or_default();
         if accepted.is_none() && was_invisibly_declined {
             accepted = Some(AcceptedState::PreDeclined);
 
@@ -156,7 +157,12 @@ impl LegislativeInitiatives for AustriaScraper {
             }
         };
 
-        // this may not be enough, go through every stage in 
+        // if !voted_by_name && eurovoc_topics.contains(&"namentliche Abstimmung".to_string()) {
+        //     println!("--> this is interesting")
+        // }
+
+        // this also shows stuff for the bundesrat:
+        // this may not be enough, go through every stage in
         // let voted_by_name = eurovoc_topics.contains(&"namentliche Abstimmung".to_string());
 
         let id = format!("{gp}/{ityp}/{inr}");
@@ -267,17 +273,44 @@ pub fn extract_most_fitting_votes(
             declined_type = Some(VoteType::Second)
         } else if text.contains("Gesetzesvorschlag in dritter Lesung") {
             declined_type = Some(VoteType::Third)
-        }
-        else if text.contains("erster Lesung") {
+        } else if text.contains("erster Lesung") {
             declined_type = Some(VoteType::First)
         } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
             declined_type = Some(VoteType::Proposal)
+        } else if text.contains("Sitzung des Nationalrates")
+            && text.contains("Genehmigung")
+            && text.to_lowercase().contains("namentliche")
+        {
+            declined_type = Some(VoteType::OnlyVotedByName)
         } else {
             // need to find fitting type, some stages are bs
             continue;
         }
 
         if text.to_lowercase().contains("namentlich") {
+            for protocol_link_obj in stage["fsth"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .rev()
+            {
+                let Some(url) = protocol_link_obj["url"].as_str() else {
+                    continue;
+                };
+
+                let start_site = protocol_link_obj["fund_von"].as_u64();
+                let end_site = protocol_link_obj["fund_end"].as_u64();
+                match (start_site, end_site) {
+                    (Some(start_site), Some(end_site)) => {
+                        // ahhh
+                    }
+                    (None, None) => {
+                        // fine
+                    }
+                    _ => panic!("should not be possible hopefully"),
+                }
+            }
             voted_by_name = true;
             break;
         }
@@ -289,6 +322,10 @@ pub fn extract_most_fitting_votes(
     }
 
     Some((declined_type, pro_contra, voted_by_name))
+}
+
+fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
+    None
 }
 
 fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
@@ -415,10 +452,31 @@ mod tests {
             party_codes.contra,
             vec!["S".to_string(), "F".to_string(), "N".to_string()]
         );
-        assert_eq!(
-            legis_init.pre_declined_type.unwrap(),
-            VoteType::Second
-        );
+        assert_eq!(legis_init.pre_declined_type.unwrap(), VoteType::Second);
+    }
+
+    #[tokio::test]
+    async fn test_get_legis_init_was_voted_by_name() {
+        let scraper = AustriaScraper::default();
+
+        let start = std::time::Instant::now();
+
+        let initiatives = scraper.post_legis_payload().await.unwrap();
+        let mut count = 0;
+        for path in scraper.legis_paths(initiatives).unwrap() {
+            println!("path: {path:?}");
+            let Ok(init) = scraper.get_legis_init(&path).await else {
+                println!("error {}{path}", AustriaScraper::BASE_URL);
+                continue;
+            };
+            if init.voted_by_name {
+                println!(" {}{path}", AustriaScraper::BASE_URL,);
+                count += 1;
+            }
+        }
+
+        println!("elapsed: {:?}", start.elapsed());
+        println!("count: {count:?}");
     }
 
     #[tokio::test]
@@ -720,7 +778,6 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/405")
             .await
             .unwrap();
-        
     }
 
     // test may get invalid -> legis init got voted on potentially

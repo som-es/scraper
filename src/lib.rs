@@ -129,6 +129,10 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
     let document = Html::parse_document(html);
 
     let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
+
+    let x = document.select(&selector).collect::<Vec<_>>();
+    println!("x: {}", x.len());
+
     document
         .select(&selector)
         .flat_map(|node| {

@@ -141,7 +141,8 @@ impl TextExtractor {
 pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<String> {
     let mut skip = 0;
 
-    let probably_contains_votes = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
+    let probably_contains_votes =
+        Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     loop {
         let variant =
@@ -162,7 +163,8 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
 #[cfg(test)]
 mod tests {
     use crate::{
-        find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor
+        find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar,
+        AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
     };
 
     #[tokio::test]
@@ -205,13 +207,16 @@ mod tests {
         let res = extractor.extract_text_from_url(&url, None).await.unwrap();
         println!("res: {res}");
     }
-    
+
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name_failing_not_anymore() {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let url = "/dokument/XXVII/NRSITZ/139/fnameorig_1463126.html#TEXTOBJ_260400";
-        let res = extractor.extract_text_from_url(&url, Some(find_optimal_votes_by_name)).await.unwrap();
+        let res = extractor
+            .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+            .await
+            .unwrap();
         println!("res: {res}");
     }
 
@@ -221,7 +226,10 @@ mod tests {
 
         let url = "/dokument/XXVII/NRSITZ/213/fnameorig_1632713.html#TEXTOBJ_296821";
         // let res = extractor.extract_text_from_url(&url, None).await.unwrap();
-        let res = extractor.extract_text_from_url(&url, Some(find_optimal_votes_by_name)).await.unwrap();
+        let res = extractor
+            .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+            .await
+            .unwrap();
         println!("res: {res}");
     }
 

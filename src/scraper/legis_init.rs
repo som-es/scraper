@@ -326,7 +326,7 @@ pub async fn extract_most_fitting_votes(
                 else {
                     continue;
                 };
-                // extract_votes_by_name(&remove_steno_info(&html_text));
+                extract_votes_by_name(&remove_steno_info(&html_text));
 
                 if true {
                     break;
@@ -362,29 +362,39 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // println!("from_html_texxt: {from_html_text}");
 
-    let find_str = "Mit „Ja“ stimmten";
-    let pro_votes_start_idx = from_html_text.find(find_str).unwrap();
+    let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
+    let pro_votes_start_idx = pro_regex.find(from_html_text)?.start();
     let pro_open_ended = &from_html_text[pro_votes_start_idx..];
     let pro_open_ended = &pro_open_ended[pro_open_ended.find(':')? + 1..];
     let end_pro_idx = pro_open_ended.find('.').unwrap();
     let pro_delegates = &pro_open_ended[..end_pro_idx];
-    println!("------------ pro_delegates: {pro_delegates}");
+
+    let pro_delegates = group_names_from_vote_section(pro_delegates);
+    // println!("------------ pro_delegates: {pro_delegates:?}");
     // println!("--------------- text: {from_html_text}");
 
-    let find_str = "Mit „Nein“ stimmten";
-    let contra_votes_start_idx = pro_open_ended.find(find_str).unwrap();
+    let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
+    let contra_votes_start_idx = contra_regex.find(from_html_text)?.start();
 
     let contra_open_ended = &pro_open_ended[contra_votes_start_idx..];
     let contra_open_ended = &contra_open_ended[contra_open_ended.find(':')? + 1..];
     let end_contra_idx = contra_open_ended.find('.').unwrap();
     let contra_delegates = &contra_open_ended[..end_contra_idx];
 
-    println!("-------------------- contra_delegates: {contra_delegates}");
-    None
+    let contra_delegates = group_names_from_vote_section(contra_delegates);
+
+    // println!("-------------------- contra_delegates: {contra_delegates:?}");
+    Some(ProContra { pro: pro_delegates, contra: contra_delegates })
 }
 
-
+fn group_names_from_vote_section(names: &str) -> Vec<String> {
+    names
+        .split([',', ';'])
+        .map(|name| name.trim_matches([' ', '\r', '\n']))
+        .map(ToString::to_string)
+        .collect()
+}
 
 fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {
     let mut is_simple_majority = true;

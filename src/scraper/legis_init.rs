@@ -4,11 +4,7 @@ use common_scrapes::{AcceptedState, LegislativeInitiative, Party, Speech, Vote, 
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url,
-    extract_pro_contra_party_codes_from_string, extract_text_from_html,
-    extract_text_from_html_via_name_attribute_next_section, person_url_to_id,
-    proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, AustriaScraper,
-    DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor,
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -294,6 +290,9 @@ pub async fn extract_most_fitting_votes(
         }
 
         if text.to_lowercase().contains("namentlich") {
+
+            let (vote_sum, pro_sum, contra_sum) = extract_vote_count(&text).unwrap();
+            println!("namentlich");
             for protocol_link_obj in stage["fsth"]
                 .as_array()
                 .cloned()
@@ -323,16 +322,18 @@ pub async fn extract_most_fitting_votes(
                 else {
                     continue;
                 };
-                let (vote_sum, pro_sum, contra_sum) = extract_vote_count(&text).unwrap();
-                extract_votes_by_name(&remove_steno_info(&html_text));
+                println!("fin");
+                // extract_votes_by_name(&remove_steno_info(&html_text));
 
                 if true {
                     break;
                 }
             }
             voted_by_name = true;
+            println!("aus namentlich");
             break;
         }
+
 
         pro_contra = extract_pro_contra_party_codes_from_string(text);
         if pro_contra.is_some() {
@@ -343,40 +344,27 @@ pub async fn extract_most_fitting_votes(
     Some((declined_type, pro_contra, voted_by_name))
 }
 
-fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<String> {
-    let mut skip = 0;
-
-    loop {
-        let variant =
-            extract_text_from_html_via_name_attribute_next_section(html, name_attribute, skip)
-                .unwrap_or_default();
-
-        if variant.contains("Mit „Ja“ stimmten die Abgeordneten:") {
-            return Some(variant);
-        }
-
-        skip += 1;
-        if skip >= 4 {
-            return None;
-        }
-    }
-}
-
 fn clear_nr_info() {}
 
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
-    let start = text.find("abgegebene Stimmen:")?;
+    let text = text.to_string().replace(';', ",");
+    println!("text: {text}");
+    let start = text.find("abgegebene Stimmen:").unwrap();
     let vote_info = &text[start..];
-    let vote_info = &vote_info[vote_info.find(':')? + 1..vote_info.find(')')?];
-    let end_sum = vote_info.find(';')?;
+    let vote_info = &vote_info[vote_info.find(':').unwrap() + 1..vote_info.find(')').unwrap()];
+    println!("vote_info: {vote_info}");
+    let end_sum = vote_info.find(',').unwrap();
 
     let vote_sum = vote_info[1..end_sum].parse::<usize>().unwrap();
-    let pro = vote_info[vote_info.find(':')? + 2..vote_info.find(',')?]
+
+    let shorter_info = &vote_info[end_sum+1..];
+    
+    let pro = shorter_info[shorter_info.find(':').unwrap() + 2..shorter_info.find(',').unwrap()]
         .parse::<usize>()
         .unwrap();
 
-    let shorter_info = &vote_info[vote_info.find(',')? + 1..];
-    let contra = shorter_info[shorter_info.find(':')? + 2..]
+    let shorter_info = &shorter_info[shorter_info.find(',').unwrap() + 1..];
+    let contra = shorter_info[shorter_info.find(':').unwrap() + 2..]
         .parse::<usize>()
         .unwrap();
     assert_eq!(vote_sum, pro + contra);
@@ -384,7 +372,7 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
 }
 
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
-    println!("from_html_texxt: {from_html_text}");
+    // println!("from_html_texxt: {from_html_text}");
 
     let find_str = "Mit „Ja“ stimmten";
     let pro_votes_start_idx = from_html_text.find(find_str).unwrap();
@@ -393,7 +381,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let pro_open_ended = &pro_open_ended[pro_open_ended.find(':')? + 1..];
     let end_pro_idx = pro_open_ended.find('.').unwrap();
     let pro_delegates = &pro_open_ended[..end_pro_idx];
-    println!("pro_delegates: {pro_delegates}");
+    println!("------------ pro_delegates: {pro_delegates}");
     // println!("--------------- text: {from_html_text}");
 
     let find_str = "Mit „Nein“ stimmten";
@@ -404,7 +392,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let end_contra_idx = contra_open_ended.find('.').unwrap();
     let contra_delegates = &contra_open_ended[..end_contra_idx];
 
-    println!("contra_delegates: {contra_delegates}");
+    println!("-------------------- contra_delegates: {contra_delegates}");
     None
 }
 

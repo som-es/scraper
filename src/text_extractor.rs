@@ -137,11 +137,29 @@ impl TextExtractor {
     }
 }
 
+pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<String> {
+    let mut skip = 0;
+
+    loop {
+        let variant =
+            extract_text_from_html_via_name_attribute_next_section(html, name_attribute, skip)
+                .unwrap_or_default();
+
+        if variant.contains("Mit „Ja“ stimmten") {
+            return Some(variant);
+        }
+
+        skip += 1;
+        if skip >= 4 {
+            return None;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper,
-        TextExtractor,
+        find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper, HasHTMLUrl, Scraper, TextExtractor
     };
 
     #[tokio::test]
@@ -182,6 +200,15 @@ mod tests {
 
         let url = "/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
         let res = extractor.extract_text_from_url(&url, None).await.unwrap();
+        println!("res: {res}");
+    }
+    
+    #[tokio::test]
+    async fn test_text_extractor_on_votes_by_name_failing() {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let url = "/dokument/XXVII/NRSITZ/139/fnameorig_1463126.html#TEXTOBJ_260400";
+        let res = extractor.extract_text_from_url(&url, Some(find_optimal_votes_by_name)).await.unwrap();
         println!("res: {res}");
     }
 

@@ -1,7 +1,9 @@
 use common_scrapes::{PlenarSpeech, Speech};
 
 use crate::{
-    extract_text_from_html, extract_text_from_html_via_name_attribute, extract_text_from_html_via_name_attribute_finding_optimal_solution, extract_text_from_html_via_name_attribute_next_section
+    extract_text_from_html, extract_text_from_html_via_name_attribute,
+    extract_text_from_html_via_name_attribute_finding_optimal_solution,
+    extract_text_from_html_via_name_attribute_next_section,
 };
 
 pub trait HasHTMLUrl {
@@ -44,8 +46,10 @@ impl HasHTMLUrl for PlenarSpeech {
     }
 }
 
+#[derive(Default, Debug, Clone)]
 enum State {
     /// The extractor is in a state where it has no cached HTML
+    #[default]
     NoCache,
     /// The extractor is in a state where it has cached HTML
     Cached(Option<String>),
@@ -56,6 +60,7 @@ enum State {
 /// You can't know if it's an entire protocol of speeches or just an isolated speech.
 ///
 /// In the future, this should be replaced by a more generic solution
+#[derive(Default, Debug, Clone)]
 pub struct TextExtractor {
     pub cached_html: Option<String>,
     state: State,
@@ -73,9 +78,14 @@ impl TextExtractor {
         }
     }
 
-    pub async fn get_html(&mut self, url: &str, key: Option<&str>) -> String {
+    pub async fn get_html(
+        &mut self,
+        url: &str,
+        key: Option<&str>,
+        attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
+    ) -> Option<String> {
         let response = self.client.get(url).send().await.unwrap();
-        let mut html = response.text().await.unwrap();
+        let mut html = response.text().await.ok()?;
         let start = html.find("<style>").unwrap_or_default();
         let end = html.find("</style>").unwrap_or_default();
         html.replace_range(start..end, "");
@@ -83,17 +93,22 @@ impl TextExtractor {
         if let Some(key) = key {
             self.state = State::Cached(Some(key.to_string()));
 
-            let text = extract_text_from_html_via_name_attribute_finding_optimal_solution(
+            let text = attribute_extraction_fn
+                .unwrap_or(extract_text_from_html_via_name_attribute_finding_optimal_solution)(
                 &html,
                 url.split('#').nth(1).unwrap(),
             );
             self.cached_html = Some(html);
             return text;
         }
-        extract_text_from_html(&html)
+        Some(extract_text_from_html(&html))
     }
 
-    pub async fn extract_text_from_url(&mut self, speech: &impl HasHTMLUrl) -> String {
+    pub async fn extract_text_from_url(
+        &mut self,
+        speech: &impl HasHTMLUrl,
+        attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
+    ) -> Option<String> {
         let url = format!("{}{}", self.base_url, speech.html_url());
 
         let key = if url.contains('#') {
@@ -103,17 +118,19 @@ impl TextExtractor {
         };
 
         match &self.state {
-            State::NoCache => self.get_html(&url, key).await,
+            State::NoCache => self.get_html(&url, key, attribute_extraction_fn).await,
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
-                    return extract_text_from_html_via_name_attribute_finding_optimal_solution(
-                        self.cached_html.as_ref().unwrap(),
-                        url.split('#').nth(1).unwrap(),
+                    let html = self.cached_html.as_ref().unwrap();
+                    let url = url.split('#').nth(1).unwrap();
+                    let f = attribute_extraction_fn.unwrap_or(
+                        extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     );
+                    return f(html, url);
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
-                    self.get_html(&url, key).await
+                    self.get_html(&url, key, attribute_extraction_fn).await
                 }
             }
         }
@@ -140,8 +157,8 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         for speech in init.speeches {
             println!("!!!!!!!! speech url {}", speech.html_url());
-            let text = extractor.extract_text_from_url(&speech).await;
-            println!("----------- text: {}", text);
+            let text = extractor.extract_text_from_url(&speech, None).await;
+            println!("----------- text: {:?}", text);
         }
     }
 
@@ -150,9 +167,13 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let res = extractor
-            .extract_text_from_url(&"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145")
-            .await;
-        println!("res: {res:?}");
+            .extract_text_from_url(
+                &"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145",
+                None,
+            )
+            .await
+            .unwrap();
+        println!("res: {res}");
     }
 
     #[tokio::test]
@@ -160,7 +181,7 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let url = "/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
-        let res = extractor.extract_text_from_url(&url).await;
+        let res = extractor.extract_text_from_url(&url, None).await.unwrap();
         println!("res: {res}");
     }
 
@@ -178,7 +199,10 @@ mod tests {
                 if speech.delegate_id != 72959 {
                     continue;
                 }
-                let text = extractor.extract_text_from_url(&speech).await;
+                let text = extractor
+                    .extract_text_from_url(&speech, None)
+                    .await
+                    .unwrap();
                 println!("{}", text);
             }
         }
@@ -190,7 +214,10 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let res = extractor
-            .extract_text_from_url(&"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870")
+            .extract_text_from_url(
+                &"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
+                None,
+            )
             .await;
         println!("res: {res:?}");
     }
@@ -209,7 +236,10 @@ mod tests {
         let mut prev_html = None;
         let mut once = false;
         for speech in init.speeches {
-            let text = extractor.extract_text_from_url(&speech).await;
+            let text = extractor
+                .extract_text_from_url(&speech, None)
+                .await
+                .unwrap();
             let url = format!("{}{}", extractor.base_url, speech.html_url());
 
             if url.contains("/43/fnameorig_845422.html#RU_221643") {
@@ -238,7 +268,10 @@ mod tests {
             .unwrap();
 
         for speech in init.speeches {
-            let text = extractor.extract_text_from_url(&speech).await;
+            let text = extractor
+                .extract_text_from_url(&speech, None)
+                .await
+                .unwrap();
             let url = format!("{}{}", extractor.base_url, speech.html_url());
 
             if url == "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/205/A_-_14_40_19_00292508.html" {

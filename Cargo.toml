@@ -23,6 +23,7 @@ once_cell = "1.18.0"
 ego-tree = "0.6.2"
 log = "0.4.21"
 futures = "0.3.30"
+pollster = "0.3.0"
 
 [dev-dependencies]
 #tokio-macros = "1.8.2"

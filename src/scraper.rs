@@ -7,7 +7,7 @@ use reqwest::{Client, Method};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{error::ScraperError, request::request};
+use crate::{error::ScraperError, request::request, TextExtractor};
 
 pub mod call_to_order;
 pub mod delegates;
@@ -120,6 +120,7 @@ pub type GegenstandPaths = Vec<String>;
 #[derive(Default, Debug, Clone)]
 pub struct AustriaScraper {
     client: Client,
+    pub text_extractor: TextExtractor,
     pub scrape_info: GeneralScrapeInfo,
     pub proposal_payload: Value,
 }

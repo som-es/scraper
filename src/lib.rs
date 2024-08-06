@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use ::scraper::{ElementRef, Html, Selector};
+use regex::Regex;
 
 mod config;
 mod document;
@@ -27,6 +28,11 @@ const PARTIES_IN_NR: usize = 5;
 /// /person/83153 -> 83153
 fn person_url_to_id(url: &str) -> Option<u64> {
     url.split('/').last().and_then(|id| id.parse::<u64>().ok())
+}
+
+pub fn remove_steno_info(haystack: &str) -> String {
+    let re = Regex::new(r"Nationalrat, .*Stenographisches Protokoll.*\d+").unwrap();
+    re.replace_all(haystack, "").to_string()
 }
 
 pub type DeclineUrlGegenstand = (String, String, Option<u32>);
@@ -136,48 +142,52 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
         .collect::<String>()
 }
 
-pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(html: &str, name_attribute: &str) -> String {
+pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
+    html: &str,
+    name_attribute: &str,
+) -> Option<String> {
     let first_variant = extract_text_from_html_via_name_attribute(html, name_attribute);
-    let second_variant = extract_text_from_html_via_name_attribute_next_section(html, name_attribute);
-    
+    let second_variant =
+        extract_text_from_html_via_name_attribute_next_section(html, name_attribute, 1)?;
+
     if first_variant.len() > second_variant.len() {
-        first_variant
+        Some(first_variant)
     } else {
-        second_variant
+        Some(second_variant)
     }
 }
 
 fn extract_text_from_html_via_name_attribute_next_section(
     html: &str,
     name_attribute: &str,
-) -> String {
+    sections: usize,
+) -> Option<String> {
     let document = Html::parse_document(html);
-
     let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
 
-    document
-        .select(&selector)
-        .flat_map(|node| {
-            Some(
-                ElementRef::wrap(
-                    node.parent()?
-                        .parent()?
-                        .next_sibling()?
-                        .next_sibling()?
-                        .next_sibling()?
-                        .next_sibling()?,
-                )?
-                .text()
-                .collect::<String>(),
-            )
-            // Some(
+    let node = document.select(&selector).next()?;
+    let mut node = node.parent()?.parent()?;
+    for _ in 0..sections * 4 {
+        node = node.next_sibling()?;
+    }
+    Some(ElementRef::wrap(node)?.text().collect::<String>())
+    // document
+    //     .select(&selector)
+    //     .flat_map(|node| {
+    //         println!("node: {}", ElementRef::wrap(node.parent()?.clone()).unwrap().html());
+    //         let mut node = node.parent()?.parent()?;
+    //         for _ in 0..sections * 4 {
+    //             node = node.next_sibling()?;
+    //         }
+    //         Some(ElementRef::wrap(node)?.text().collect::<String>())
+    //         // Some(
 
-            //     ElementRef::wrap(node.parent()?.parent()?)?
-            //         .text()
-            //         .collect::<String>(),
-            // )
-        })
-        .collect::<String>()
+    //         //     ElementRef::wrap(node.parent()?.parent()?)?
+    //         //         .text()
+    //         //         .collect::<String>(),
+    //         // )
+    //     })
+    //     .collect::<String>()
 }
 
 pub fn convert_party_code_list_to_vec(party_list: &str) -> Vec<String> {

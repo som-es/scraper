@@ -5,9 +5,10 @@ use serde_json::{json, Value};
 
 use crate::{
     documents, error::ScraperError, extract_from_gegenstand_url,
-    extract_pro_contra_party_codes_from_string, extract_text_from_html, person_url_to_id,
-    proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand,
-    GegenstandPaths, ProContra, Scraper,
+    extract_pro_contra_party_codes_from_string, extract_text_from_html,
+    extract_text_from_html_via_name_attribute_next_section, person_url_to_id,
+    proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, AustriaScraper,
+    DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -34,7 +35,7 @@ pub trait LegislativeInitiatives: Scraper {
         .await
     }
 
-    fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative>;
+    async fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative>;
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError>;
 
@@ -43,10 +44,13 @@ pub trait LegislativeInitiatives: Scraper {
         proposal_path: &str,
     ) -> Result<LegislativeInitiative, ScraperError> {
         let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
-        Self::raw_legis_into_legis(raw_proposal).ok_or(ScraperError::LegisInitParseError)
+        Self::raw_legis_into_legis(raw_proposal)
+            .await
+            .ok_or(ScraperError::LegisInitParseError)
     }
 }
 
+#[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=10103&showAll=true";
@@ -55,7 +59,7 @@ impl LegislativeInitiatives for AustriaScraper {
         json!({"GP": self.scrape_info.gp, "NRBR": self.scrape_info.council_type})
     }
 
-    fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative> {
+    async fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative> {
         let description = raw_legis["meta"]["description"].as_str()?.to_string();
         let title = raw_legis["meta"]["title"].as_str()?.to_string();
 
@@ -136,7 +140,9 @@ impl LegislativeInitiatives for AustriaScraper {
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
         let (vote_type, mut hidden_votes_untranslated, voted_by_name) =
-            extract_hidden_votes(legis_content).unwrap_or_default();
+            extract_hidden_votes(legis_content)
+                .await
+                .unwrap_or_default();
         if accepted.is_none() && was_invisibly_declined {
             accepted = Some(AcceptedState::PreDeclined);
 
@@ -231,7 +237,7 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
     most_fitting_date
 }
 
-pub fn extract_hidden_votes(
+pub async fn extract_hidden_votes(
     legis_content: &Value,
 ) -> Option<(Option<VoteType>, Option<ProContra>, bool)> {
     let mut most_fitting_votes = None;
@@ -245,14 +251,14 @@ pub fn extract_hidden_votes(
             .unwrap()
             .contains("Plenarberatungen NR")
         {
-            most_fitting_votes = extract_most_fitting_votes(stages);
+            most_fitting_votes = extract_most_fitting_votes(stages).await;
             break;
         }
     }
     most_fitting_votes
 }
 
-pub fn extract_most_fitting_votes(
+pub async fn extract_most_fitting_votes(
     stages: &Value,
 ) -> Option<(Option<VoteType>, Option<ProContra>, bool)> {
     let mut declined_type = None;
@@ -299,16 +305,29 @@ pub fn extract_most_fitting_votes(
                     continue;
                 };
 
-                let start_site = protocol_link_obj["fund_von"].as_u64();
-                let end_site = protocol_link_obj["fund_end"].as_u64();
-                match (start_site, end_site) {
-                    (Some(start_site), Some(end_site)) => {
-                        // ahhh
-                    }
-                    (None, None) => {
-                        // fine
-                    }
-                    _ => panic!("should not be possible hopefully"),
+                // let start_site = protocol_link_obj["fund_von"].as_u64();
+                // let end_site = protocol_link_obj["fund_bis"].as_u64();
+                // match (start_site, end_site) {
+                //     (Some(start_site), Some(end_site)) => {
+                //         // ahhh
+                //     }
+                //     (None, None) => {
+                //         // fine
+                //     }
+                //     _ => panic!("should not be possible hopefully"),
+                // }
+                let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+                let Some(html_text) = extractor
+                    .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+                    .await
+                else {
+                    continue;
+                };
+                let (vote_sum, pro_sum, contra_sum) = extract_vote_count(&text).unwrap();
+                extract_votes_by_name(&remove_steno_info(&html_text));
+
+                if true {
+                    break;
                 }
             }
             voted_by_name = true;
@@ -324,7 +343,68 @@ pub fn extract_most_fitting_votes(
     Some((declined_type, pro_contra, voted_by_name))
 }
 
+fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<String> {
+    let mut skip = 0;
+
+    loop {
+        let variant =
+            extract_text_from_html_via_name_attribute_next_section(html, name_attribute, skip)
+                .unwrap_or_default();
+
+        if variant.contains("Mit „Ja“ stimmten die Abgeordneten:") {
+            return Some(variant);
+        }
+
+        skip += 1;
+        if skip >= 4 {
+            return None;
+        }
+    }
+}
+
+fn clear_nr_info() {}
+
+fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
+    let start = text.find("abgegebene Stimmen:")?;
+    let vote_info = &text[start..];
+    let vote_info = &vote_info[vote_info.find(':')? + 1..vote_info.find(')')?];
+    let end_sum = vote_info.find(';')?;
+
+    let vote_sum = vote_info[1..end_sum].parse::<usize>().unwrap();
+    let pro = vote_info[vote_info.find(':')? + 2..vote_info.find(',')?]
+        .parse::<usize>()
+        .unwrap();
+
+    let shorter_info = &vote_info[vote_info.find(',')? + 1..];
+    let contra = shorter_info[shorter_info.find(':')? + 2..]
+        .parse::<usize>()
+        .unwrap();
+    assert_eq!(vote_sum, pro + contra);
+    Some((vote_sum, pro, contra))
+}
+
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
+    println!("from_html_texxt: {from_html_text}");
+
+    let find_str = "Mit „Ja“ stimmten";
+    let pro_votes_start_idx = from_html_text.find(find_str).unwrap();
+
+    let pro_open_ended = &from_html_text[pro_votes_start_idx..];
+    let pro_open_ended = &pro_open_ended[pro_open_ended.find(':')? + 1..];
+    let end_pro_idx = pro_open_ended.find('.').unwrap();
+    let pro_delegates = &pro_open_ended[..end_pro_idx];
+    println!("pro_delegates: {pro_delegates}");
+    // println!("--------------- text: {from_html_text}");
+
+    let find_str = "Mit „Nein“ stimmten";
+    let contra_votes_start_idx = pro_open_ended.find(find_str).unwrap();
+
+    let contra_open_ended = &pro_open_ended[contra_votes_start_idx..];
+    let contra_open_ended = &contra_open_ended[contra_open_ended.find(':')? + 1..];
+    let end_contra_idx = contra_open_ended.find('.').unwrap();
+    let contra_delegates = &contra_open_ended[..end_contra_idx];
+
+    println!("contra_delegates: {contra_delegates}");
     None
 }
 
@@ -758,6 +838,15 @@ mod tests {
         let res = scraper.get_legis_init("/gegenstand/XX/I/1").await.unwrap();
     }
 
+    // /gegenstand/XXVII/A/3945
+    #[tokio::test]
+    async fn test_legis_init_voted_by_name_xxvii_a_3945() {
+        let mut scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3945")
+            .await
+            .unwrap();
+    }
     #[tokio::test]
     async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {
         let mut scraper = AustriaScraper::default();

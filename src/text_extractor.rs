@@ -98,7 +98,8 @@ impl TextExtractor {
                 .unwrap_or(extract_text_from_html_via_name_attribute_finding_optimal_solution)(
                 &html,
                 url.split('#').nth(1).unwrap(),
-            ).map(|text| remove_steno_info(&text));
+            )
+            .map(|text| remove_steno_info(&text));
             self.cached_html = Some(html);
             return text;
         }
@@ -108,7 +109,7 @@ impl TextExtractor {
     pub async fn extract_text_from_url(
         &mut self,
         speech: &impl HasHTMLUrl,
-        attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
+        search_strategy_fn: Option<fn(&str, &str) -> Option<String>>,
     ) -> Option<String> {
         let url = format!("{}{}", self.base_url, speech.html_url());
 
@@ -119,19 +120,19 @@ impl TextExtractor {
         };
 
         match &self.state {
-            State::NoCache => self.get_html(&url, key, attribute_extraction_fn).await,
+            State::NoCache => self.get_html(&url, key, search_strategy_fn).await,
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
                     let html = self.cached_html.as_ref().unwrap();
                     let url = url.split('#').nth(1).unwrap();
-                    let f = attribute_extraction_fn.unwrap_or(
+                    let f = search_strategy_fn.unwrap_or(
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     );
                     return f(html, url).map(|text| remove_steno_info(&text));
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
-                    self.get_html(&url, key, attribute_extraction_fn).await
+                    self.get_html(&url, key, search_strategy_fn).await
                 }
             }
         }
@@ -139,8 +140,10 @@ impl TextExtractor {
 }
 
 pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<String> {
-    let probably_contains_votes =
+    let probably_contains_votes_yes_indicator =
         Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
+    let probably_contains_votes_no_indicator =
+        Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     for parent in 1..3 {
         for skip in 0..6 {
@@ -154,12 +157,19 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
 
             let new_lines = variant.chars().filter(|c| *c == '\n').count();
             if new_lines >= 140 {
-                continue
+                continue;
             }
 
             // checking for one, because if multiple votes are inside, do not process
-            if probably_contains_votes.find_iter(&variant).count() == 1 {
-                println!("variant: {variant}");
+            if probably_contains_votes_yes_indicator
+                .find_iter(&variant)
+                .count()
+                == 1
+                && probably_contains_votes_no_indicator
+                    .find_iter(&variant)
+                    .count()
+                    == 1
+            {
                 return Some(variant);
             }
         }
@@ -273,7 +283,8 @@ mod tests {
                 &"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
                 None,
             )
-            .await.unwrap();
+            .await
+            .unwrap();
         println!("res: {res}");
     }
 
@@ -282,11 +293,9 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let res = extractor
-            .extract_text_from_url(
-                &"/dokument/XXV/NRSITZ/55/fnameorig_397751.html",
-                None,
-            )
-            .await.unwrap();
+            .extract_text_from_url(&"/dokument/XXV/NRSITZ/55/fnameorig_397751.html", None)
+            .await
+            .unwrap();
 
         if res.contains("Nationalrat, XXV.GP") {
             panic!("NOPE");

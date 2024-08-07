@@ -317,9 +317,12 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                 else {
                     continue;
                 };
-                delegate_votes = extract_votes_by_name(&html_text);
-
-                break;
+                if let Some(new_delegate_votes) = extract_votes_by_name(&html_text) {
+                    delegate_votes = Some(new_delegate_votes);
+                    break;
+                } else {
+                    continue;
+                }
             }
             hidden_votes.voted_by_name = true;
             hidden_votes.voted_by_name_data = Some(VotedByName {
@@ -329,7 +332,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                 contra_count,
                 invalid_count,
             });
-            println!("hidden_votes: {hidden_votes:?}");
+            // println!("hidden_votes: {hidden_votes:?}");
             break;
         }
 
@@ -343,7 +346,6 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
 }
 
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
-    println!("text: {text}");
     let vote_counts_regex =
         Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*Ja-Stimmen[:\s]*\s*(\d+)[^\d]*Nein-Stimmen[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
             .unwrap();
@@ -361,24 +363,25 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
 }
 
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
+    // println!("variant: {from_html_text}");
     let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
+    let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     let pro_votes_start_idx = pro_regex.find(from_html_text)?.start();
+    let contra_votes_start_idx = contra_regex.find(from_html_text)?.start();
+
     let pro_open_ended = &from_html_text[pro_votes_start_idx..];
     let pro_open_ended = &pro_open_ended[pro_open_ended.find(':')? + 1..];
-    let end_pro_idx = pro_open_ended.find('.').unwrap();
+    let end_pro_idx = pro_open_ended.find('.')?;
     let pro_delegates = &pro_open_ended[..end_pro_idx];
 
     let pro_delegates = group_names_from_vote_section(pro_delegates);
     // println!("------------ pro_delegates: {pro_delegates:?}");
     // println!("--------------- text: {from_html_text}");
 
-    let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
-    let contra_votes_start_idx = contra_regex.find(from_html_text)?.start();
-
     let contra_open_ended = &pro_open_ended[contra_votes_start_idx..];
     let contra_open_ended = &contra_open_ended[contra_open_ended.find(':')? + 1..];
-    let end_contra_idx = contra_open_ended.find('.').unwrap();
+    let end_contra_idx = contra_open_ended.find('.')?;
     let contra_delegates = &contra_open_ended[..end_contra_idx];
 
     let contra_delegates = group_names_from_vote_section(contra_delegates);
@@ -533,7 +536,9 @@ mod tests {
         let mut scraper = AustriaScraper::default();
 
         let start = std::time::Instant::now();
-        for gp in ["XXV", "XXIV"] {
+
+        // for gp in ["XXV", "XXIV"] {
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
@@ -893,6 +898,8 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/3945")
             .await
             .unwrap();
+
+        res.hidden_votes_info.voted_by_name_data.unwrap();
     }
     #[tokio::test]
     async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {

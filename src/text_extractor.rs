@@ -144,11 +144,16 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
 
     for parent in 1..3 {
         for skip in 0..6 {
-            let variant =
-            extract_text_from_html_via_name_attribute_next_section(html, name_attribute, parent, skip)
-                .unwrap_or_default();
+            let variant = extract_text_from_html_via_name_attribute_next_section(
+                html,
+                name_attribute,
+                parent,
+                skip,
+            )
+            .unwrap_or_default();
 
-            if probably_contains_votes.is_match(&variant) {
+            // checking for one, because if multiple votes are inside, do not process
+            if probably_contains_votes.find_iter(&variant).count() == 1 {
                 return Some(variant);
             }
         }
@@ -267,7 +272,7 @@ mod tests {
     }
 
     // https://www.parlament.gv.at/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html
-    
+
     #[tokio::test]
     async fn test_text_extractor_fail_older() {
         // /dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html

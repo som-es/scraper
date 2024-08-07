@@ -291,14 +291,10 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
         }
 
         if text.to_lowercase().contains("namentlich") {
-            let (vote_sum, pro_sum, contra_sum) = extract_vote_count(&text).unwrap();
+            let (vote_sum, pro_count, contra_count, invalid_count) =
+                extract_vote_count(&text).unwrap();
             let mut delegate_votes = None;
-            for protocol_link_obj in stage["fsth"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
-                .iter()
-            {
+            for protocol_link_obj in stage["fsth"].as_array().cloned().unwrap_or_default().iter() {
                 let Some(url) = protocol_link_obj["url"].as_str() else {
                     continue;
                 };
@@ -329,8 +325,9 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
             hidden_votes.voted_by_name_data = Some(VotedByName {
                 delegates_pro_contra: delegate_votes,
                 vote_sum,
-                pro_sum,
-                contra_sum,
+                pro_count,
+                contra_count,
+                invalid_count,
             });
             println!("hidden_votes: {hidden_votes:?}");
             break;
@@ -345,10 +342,10 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
     Some(hidden_votes)
 }
 
-fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
+fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     println!("text: {text}");
     let vote_counts_regex =
-        Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*Ja-Stimmen[:\s]*\s*(\d+)[^\d]*Nein-Stimmen[:\s]*\s*(\d+)")
+        Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*Ja-Stimmen[:\s]*\s*(\d+)[^\d]*Nein-Stimmen[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
             .unwrap();
 
     let captures = vote_counts_regex.captures(text).unwrap();
@@ -356,6 +353,10 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
         captures.get(1).unwrap().as_str().parse().unwrap(),
         captures.get(2).unwrap().as_str().parse().unwrap(),
         captures.get(3).unwrap().as_str().parse().unwrap(),
+        captures
+            .get(4)
+            .map(|cap| cap.as_str().parse::<usize>().unwrap_or_default())
+            .unwrap_or(0),
     ))
 }
 
@@ -551,7 +552,6 @@ mod tests {
             println!("elapsed: {:?}", start.elapsed());
             println!("count: {count:?}");
         }
-
     }
 
     #[tokio::test]
@@ -660,11 +660,45 @@ mod tests {
             .await
             .unwrap();
         assert!(init.hidden_votes_info.voted_by_name);
-        assert_eq!(init.hidden_votes_info.clone().voted_by_name_data.unwrap().delegates_pro_contra.unwrap()
-            .pro[..8], vec!["Amesbauer", "Amon Werner", "Angerer", "Baumgartner", "Belakowitsch Dagmar", "Berger", "Berlakovich Nikolaus", "Bernhard"]);
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .pro[..8],
+            vec![
+                "Amesbauer",
+                "Amon Werner",
+                "Angerer",
+                "Baumgartner",
+                "Belakowitsch Dagmar",
+                "Berger",
+                "Berlakovich Nikolaus",
+                "Bernhard"
+            ]
+        );
 
-        assert_eq!(init.hidden_votes_info.clone().voted_by_name_data.unwrap().delegates_pro_contra.unwrap()
-            .contra[..8], vec!["Androsch", "Antoni", "Bacher Walter", "Bayr", "Becher Ruth", "Bißmann", "Cox", "Duzdar Muna"])
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .contra[..8],
+            vec![
+                "Androsch",
+                "Antoni",
+                "Bacher Walter",
+                "Bayr",
+                "Becher Ruth",
+                "Bißmann",
+                "Cox",
+                "Duzdar Muna"
+            ]
+        )
     }
 
     #[tokio::test]

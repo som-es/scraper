@@ -170,7 +170,7 @@ fn extract_text_from_html_via_name_attribute_next_section(
     let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
 
     let mut node = document.select(&selector).next()?.parent()?;
-    for _ in 0..parents-1 {
+    for _ in 0..parents - 1 {
         node = node.parent()?;
     }
     for _ in 0..sections * 4 {

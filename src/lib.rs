@@ -131,11 +131,11 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
     let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
 
     let x = document.select(&selector).collect::<Vec<_>>();
-    println!("x: {}", x.len());
 
     document
         .select(&selector)
         .flat_map(|node| {
+            println!("x: {}", ElementRef::wrap(node.parent()?)?.html());
             Some(
                 ElementRef::wrap(node.parent()?.parent()?)?
                     .text()
@@ -151,7 +151,7 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
 ) -> Option<String> {
     let first_variant = extract_text_from_html_via_name_attribute(html, name_attribute);
     let second_variant =
-        extract_text_from_html_via_name_attribute_next_section(html, name_attribute, 1)?;
+        extract_text_from_html_via_name_attribute_next_section(html, name_attribute, 2, 1)?;
 
     if first_variant.len() > second_variant.len() {
         Some(first_variant)
@@ -163,13 +163,16 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
 fn extract_text_from_html_via_name_attribute_next_section(
     html: &str,
     name_attribute: &str,
+    parents: usize,
     sections: usize,
 ) -> Option<String> {
     let document = Html::parse_document(html);
     let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
 
-    let node = document.select(&selector).next()?;
-    let mut node = node.parent()?.parent()?;
+    let mut node = document.select(&selector).next()?.parent()?;
+    for _ in 0..parents-1 {
+        node = node.parent()?;
+    }
     for _ in 0..sections * 4 {
         node = node.next_sibling()?;
     }

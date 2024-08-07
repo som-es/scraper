@@ -139,25 +139,21 @@ impl TextExtractor {
 }
 
 pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<String> {
-    let mut skip = 0;
-
     let probably_contains_votes =
         Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
-    loop {
-        let variant =
-            extract_text_from_html_via_name_attribute_next_section(html, name_attribute, skip)
+    for parent in 1..3 {
+        for skip in 0..4 {
+            let variant =
+            extract_text_from_html_via_name_attribute_next_section(html, name_attribute, parent, skip)
                 .unwrap_or_default();
 
-        if probably_contains_votes.is_match(&variant) {
-            return Some(variant);
-        }
-
-        skip += 1;
-        if skip >= 4 {
-            return None;
+            if probably_contains_votes.is_match(&variant) {
+                return Some(variant);
+            }
         }
     }
+    return None;
 }
 
 #[cfg(test)]
@@ -265,6 +261,23 @@ mod tests {
             .extract_text_from_url(
                 &"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
                 None,
+            )
+            .await;
+        println!("res: {res:?}");
+    }
+
+    // https://www.parlament.gv.at/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html
+    
+    #[tokio::test]
+    async fn test_text_extractor_fail_older() {
+        // /dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let res = extractor
+            .extract_text_from_url(
+                &"/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html",
+                Some(find_optimal_votes_by_name),
+                // None
             )
             .await;
         println!("res: {res:?}");

@@ -291,7 +291,6 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
         }
 
         if text.to_lowercase().contains("namentlich") {
-            println!("text: {text}");
             let (vote_sum, pro_sum, contra_sum) = extract_vote_count(&text).unwrap();
             let mut delegate_votes = None;
             for protocol_link_obj in stage["fsth"]
@@ -334,6 +333,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                 pro_sum,
                 contra_sum,
             });
+            println!("hidden_votes: {hidden_votes:?}");
             break;
         }
 
@@ -360,7 +360,7 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
 }
 
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
-    // println!("from_html_texxt: {from_html_text}");
+    println!("from_html_texxt: {from_html_text}");
 
     let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
@@ -395,7 +395,7 @@ fn group_names_from_vote_section(names: &str) -> Vec<String> {
     names
         .split([',', ';'])
         .map(|name| name.trim_matches([' ', '\r', '\n']))
-        .map(ToString::to_string)
+        .map(|name| name.replace('\n', " "))
         .collect()
 }
 
@@ -531,26 +531,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_legis_init_was_voted_by_name() {
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
 
         let start = std::time::Instant::now();
+        for gp in ["XXVI", "XXV", "XXIV"] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
 
-        let initiatives = scraper.post_legis_payload().await.unwrap();
-        let mut count = 0;
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-            if init.hidden_votes_info.voted_by_name {
-                println!(" {}{path}", AustriaScraper::BASE_URL,);
-                count += 1;
+            let initiatives = scraper.post_legis_payload().await.unwrap();
+            let mut count = 0;
+            for path in scraper.legis_paths(initiatives).unwrap() {
+                println!("path: {path:?}");
+                let Ok(init) = scraper.get_legis_init(&path).await else {
+                    println!("error {}{path}", AustriaScraper::BASE_URL);
+                    continue;
+                };
+                if init.hidden_votes_info.voted_by_name {
+                    println!(" {}{path}", AustriaScraper::BASE_URL,);
+                    count += 1;
+                }
             }
+            println!("elapsed: {:?}", start.elapsed());
+            println!("count: {count:?}");
         }
 
-        println!("elapsed: {:?}", start.elapsed());
-        println!("count: {count:?}");
     }
 
     #[tokio::test]
@@ -646,6 +649,24 @@ mod tests {
             init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
+    }
+
+    // gegenstand/XXVI/A/303
+
+    #[tokio::test]
+    async fn test_get_legis_init_xxvi_a_303() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVI/A/303")
+            .await
+            .unwrap();
+        assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.hidden_votes_info.clone().voted_by_name_data.unwrap().delegates_pro_contra.unwrap()
+            .pro[..8], vec!["Amesbauer", "Amon Werner", "Angerer", "Baumgartner", "Belakowitsch Dagmar", "Berger", "Berlakovich Nikolaus", "Bernhard"]);
+
+        assert_eq!(init.hidden_votes_info.clone().voted_by_name_data.unwrap().delegates_pro_contra.unwrap()
+            .contra[..8], vec!["Androsch", "Antoni", "Bacher Walter", "Bayr", "Becher Ruth", "Bißmann", "Cox", "Duzdar Muna"])
     }
 
     #[tokio::test]

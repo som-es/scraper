@@ -298,7 +298,6 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                 .cloned()
                 .unwrap_or_default()
                 .iter()
-                .rev()
             {
                 let Some(url) = protocol_link_obj["url"].as_str() else {
                     continue;
@@ -347,8 +346,9 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
 }
 
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
+    println!("text: {text}");
     let vote_counts_regex =
-        Regex::new(r"(?i)abgegebene\s*Stimmen[:\s]*\s*(\d+)[^\d]*Ja-Stimmen[:\s]*\s*(\d+)[^\d]*Nein-Stimmen[:\s]*\s*(\d+)")
+        Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*Ja-Stimmen[:\s]*\s*(\d+)[^\d]*Nein-Stimmen[:\s]*\s*(\d+)")
             .unwrap();
 
     let captures = vote_counts_regex.captures(text).unwrap();
@@ -360,8 +360,6 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize)> {
 }
 
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
-    println!("from_html_texxt: {from_html_text}");
-
     let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     let pro_votes_start_idx = pro_regex.find(from_html_text)?.start();
@@ -534,7 +532,7 @@ mod tests {
         let mut scraper = AustriaScraper::default();
 
         let start = std::time::Instant::now();
-        for gp in ["XXVI", "XXV", "XXIV"] {
+        for gp in ["XXV", "XXIV"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();

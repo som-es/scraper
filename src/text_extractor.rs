@@ -143,7 +143,7 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
         Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     for parent in 1..3 {
-        for skip in 0..4 {
+        for skip in 0..6 {
             let variant =
             extract_text_from_html_via_name_attribute_next_section(html, name_attribute, parent, skip)
                 .unwrap_or_default();

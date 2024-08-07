@@ -317,7 +317,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                 else {
                     continue;
                 };
-                delegate_votes = extract_votes_by_name(&remove_steno_info(&html_text));
+                delegate_votes = extract_votes_by_name(&html_text);
 
                 break;
             }

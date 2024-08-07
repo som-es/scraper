@@ -4,7 +4,7 @@ use regex::Regex;
 use crate::{
     extract_text_from_html, extract_text_from_html_via_name_attribute,
     extract_text_from_html_via_name_attribute_finding_optimal_solution,
-    extract_text_from_html_via_name_attribute_next_section,
+    extract_text_from_html_via_name_attribute_next_section, remove_steno_info,
 };
 
 pub trait HasHTMLUrl {
@@ -98,11 +98,11 @@ impl TextExtractor {
                 .unwrap_or(extract_text_from_html_via_name_attribute_finding_optimal_solution)(
                 &html,
                 url.split('#').nth(1).unwrap(),
-            );
+            ).map(|text| remove_steno_info(&text));
             self.cached_html = Some(html);
             return text;
         }
-        Some(extract_text_from_html(&html))
+        Some(remove_steno_info(&extract_text_from_html(&html)))
     }
 
     pub async fn extract_text_from_url(
@@ -127,7 +127,7 @@ impl TextExtractor {
                     let f = attribute_extraction_fn.unwrap_or(
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     );
-                    return f(html, url);
+                    return f(html, url).map(|text| remove_steno_info(&text));
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
@@ -152,8 +152,14 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
             )
             .unwrap_or_default();
 
+            let new_lines = variant.chars().filter(|c| *c == '\n').count();
+            if new_lines >= 140 {
+                continue
+            }
+
             // checking for one, because if multiple votes are inside, do not process
             if probably_contains_votes.find_iter(&variant).count() == 1 {
+                println!("variant: {variant}");
                 return Some(variant);
             }
         }
@@ -267,8 +273,24 @@ mod tests {
                 &"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
                 None,
             )
-            .await;
-        println!("res: {res:?}");
+            .await.unwrap();
+        println!("res: {res}");
+    }
+
+    #[tokio::test]
+    async fn test_text_extractor_no_steno_info() {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let res = extractor
+            .extract_text_from_url(
+                &"/dokument/XXV/NRSITZ/55/fnameorig_397751.html",
+                None,
+            )
+            .await.unwrap();
+
+        if res.contains("Nationalrat, XXV.GP") {
+            panic!("NOPE");
+        }
     }
 
     // https://www.parlament.gv.at/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html

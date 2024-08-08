@@ -7,11 +7,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url,
-    extract_pro_contra_party_codes_from_string, extract_text_from_html,
-    extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name,
-    person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches,
-    AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor,
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -400,6 +396,7 @@ fn group_names_from_vote_section(names: &str) -> Vec<String> {
         .map(|name| name.replace('\n', " "))
         .map(|name| name.replace('\u{ad}', ""))
         .map(|name| name.replace('\u{a0}', " "))
+        .map(|name| remove_multiple_of(&name, ' '))
         .collect()
 }
 

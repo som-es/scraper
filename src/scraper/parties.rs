@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use common_scrapes::Party;
 
@@ -18,7 +20,9 @@ impl Parties for AustriaScraper {
         let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;*/
 
         let raw = self.post_legis_payload().await?;
-        for path in self.legis_paths(raw)? {
+        let legis_paths = self.legis_paths(raw)?;
+        let mut votes = HashSet::new();
+        for path in legis_paths.iter().rev() {
             // println!("path: {path}");
             let Ok(legis_init) = self.get_legis_init(&path).await else {
                 continue;
@@ -26,27 +30,28 @@ impl Parties for AustriaScraper {
             if legis_init.votes.is_empty() {
                 continue;
             }
-            return Ok(legis_init
+            votes.extend(legis_init
                 .votes
                 .into_iter()
-                .map(|vote| vote.party)
-                .collect());
+                .map(|vote| vote.party));
+            break;
         }
-        let legis_init = self
-            .get_legis_init(&format!("/gegenstand/{}/I/1", self.scrape_info.gp[0]))
-            .await?;
 
-        // let parties = HashSet::new();
-
-        Ok(
-            //enactment
-            // .legislative_initiative
-            legis_init
+        for path in legis_paths.iter() {
+            let Ok(legis_init) = self.get_legis_init(&path).await else {
+                continue;
+            };
+            if legis_init.votes.is_empty() {
+                continue;
+            }
+            votes.extend(legis_init
                 .votes
                 .into_iter()
-                .map(|vote| vote.party)
-                .collect(),
-        )
+                .map(|vote| vote.party));
+            break;
+        }
+
+        Ok(votes.into_iter().collect())
     }
 }
 
@@ -149,7 +154,7 @@ mod tests {
         for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
             let parties = scraper.get_parties().await.unwrap();
-            println!("parties: {parties:?}");
+            println!("gp: {gp}, parties: {parties:?}");
         }
     }
 }

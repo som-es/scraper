@@ -396,8 +396,10 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
 fn group_names_from_vote_section(names: &str) -> Vec<String> {
     names
         .split([',', ';'])
-        .map(|name| name.trim_matches([' ', '\r', '\n']))
+        .map(|name| name.trim_matches([' ', '\r', '\n', '\u{ad}']))
         .map(|name| name.replace('\n', " "))
+        .map(|name| name.replace('\u{ad}', ""))
+        .map(|name| name.replace('\u{a0}', " "))
         .collect()
 }
 
@@ -921,6 +923,18 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/405")
             .await
             .unwrap();
+    }
+
+        #[tokio::test]
+    async fn test_xxvii_erroring_legis_init_xxvi_a_110() {
+        //https://www.parlament.gv.at/gegenstand/XXVII/I/405
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/A/110")
+            .await
+            .unwrap();
+        res.hidden_votes_info.pro_contra_parties.unwrap();
     }
 
     // test may get invalid -> legis init got voted on potentially

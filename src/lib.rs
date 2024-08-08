@@ -11,6 +11,7 @@ mod scraper;
 mod speeches;
 mod text_extractor;
 mod url;
+mod text_utils;
 
 pub use text_extractor::*;
 

@@ -925,7 +925,7 @@ mod tests {
             .unwrap();
     }
 
-        #[tokio::test]
+    #[tokio::test]
     async fn test_xxvii_erroring_legis_init_xxvi_a_110() {
         //https://www.parlament.gv.at/gegenstand/XXVII/I/405
         let scraper = AustriaScraper::default();

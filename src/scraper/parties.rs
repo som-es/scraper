@@ -30,10 +30,7 @@ impl Parties for AustriaScraper {
             if legis_init.votes.is_empty() {
                 continue;
             }
-            votes.extend(legis_init
-                .votes
-                .into_iter()
-                .map(|vote| vote.party));
+            votes.extend(legis_init.votes.into_iter().map(|vote| vote.party));
             break;
         }
 
@@ -44,10 +41,7 @@ impl Parties for AustriaScraper {
             if legis_init.votes.is_empty() {
                 continue;
             }
-            votes.extend(legis_init
-                .votes
-                .into_iter()
-                .map(|vote| vote.party));
+            votes.extend(legis_init.votes.into_iter().map(|vote| vote.party));
             break;
         }
 

@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
+use reqwest::StatusCode;
 use thiserror::Error;
 
-#[derive(Error, Clone, Debug, PartialEq, Eq)]
+#[derive(Error, Clone, Debug)]
 pub enum ScraperError {
     /// 401
     #[error("Unauthorized")]
@@ -24,7 +27,9 @@ pub enum ScraperError {
 
     /// request error
     #[error("Http Request Error")]
-    RequestError,
+    RequestError(Arc<reqwest::Error>),
+    #[error("Status")]
+    StatusError(StatusCode),
 
     #[error("Encounterd invalid delegate information from API")]
     InvalidDelegateInfoError,

@@ -10,8 +10,8 @@ mod request;
 mod scraper;
 mod speeches;
 mod text_extractor;
-mod url;
 mod text_utils;
+mod url;
 
 pub use text_extractor::*;
 

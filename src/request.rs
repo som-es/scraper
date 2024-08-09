@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::error::ScraperError;
 use reqwest::{Client, Method, StatusCode};
 use serde::Serialize;
@@ -25,14 +27,15 @@ where
 
     let res = req.send().await;
 
-    let Ok(res) = res else {
-        return Err(ScraperError::RequestError);
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return Err(ScraperError::RequestError(Arc::new(e))),
     };
 
     if res.status().is_success() {
         res.json::<Value>()
             .await
-            .map_err(|_| ScraperError::RequestError)
+            .map_err(|e| ScraperError::RequestError(Arc::new(e)))
     } else {
         match res.status() {
             StatusCode::UNAUTHORIZED => Err(ScraperError::Unauthorized),
@@ -40,7 +43,7 @@ where
             StatusCode::NOT_FOUND => Err(ScraperError::NotFound),
             StatusCode::INTERNAL_SERVER_ERROR => Err(ScraperError::InternalServerError),
             StatusCode::UNPROCESSABLE_ENTITY => Err(ScraperError::Unauthorized),
-            _ => Err(ScraperError::RequestError),
+            s => Err(ScraperError::StatusError(s)),
         }
     }
 }

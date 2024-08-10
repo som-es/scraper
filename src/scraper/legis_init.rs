@@ -146,6 +146,10 @@ impl LegislativeInitiatives for AustriaScraper {
         let mut hidden_votes = extract_hidden_votes(legis_content)
             .await
             .unwrap_or_default();
+        if hidden_votes.voted_by_name && hidden_votes.voted_by_name_data.is_some() {
+            let voted_by_name_data = hidden_votes.voted_by_name_data.as_ref().unwrap();
+            accepted = Some(is_accepted_based_on_votes(voted_by_name_data.vote_sum, voted_by_name_data.pro_count, requires_simple_majority)) 
+        }
         if accepted.is_none() && was_invisibly_declined {
             accepted = Some(AcceptedState::PreDeclined);
 
@@ -207,6 +211,17 @@ impl LegislativeInitiatives for AustriaScraper {
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError> {
         self.gegenstand_paths(initiatives, 12)
             .ok_or(ScraperError::LegisInitParseError)
+    }
+}
+
+pub fn is_accepted_based_on_votes(vote_sum: usize, pro_count: usize, requires_simple_majority: bool) -> AcceptedState {
+    let pro_share = pro_count as f64 / vote_sum as f64;
+    if requires_simple_majority && pro_share >= 0.5 {
+        AcceptedState::Accepted
+    } else if !requires_simple_majority && pro_share >= 2 as f64 / 3 as f64 {
+        AcceptedState::Accepted
+    } else {
+        AcceptedState::Declined
     }
 }
 
@@ -489,6 +504,26 @@ mod tests {
         AustriaScraper, Scraper,
     };
 
+    use super::is_accepted_based_on_votes;
+
+    #[test]
+    fn test_accepted_on_vote_count_stuff() {
+        let accepted = is_accepted_based_on_votes(100, 50, true);
+        assert_eq!(accepted, AcceptedState::Accepted);
+
+        let accepted = is_accepted_based_on_votes(120, 50, true);
+        assert_eq!(accepted, AcceptedState::Declined);
+        
+        let accepted = is_accepted_based_on_votes(120, 65, false);
+        assert_eq!(accepted, AcceptedState::Declined);
+
+        let accepted = is_accepted_based_on_votes(120, 80, false);
+        assert_eq!(accepted, AcceptedState::Accepted);
+
+        let accepted = is_accepted_based_on_votes(120, 79, false);
+        assert_eq!(accepted, AcceptedState::Declined);
+    }
+
     #[test]
     fn test_text_extract() {
         let html = r#"<h4>Schwerpunkte der Regierungsvorlage</h4>\n\n<ul class=\"unordered-list\">\n\t<li>&Auml;nderung des &sect; 46 KFG und Schaffung exakterer Vorgaben f&uuml;r die Bewilligung von &Uuml;berstellungsfahrten</li>\n\t<li>Entsprechende &Auml;nderung des &sect; 40 und des &sect; 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister &uuml;bernehmen k&ouml;nnen. Zus&auml;tzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgef&uuml;hrt werden</li>\n</ul>\n"#;
@@ -554,6 +589,7 @@ mod tests {
                     continue;
                 };
                 if init.hidden_votes_info.voted_by_name {
+                    println!("init: title: {}, accepted: {:?}, votes: {:?}, id: {:?}, hidden_votes: {:?}, ", init.title, init.accepted, init.votes, init.id, init.hidden_votes_info);
                     println!(" {}{path}", AustriaScraper::BASE_URL,);
                     count += 1;
                 }
@@ -669,6 +705,7 @@ mod tests {
             .await
             .unwrap();
         assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
         assert_eq!(
             init.hidden_votes_info
                 .clone()
@@ -904,6 +941,7 @@ mod tests {
             .unwrap();
 
         res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted)); 
     }
     #[tokio::test]
     async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {

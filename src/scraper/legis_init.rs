@@ -98,7 +98,7 @@ impl LegislativeInitiatives for AustriaScraper {
         // let votes = extract_votes(legis_content)?;
         let votes = extract_votes(legis_content).unwrap_or_default();
         let topics = extract_topics(legis_content, "topics").unwrap_or_default();
-        let eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
+        let mut eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
         let other_keyword_topics = extract_topics(legis_content, "headwords").unwrap_or_default();
 
         let mut speeches = extract_speeches(legis_content).unwrap_or_default();
@@ -146,6 +146,11 @@ impl LegislativeInitiatives for AustriaScraper {
         let mut hidden_votes = extract_hidden_votes(legis_content)
             .await
             .unwrap_or_default();
+        
+        // sometimes, the info is missing 
+        if hidden_votes.voted_by_name && !eurovoc_topics.contains(&"namentliche Abstimmung".into()) {
+            eurovoc_topics.push("namentliche Abstimmung".into());
+        }
         if hidden_votes.voted_by_name && hidden_votes.voted_by_name_data.is_some() {
             let voted_by_name_data = hidden_votes.voted_by_name_data.as_ref().unwrap();
             accepted = Some(is_accepted_based_on_votes(voted_by_name_data.vote_sum, voted_by_name_data.pro_count, requires_simple_majority)) 

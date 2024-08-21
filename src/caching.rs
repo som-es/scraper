@@ -8,7 +8,7 @@ fn cache_dir() -> String {
 }
 
 pub async fn get_disk_cache(entry: &str) -> Option<String> { 
-    if entry.contains("XXVII") {
+    if entry.contains("XXVII/") {
         return None;
     }
     let cache_path = format!("{}{entry}.json", cache_dir());

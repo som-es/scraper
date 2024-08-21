@@ -417,35 +417,46 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
 
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {    
     let yes_no_regex = yes_no_votes_regex();
-    let start_of_yes_no_idx = yes_no_regex.find(from_html_text)?.start();
+    let start_of_yes_no_idx = yes_no_regex.find(from_html_text).map(|x| x.end()).unwrap_or_default();
     let from_html_text = &from_html_text[start_of_yes_no_idx..];
 
-    let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
-    let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
+    let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
+    let contra_regex = Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
 
-    let find = pro_regex.find(from_html_text)?;
-    let pro_votes_start_idx = find.start();
+    let pro_match = pro_regex.find(from_html_text)?;
+    let pro_votes_start_idx = pro_match.start();
     
     let contra_match = contra_regex.find(from_html_text)?;
     let contra_votes_start_idx = contra_match.start();
 
-    let from_html_text = from_html_text.chars().collect::<Vec<char>>();
-    let pro_open_ended = &from_html_text[pro_votes_start_idx..];
-    let pro_open_ended = &pro_open_ended[pro_open_ended.iter().position(|x| *x == ':')? + 1..];
-    let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
+    dbg!(from_html_text[pro_match.start()..pro_match.end()].chars().collect::<String>());
+    dbg!(from_html_text[contra_match.start()..contra_match.end()].chars().collect::<String>());
+
+    // let from_html_text = from_html_text.chars().collect::<Vec<char>>();
+    // let pro_open_ended = &from_html_text[pro_votes_start_idx..];
+    // let pro_open_ended = &pro_open_ended[pro_open_ended.iter().position(|x| *x == ':')? + 1..];
+    let pro_open_ended = &from_html_text[pro_match.end()..];
+    // let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
+    let end_pro_idx = pro_open_ended.find('.')?;
     let pro_delegates = &pro_open_ended[..end_pro_idx];
 
-    let pro_delegates = group_names_from_vote_section(&pro_delegates.iter().collect::<String>());
+    // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
+
+    // let pro_delegates = group_names_from_vote_section(&pro_delegates.iter().collect::<String>());
+    let pro_delegates = group_names_from_vote_section(pro_delegates);
     // println!("------------ pro_delegates: {pro_delegates:?}");
     // println!("--------------- text: {from_html_text}");
 
     dbg!(contra_votes_start_idx);
-    let contra_open_ended = &pro_open_ended[contra_votes_start_idx..];
-    let contra_open_ended = &contra_open_ended[contra_open_ended.iter().position(|x| *x == ':')? + 1..];
-    let end_contra_idx = contra_open_ended.iter().position(|x| *x == '.')?;
+    // let contra_open_ended = &from_html_text[contra_votes_start_idx..];
+    // let contra_open_ended = &contra_open_ended[contra_open_ended.iter().position(|x| *x == ':')? + 1..];
+    let contra_open_ended = &from_html_text[contra_match.end() + 1..];
+    // let end_contra_idx = contra_open_ended.iter().position(|x| *x == '.')?;
+    let end_contra_idx = contra_open_ended.find('.')?;
     let contra_delegates = &contra_open_ended[..end_contra_idx];
 
-    let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());
+    // let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());
+    let contra_delegates = group_names_from_vote_section(&contra_delegates);
 
     // println!("-------------------- contra_delegates: {contra_delegates:?}");
     Some(ProContra {
@@ -737,6 +748,20 @@ mod tests {
             init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
+    }
+
+
+    // gegenstand/XXII/I/653
+
+    #[tokio::test]
+    async fn test_get_legis_init_voted_by_name_xxii_i_653() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXII/I/653")
+            .await
+            .unwrap();
+        assert!(init.hidden_votes_info.voted_by_name);
     }
 
     // gegenstand/XXVI/A/303

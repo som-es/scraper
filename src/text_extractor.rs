@@ -124,15 +124,17 @@ impl TextExtractor {
 
             let add_zeros = (0..(4-count as i32).max(0)).map(|_| '0').collect::<String>();
             let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
-            println!("to_fetch: {to_fetch}");
+            dbg!(&to_fetch);
             if let Some(text) = self.extract_text_from_url(&to_fetch, None).await {
                 if skip_strategy_fn(&text, already_skipped) {
                     already_skipped = true;
                     continue
                 }
+                // dbg!(&text);
                 text_acc.push_str(&text);
             }
         }
+        println!("text_acc: {}", text_acc);
         Some(remove_plenar_info(&remove_page_info(&text_acc)))
     }
 

@@ -37,7 +37,8 @@ pub fn remove_page_info(haystack: &str) -> String {
 }
 
 pub fn remove_steno_info(haystack: &str) -> String {
-    let re = Regex::new(r"Nationalrat, [\S\s]*Stenographisches Protokoll[\S\s]*\d+").unwrap();
+    // let re = Regex::new(r"Nationalrat, [\S\s]*Stenographisches Protokoll[\S\s]*\d+").unwrap();
+    let re = Regex::new(r"(?U)Nationalrat[\S\s]*Stenographisches Protokoll[\S\s]*\d+$").unwrap();
     re.replace_all(haystack, "").to_string()
 }
 

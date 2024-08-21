@@ -423,8 +423,12 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
     let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
-    let pro_votes_start_idx = pro_regex.find(from_html_text)?.start();
-    let contra_votes_start_idx = contra_regex.find(from_html_text)?.start();
+    let find = pro_regex.find(from_html_text)?;
+    let pro_votes_start_idx = find.start();
+    
+    let contra_match = contra_regex.find(from_html_text)?;
+    let contra_votes_start_idx = contra_match.start();
+
     let from_html_text = from_html_text.chars().collect::<Vec<char>>();
     let pro_open_ended = &from_html_text[pro_votes_start_idx..];
     let pro_open_ended = &pro_open_ended[pro_open_ended.iter().position(|x| *x == ':')? + 1..];

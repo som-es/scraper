@@ -419,6 +419,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let yes_no_regex = yes_no_votes_regex();
     let start_of_yes_no_idx = yes_no_regex.find(from_html_text).map(|x| x.end()).unwrap_or_default();
     let from_html_text = &from_html_text[start_of_yes_no_idx..];
+    let from_html_text = &from_html_text.replace("Graf Herbert L.", "Graf Herbert L");
 
     let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
     let contra_regex = Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
@@ -428,6 +429,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     
     let contra_match = contra_regex.find(from_html_text)?;
     let contra_votes_start_idx = contra_match.start();
+
 
     dbg!(from_html_text[pro_match.start()..pro_match.end()].chars().collect::<String>());
     dbg!(from_html_text[contra_match.start()..contra_match.end()].chars().collect::<String>());
@@ -439,6 +441,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
     let end_pro_idx = pro_open_ended.find('.')?;
     let pro_delegates = &pro_open_ended[..end_pro_idx];
+    println!("pro_delegates: {pro_delegates}");
 
     // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
 
@@ -751,6 +754,133 @@ mod tests {
     }
 
 
+    // https://www.parlament.gv.at/gegenstand/XXI/I/1183
+
+    #[tokio::test]
+    async fn test_get_legis_init_xxi_i_1183() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXI/I/1183")
+            .await
+            .unwrap();
+
+        assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+
+         assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .pro[..39],
+ 
+            vec![
+                "Achatz", "Amon", "Auer", "Bauer Gerhard", "Baumgartner-Gabitzer", "Blasisker", "Böhacker", "Brinek",
+                "Bruckmann", "Brugger", "Burket", "Dolinschek", "Donabauer", "Donnerbauer", "Egghart", "Ellmauer",
+                "Fallent", "Fasslabend", "Fekter", "Fink", "Firlinger", "Freigaßner", "Freund", "Frieser", "Gahr", "Gatterer", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck", "Hakl", "Haller", "Hartinger", "Haubner", "Hetzl", "Hofmann", "Hornegger", "Hornek", "Jung"
+
+            ]
+        );
+        
+
+        /*
+        
+        Abraham;
+
+Bauer Hannes, Bauer Sophie, Binder, Brosz, Bures;
+
+Cap, Csörgits;
+
+Dietachmayr;
+
+Eder, Edler, Edlinger;
+
+Faul, Feurstein, Fischer;
+
+Gaál, Gartlehner, Gaßner, Glawischnig, Gradwohl, Grünewald, Gusenbauer;
+
+Hagenhofer, Haidlmayr, Heindl, Heinisch-Hosek, Heinzl, Hlavac, Horn, Huber;
+
+Jäger, Jarolim;
+
+Kaipel, Kiermaier, Kopf, Kubitschek, Kummerer, Kuntzl;
+
+Lackner, Lapp, Lichtenberger, Lunacek;
+
+Maier, Marizzi, Mertel, Moser, Muttonen;
+
+Niederwieser, Nürnberger;
+
+Oberhaidinger, Öllinger;
+
+Parfuss, Parnigoni, Pendl, Petrovic, Pirklhuber, Posch, Prähauser, Prammer;
+
+Rada, Reheis, Riepl;
+
+Schasching, Schieder, Schwemlein, Silhavy, Sima, Stoisits;
+
+Van der Bellen, Verzetnitsch;
+
+Wimmer, Wittmann. */
+
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .contra,
+            vec![
+                "Abraham", "Bauer Hannes", "Bauer Sophie", "Binder", "Brosz", "Bures", "Cap", "Csörgits",
+                "Dietachmayr", "Eder", "Edler", "Edlinger", "Faul", "Feurstein", "Fischer", "Gaál", "Gartlehner", "Gaßner", "Glawischnig", "Gradwohl", "Grünewald", "Gusenbauer", "Hagenhofer", "Haidlmayr", "Heindl", "Heinisch-Hosek", "Heinzl", "Hlavac", "Horn", "Huber", "Jäger", "Jarolim", "Kaipel", "Kiermaier", "Kopf", "Kubitschek", "Kummerer", "Kuntzl", "Lackner", "Lapp", "Lichtenberger", "Lunacek", "Maier", "Marizzi", "Mertel", "Moser", "Muttonen", "Niederwieser", "Nürnberger", "Oberhaidinger", "Öllinger", "Parfuss", "Parnigoni", "Pendl", "Petrovic", "Pirklhuber", "Posch", "Prähauser", "Prammer", "Rada", "Reheis", "Riepl", "Schasching", "Schieder", "Schwemlein", "Silhavy", "Sima", "Stoisits", "Van der Bellen", "Verzetnitsch", "Wimmer", "Wittmann"
+            ]
+        )
+
+    }
+
+    // https://www.parlament.gv.at/gegenstand/XXVII/A/2068
+    #[tokio::test]
+    async fn test_get_legis_init_voted_by_name_xxvii_a_2068() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/2068")
+            .await
+            .unwrap();
+        assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Declined));
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .pro[..8],
+            vec![
+                "Baumgartner", "Berlakovich Nikolaus", "Bernhard", "Blimlinger", "Brandstätter Helmut", "Brandstötter Henrike", "Brandweiner", "Bürstmayr"
+            ]
+        );
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .contra[..8],
+            vec![
+                "Amesbauer", "Angerer",
+                "Bayr", "Becher", "Belakowitsch Dagmar", "Bösch", "Brückl", "Bures",
+            ]
+        )
+    }
+
+
     // gegenstand/XXII/I/653
 
     #[tokio::test]
@@ -762,6 +892,45 @@ mod tests {
             .await
             .unwrap();
         assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .pro[..8],
+            vec![
+                "Achleitner",
+                "Amon",
+                "Auer Jakob",
+                "Auer Klaus Hubert",
+                "Baumgartner-Gabitzer",
+                "Böhm",
+                "Böhmdorfer",
+                "Bösch"
+            ]
+        );
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .contra[..8],
+            vec![
+                "Bauer",
+                "Bayr",
+                "Becher",
+                "Binder",
+                "Brosz",
+                "Broukal",
+                "Bures",
+                "Cap"
+            ]
+        )
     }
 
     // gegenstand/XXVI/A/303

@@ -99,6 +99,7 @@ impl TextExtractor {
                 &html,
                 url.split('#').nth(1).unwrap(),
             )
+            .inspect(|x| println!("--------------------- {x}\n --------------"))
             .map(|text| remove_steno_info(&text));
             self.cached_html = Some(html);
             return text;
@@ -134,7 +135,6 @@ impl TextExtractor {
                 text_acc.push_str(&text);
             }
         }
-        println!("text_acc: {}", text_acc);
         Some(remove_plenar_info(&remove_page_info(&text_acc)))
     }
 

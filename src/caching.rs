@@ -25,14 +25,9 @@ pub async fn get_disk_cache(entry: &str) -> Option<String> {
 }
 
 pub async fn disk_caching(entry: &str, data: impl AsRef<[u8]>) -> std::io::Result<()> {
-    if entry.contains("XXVII") {
-        return Ok(());
-    }
     let cache_path = format!("{}{entry}.json", cache_dir());
     let cache_path = PathBuf::from(cache_path);
-    println!("hi");
     tokio::fs::create_dir_all(&cache_path.parent().unwrap()).await?;
-    println!("{cache_path:?} hi 2: {:?}", cache_path.parent());
     tokio::fs::write(cache_path, data).await.unwrap();
     Ok(())
 }

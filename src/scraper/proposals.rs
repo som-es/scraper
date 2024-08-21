@@ -6,8 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, legis_init::extract_topics, person_url_to_id, DatePayload,
-    GeneralScrapeInfo,
+    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, legis_init::extract_topics, person_url_to_id, DatePayload, GeneralScrapeInfo
 };
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
@@ -59,8 +58,18 @@ pub trait ProposalScraper: Scraper {
     fn proposal_paths(&self, proposals: Value) -> Result<GegenstandPaths, ScraperError>;
 
     async fn get_proposal(&self, proposal_path: &str) -> Result<Proposal, ScraperError> {
-        let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
-        Self::raw_proposal_into_proposal(raw_proposal).ok_or(ScraperError::InvalidProposalInfoError)
+        let raw = match get_disk_cache_json(proposal_path).await {
+            Some(raw) => raw,
+            None => {
+                let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
+                if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
+                    log::warn!("could cache raw {proposal_path}: {e:?}")
+                }
+                raw_proposal
+            },
+        };
+
+        Self::raw_proposal_into_proposal(raw).ok_or(ScraperError::InvalidProposalInfoError)
     }
 }
 

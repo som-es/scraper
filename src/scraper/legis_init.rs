@@ -370,6 +370,8 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                         None => continue,
                     }
                 };
+
+                    println!("variant: {html_text}");
                 if let Some(new_delegate_votes) = extract_votes_by_name(&html_text) {
                     delegate_votes = Some(new_delegate_votes);
                     break;
@@ -418,7 +420,6 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let start_of_yes_no_idx = yes_no_regex.find(from_html_text)?.start();
     let from_html_text = &from_html_text[start_of_yes_no_idx..];
 
-    // println!("variant: {from_html_text}");
     let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
     let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
@@ -616,8 +617,8 @@ mod tests {
 
         let start = std::time::Instant::now();
 
-        for gp in ["XXIV", "XXIII", "XXII"] {
-        // for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        // for gp in ["XXIV", "XXIII", "XXII"] {
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();

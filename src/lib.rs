@@ -32,12 +32,12 @@ fn person_url_to_id(url: &str) -> Option<u64> {
 }
 
 pub fn remove_page_info(haystack: &str) -> String {
-    let re = Regex::new(r"Home.*Seite \d+.*Vorherige Seite.*Nächste Seite.*").unwrap();
+    let re = Regex::new(r"Home[\S\s]*Seite \d+[\S\s]*Vorherige Seite[\S\s]*Nächste Seite[\S\s]").unwrap();
     re.replace_all(haystack, "").to_string()
 }
 
 pub fn remove_steno_info(haystack: &str) -> String {
-    let re = Regex::new(r"Nationalrat, .*Stenographisches Protokoll.*\d+").unwrap();
+    let re = Regex::new(r"Nationalrat, [\S\s]*Stenographisches Protokoll[\S\s]*\d+").unwrap();
     re.replace_all(haystack, "").to_string()
 }
 

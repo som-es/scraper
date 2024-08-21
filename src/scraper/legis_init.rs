@@ -7,7 +7,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
+    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -42,8 +42,17 @@ pub trait LegislativeInitiatives: Scraper {
         &self,
         proposal_path: &str,
     ) -> Result<LegislativeInitiative, ScraperError> {
-        let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
-        Self::raw_legis_into_legis(raw_proposal)
+        let raw = match get_disk_cache_json(proposal_path).await {
+            Some(raw) => raw,
+            None => {
+                let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
+                if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
+                    log::warn!("could cache raw {proposal_path}: {e:?}")
+                }
+                raw_proposal
+            },
+        };
+        Self::raw_legis_into_legis(raw)
             .await
             .ok_or(ScraperError::LegisInitParseError)
     }
@@ -354,7 +363,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                         .text_accumulation(
                             &url[..last_idx + 1],
                             site_start as usize..=site_end as usize,
-                            |_, _| false
+                            |_, _| false,
                         )
                         .await
                     {
@@ -371,7 +380,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                     }
                 };
 
-                    println!("variant: {html_text}");
+                println!("variant: {html_text}");
                 if let Some(new_delegate_votes) = extract_votes_by_name(&html_text) {
                     delegate_votes = Some(new_delegate_votes);
                     break;
@@ -415,24 +424,31 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     ))
 }
 
-fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {    
+fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let yes_no_regex = yes_no_votes_regex();
-    let start_of_yes_no_idx = yes_no_regex.find(from_html_text).map(|x| x.end()).unwrap_or_default();
+    let start_of_yes_no_idx = yes_no_regex
+        .find(from_html_text)
+        .map(|x| x.end())
+        .unwrap_or_default();
     let from_html_text = &from_html_text[start_of_yes_no_idx..];
     let from_html_text = &from_html_text.replace("Graf Herbert L.", "Graf Herbert L");
 
     let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
-    let contra_regex = Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
+    let contra_regex =
+        Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
 
     let pro_match = pro_regex.find(from_html_text)?;
     let pro_votes_start_idx = pro_match.start();
-    
+
     let contra_match = contra_regex.find(from_html_text)?;
     let contra_votes_start_idx = contra_match.start();
 
-
-    dbg!(from_html_text[pro_match.start()..pro_match.end()].chars().collect::<String>());
-    dbg!(from_html_text[contra_match.start()..contra_match.end()].chars().collect::<String>());
+    dbg!(from_html_text[pro_match.start()..pro_match.end()]
+        .chars()
+        .collect::<String>());
+    dbg!(from_html_text[contra_match.start()..contra_match.end()]
+        .chars()
+        .collect::<String>());
 
     // let from_html_text = from_html_text.chars().collect::<Vec<char>>();
     // let pro_open_ended = &from_html_text[pro_votes_start_idx..];
@@ -441,7 +457,6 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
     let end_pro_idx = pro_open_ended.find('.')?;
     let pro_delegates = &pro_open_ended[..end_pro_idx];
-    println!("pro_delegates: {pro_delegates}");
 
     // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
 
@@ -753,6 +768,202 @@ mod tests {
         );
     }
 
+    // https://www.parlament.gv.at/gegenstand/XX/I/1428
+    #[tokio::test]
+    async fn test_get_legis_init_xx_i_1428() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XX/I/1428")
+            .await
+            .unwrap();
+
+        assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .pro,
+            vec![
+                "Ablinger",
+                "Achs",
+                "Amon",
+                "Antoni",
+                "Auer",
+                "Bauer Rosemarie",
+                "Bauer Sophie",
+                "Binder",
+                "Brix",
+                "Buder",
+                "Bures",
+                "Donabauer",
+                "Eder",
+                "Edler",
+                "Ellmauer",
+                "Feurstein",
+                "Fink",
+                "Fischer",
+                "Freund",
+                "Fuchs",
+                "Gaál",
+                "Gartlehner",
+                "Gaßner",
+                "Gatterer",
+                "Grabner",
+                "Gradwohl",
+                "Großruck",
+                "Gusenbauer",
+                "Hagenhofer",
+                "Heindl",
+                "Heinzl",
+                "Hlavac",
+                "Höchtl",
+                "Horngacher",
+                "Kaipel",
+                "Kampichler",
+                "Kaufmann",
+                "Keppelmüller",
+                "Khol",
+                "Kiermaier",
+                "Kiss",
+                "König",
+                "Konrad",
+                "Koppler",
+                "Kostelka",
+                "Krammer",
+                "Kräuter",
+                "Kröll",
+                "Kukacka",
+                "Kummerer",
+                "Kurzbauer",
+                "Leikam",
+                "Leiner",
+                "Löschnak",
+                "Lukesch",
+                "Maier",
+                "Maitz",
+                "Marizzi",
+                "Mertel",
+                "Mock",
+                "Morak",
+                "Moser-Starrach",
+                "Mühlbachler",
+                "Müller",
+                "Murauer",
+                "Neisser",
+                "Niederwieser",
+                "Nowotny",
+                "Nürnberger",
+                "Oberhaidinger",
+                "Parfuss",
+                "Parnigoni",
+                "Pendl",
+                "Pittermann",
+                "Platter",
+                "Rasinger",
+                "Rauch-Kallat",
+                "Reitsamer",
+                "Riepl",
+                "Sauer",
+                "Schieder",
+                "Schrefel",
+                "Schuster",
+                "Schwarzböck",
+                "Schwarzenberger",
+                "Schwemlein",
+                "Seidinger",
+                "Sigl",
+                "Silhavy",
+                "Spindelegger",
+                "Stampler",
+                "Steibl",
+                "Steindl",
+                "Stippel",
+                "Tegischer",
+                "Tichy-Schreder",
+                "Tychtl",
+                "Verzetnitsch",
+                "Wimmer",
+                "Wurmitzer"
+            ]
+        );
+
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .contra,
+            vec![
+                "Apfelbeck",
+                "Aumayr",
+                "Barmüller",
+                "Blünegger",
+                "Böhacker",
+                "Brauneder",
+                "Dolinschek",
+                "Fekter",
+                "Firlinger",
+                "Fischl",
+                "Frieser",
+                "Gaugg",
+                "Graf",
+                "Gredler",
+                "Grollitsch",
+                "Haider",
+                "Haller",
+                "Haupt",
+                "Hofmann",
+                "Jung",
+                "Kammerlander",
+                "Kier",
+                "Klein",
+                "Koller",
+                "Kopf",
+                "Krüger",
+                "Kurzmann",
+                "Lafer",
+                "Maderthaner",
+                "Madl",
+                "Marolt",
+                "Meischberger",
+                "Meisinger",
+                "Mentil",
+                "Moser Gabriela",
+                "Moser Hans Helmut",
+                "Nußbaumer",
+                "Öllinger",
+                "Partik-Pablé",
+                "Peter",
+                "Petrovic",
+                "Povysil",
+                "Preisinger",
+                "Pumberger",
+                "Puttinger",
+                "Rieß",
+                "Salzl",
+                "Schaffenrath",
+                "Scheibner",
+                "Schöggl",
+                "Schweitzer",
+                "Stadler",
+                "Stummvoll",
+                "Trattner",
+                "Trinkl",
+                "Van der Bellen",
+                "Wabl",
+                "Wenitsch",
+                "Zweytick"
+            ]
+        );
+    }
 
     // https://www.parlament.gv.at/gegenstand/XXI/I/1183
 
@@ -768,7 +979,7 @@ mod tests {
         assert!(init.hidden_votes_info.voted_by_name);
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
 
-         assert_eq!(
+        assert_eq!(
             init.hidden_votes_info
                 .clone()
                 .voted_by_name_data
@@ -776,55 +987,88 @@ mod tests {
                 .delegates_pro_contra
                 .unwrap()
                 .pro[..39],
- 
             vec![
-                "Achatz", "Amon", "Auer", "Bauer Gerhard", "Baumgartner-Gabitzer", "Blasisker", "Böhacker", "Brinek",
-                "Bruckmann", "Brugger", "Burket", "Dolinschek", "Donabauer", "Donnerbauer", "Egghart", "Ellmauer",
-                "Fallent", "Fasslabend", "Fekter", "Fink", "Firlinger", "Freigaßner", "Freund", "Frieser", "Gahr", "Gatterer", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck", "Hakl", "Haller", "Hartinger", "Haubner", "Hetzl", "Hofmann", "Hornegger", "Hornek", "Jung"
-
+                "Achatz",
+                "Amon",
+                "Auer",
+                "Bauer Gerhard",
+                "Baumgartner-Gabitzer",
+                "Blasisker",
+                "Böhacker",
+                "Brinek",
+                "Bruckmann",
+                "Brugger",
+                "Burket",
+                "Dolinschek",
+                "Donabauer",
+                "Donnerbauer",
+                "Egghart",
+                "Ellmauer",
+                "Fallent",
+                "Fasslabend",
+                "Fekter",
+                "Fink",
+                "Firlinger",
+                "Freigaßner",
+                "Freund",
+                "Frieser",
+                "Gahr",
+                "Gatterer",
+                "Graf Herbert L",
+                "Graf Martin",
+                "Grollitsch",
+                "Großruck",
+                "Hakl",
+                "Haller",
+                "Hartinger",
+                "Haubner",
+                "Hetzl",
+                "Hofmann",
+                "Hornegger",
+                "Hornek",
+                "Jung"
             ]
         );
-        
 
         /*
-        
-        Abraham;
 
-Bauer Hannes, Bauer Sophie, Binder, Brosz, Bures;
+                Abraham;
 
-Cap, Csörgits;
+        Bauer Hannes, Bauer Sophie, Binder, Brosz, Bures;
 
-Dietachmayr;
+        Cap, Csörgits;
 
-Eder, Edler, Edlinger;
+        Dietachmayr;
 
-Faul, Feurstein, Fischer;
+        Eder, Edler, Edlinger;
 
-Gaál, Gartlehner, Gaßner, Glawischnig, Gradwohl, Grünewald, Gusenbauer;
+        Faul, Feurstein, Fischer;
 
-Hagenhofer, Haidlmayr, Heindl, Heinisch-Hosek, Heinzl, Hlavac, Horn, Huber;
+        Gaál, Gartlehner, Gaßner, Glawischnig, Gradwohl, Grünewald, Gusenbauer;
 
-Jäger, Jarolim;
+        Hagenhofer, Haidlmayr, Heindl, Heinisch-Hosek, Heinzl, Hlavac, Horn, Huber;
 
-Kaipel, Kiermaier, Kopf, Kubitschek, Kummerer, Kuntzl;
+        Jäger, Jarolim;
 
-Lackner, Lapp, Lichtenberger, Lunacek;
+        Kaipel, Kiermaier, Kopf, Kubitschek, Kummerer, Kuntzl;
 
-Maier, Marizzi, Mertel, Moser, Muttonen;
+        Lackner, Lapp, Lichtenberger, Lunacek;
 
-Niederwieser, Nürnberger;
+        Maier, Marizzi, Mertel, Moser, Muttonen;
 
-Oberhaidinger, Öllinger;
+        Niederwieser, Nürnberger;
 
-Parfuss, Parnigoni, Pendl, Petrovic, Pirklhuber, Posch, Prähauser, Prammer;
+        Oberhaidinger, Öllinger;
 
-Rada, Reheis, Riepl;
+        Parfuss, Parnigoni, Pendl, Petrovic, Pirklhuber, Posch, Prähauser, Prammer;
 
-Schasching, Schieder, Schwemlein, Silhavy, Sima, Stoisits;
+        Rada, Reheis, Riepl;
 
-Van der Bellen, Verzetnitsch;
+        Schasching, Schieder, Schwemlein, Silhavy, Sima, Stoisits;
 
-Wimmer, Wittmann. */
+        Van der Bellen, Verzetnitsch;
+
+        Wimmer, Wittmann. */
 
         assert_eq!(
             init.hidden_votes_info
@@ -835,11 +1079,80 @@ Wimmer, Wittmann. */
                 .unwrap()
                 .contra,
             vec![
-                "Abraham", "Bauer Hannes", "Bauer Sophie", "Binder", "Brosz", "Bures", "Cap", "Csörgits",
-                "Dietachmayr", "Eder", "Edler", "Edlinger", "Faul", "Feurstein", "Fischer", "Gaál", "Gartlehner", "Gaßner", "Glawischnig", "Gradwohl", "Grünewald", "Gusenbauer", "Hagenhofer", "Haidlmayr", "Heindl", "Heinisch-Hosek", "Heinzl", "Hlavac", "Horn", "Huber", "Jäger", "Jarolim", "Kaipel", "Kiermaier", "Kopf", "Kubitschek", "Kummerer", "Kuntzl", "Lackner", "Lapp", "Lichtenberger", "Lunacek", "Maier", "Marizzi", "Mertel", "Moser", "Muttonen", "Niederwieser", "Nürnberger", "Oberhaidinger", "Öllinger", "Parfuss", "Parnigoni", "Pendl", "Petrovic", "Pirklhuber", "Posch", "Prähauser", "Prammer", "Rada", "Reheis", "Riepl", "Schasching", "Schieder", "Schwemlein", "Silhavy", "Sima", "Stoisits", "Van der Bellen", "Verzetnitsch", "Wimmer", "Wittmann"
+                "Abraham",
+                "Bauer Hannes",
+                "Bauer Sophie",
+                "Binder",
+                "Brosz",
+                "Bures",
+                "Cap",
+                "Csörgits",
+                "Dietachmayr",
+                "Eder",
+                "Edler",
+                "Edlinger",
+                "Faul",
+                "Feurstein",
+                "Fischer",
+                "Gaál",
+                "Gartlehner",
+                "Gaßner",
+                "Glawischnig",
+                "Gradwohl",
+                "Grünewald",
+                "Gusenbauer",
+                "Hagenhofer",
+                "Haidlmayr",
+                "Heindl",
+                "Heinisch-Hosek",
+                "Heinzl",
+                "Hlavac",
+                "Horn",
+                "Huber",
+                "Jäger",
+                "Jarolim",
+                "Kaipel",
+                "Kiermaier",
+                "Kopf",
+                "Kubitschek",
+                "Kummerer",
+                "Kuntzl",
+                "Lackner",
+                "Lapp",
+                "Lichtenberger",
+                "Lunacek",
+                "Maier",
+                "Marizzi",
+                "Mertel",
+                "Moser",
+                "Muttonen",
+                "Niederwieser",
+                "Nürnberger",
+                "Oberhaidinger",
+                "Öllinger",
+                "Parfuss",
+                "Parnigoni",
+                "Pendl",
+                "Petrovic",
+                "Pirklhuber",
+                "Posch",
+                "Prähauser",
+                "Prammer",
+                "Rada",
+                "Reheis",
+                "Riepl",
+                "Schasching",
+                "Schieder",
+                "Schwemlein",
+                "Silhavy",
+                "Sima",
+                "Stoisits",
+                "Van der Bellen",
+                "Verzetnitsch",
+                "Wimmer",
+                "Wittmann"
             ]
         )
-
     }
 
     // https://www.parlament.gv.at/gegenstand/XXVII/A/2068
@@ -862,7 +1175,14 @@ Wimmer, Wittmann. */
                 .unwrap()
                 .pro[..8],
             vec![
-                "Baumgartner", "Berlakovich Nikolaus", "Bernhard", "Blimlinger", "Brandstätter Helmut", "Brandstötter Henrike", "Brandweiner", "Bürstmayr"
+                "Baumgartner",
+                "Berlakovich Nikolaus",
+                "Bernhard",
+                "Blimlinger",
+                "Brandstätter Helmut",
+                "Brandstötter Henrike",
+                "Brandweiner",
+                "Bürstmayr"
             ]
         );
         assert_eq!(
@@ -874,12 +1194,17 @@ Wimmer, Wittmann. */
                 .unwrap()
                 .contra[..8],
             vec![
-                "Amesbauer", "Angerer",
-                "Bayr", "Becher", "Belakowitsch Dagmar", "Bösch", "Brückl", "Bures",
+                "Amesbauer",
+                "Angerer",
+                "Bayr",
+                "Becher",
+                "Belakowitsch Dagmar",
+                "Bösch",
+                "Brückl",
+                "Bures",
             ]
         )
     }
-
 
     // gegenstand/XXII/I/653
 
@@ -920,16 +1245,7 @@ Wimmer, Wittmann. */
                 .delegates_pro_contra
                 .unwrap()
                 .contra[..8],
-            vec![
-                "Bauer",
-                "Bayr",
-                "Becher",
-                "Binder",
-                "Brosz",
-                "Broukal",
-                "Bures",
-                "Cap"
-            ]
+            vec!["Bauer", "Bayr", "Becher", "Binder", "Brosz", "Broukal", "Bures", "Cap"]
         )
     }
 

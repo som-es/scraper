@@ -24,7 +24,7 @@ ego-tree = "0.6.2"
 log = "0.4.21"
 futures = "0.3.30"
 pollster = "0.3.0"
+tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt", "fs"] }
 
 [dev-dependencies]
 #tokio-macros = "1.8.2"
-tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt"] }

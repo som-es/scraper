@@ -4,7 +4,10 @@ use common_scrapes::{PlenarSpeech, Speech};
 use regex::Regex;
 
 use crate::{
-    extract_text_from_html, extract_text_from_html_via_name_attribute, extract_text_from_html_via_name_attribute_finding_optimal_solution, extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info, remove_steno_info
+    extract_text_from_html, extract_text_from_html_via_name_attribute,
+    extract_text_from_html_via_name_attribute_finding_optimal_solution,
+    extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info,
+    remove_steno_info,
 };
 
 pub trait HasHTMLUrl {
@@ -99,7 +102,7 @@ impl TextExtractor {
                 &html,
                 url.split('#').nth(1).unwrap(),
             )
-            .inspect(|x| println!("--------------------- {x}\n --------------"))
+            // .inspect(|x| println!("--------------------- {x}\n --------------"))
             .map(|text| remove_steno_info(&text));
             self.cached_html = Some(html);
             return text;
@@ -123,14 +126,17 @@ impl TextExtractor {
                 count += 1;
             }
 
-            let add_zeros = (0..(4-count as i32).max(0)).map(|_| '0').collect::<String>();
+            let add_zeros = (0..(4 - count as i32).max(0))
+                .map(|_| '0')
+                .collect::<String>();
             let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
             dbg!(&to_fetch);
             if let Some(text) = self.extract_text_from_url(&to_fetch, None).await {
                 if skip_strategy_fn(&text, already_skipped) {
                     already_skipped = true;
-                    continue
+                    continue;
                 }
+                println!("text_acc: {text}");
                 // dbg!(&text);
                 text_acc.push_str(&text);
             }

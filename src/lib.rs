@@ -11,6 +11,7 @@ mod scraper;
 mod speeches;
 mod text_extractor;
 mod text_utils;
+mod caching;
 mod url;
 
 pub use text_extractor::*;
@@ -32,20 +33,24 @@ fn person_url_to_id(url: &str) -> Option<u64> {
 }
 
 pub fn remove_page_info(haystack: &str) -> String {
-    let re = Regex::new(r"Home[\S\s]*?Seite \d+[\S\s]*?Vorherige Seite[\S\s]*?Nächste Seite[\S\s]*?").unwrap();
+    let re =
+        Regex::new(r"Home[\S\s]*?Seite \d+[\S\s]*?Vorherige Seite[\S\s]*?Nächste Seite[\S\s]*?")
+            .unwrap();
     re.replace_all(haystack, "").to_string()
 }
 
 pub fn remove_steno_info(haystack: &str) -> String {
+    println!("haystack: {haystack}");
     // let re = Regex::new(r"Nationalrat, [\S\s]*Stenographisches Protokoll[\S\s]*\d+").unwrap();
-    let re = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?Seite \d+").unwrap();
+    // Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+
+    // let re = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?[Seite]{5}? \d+").unwrap();
+    let re = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
     re.replace_all(haystack, "").to_string()
 }
 
 pub fn remove_plenar_info(haystack: &str) -> String {
     // Parlamentarische Materialien
     haystack.replace("Parlamentarische Materialien", "")
-
 }
 
 pub fn yes_no_votes_regex() -> Regex {

@@ -31,9 +31,25 @@ fn person_url_to_id(url: &str) -> Option<u64> {
     url.split('/').last().and_then(|id| id.parse::<u64>().ok())
 }
 
+pub fn remove_page_info(haystack: &str) -> String {
+    let re = Regex::new(r"Home.*Seite \d+.*Vorherige Seite.*Nächste Seite.*").unwrap();
+    re.replace_all(haystack, "").to_string()
+}
+
 pub fn remove_steno_info(haystack: &str) -> String {
     let re = Regex::new(r"Nationalrat, .*Stenographisches Protokoll.*\d+").unwrap();
     re.replace_all(haystack, "").to_string()
+}
+
+pub fn remove_plenar_info(haystack: &str) -> String {
+    // Parlamentarische Materialien
+    haystack.replace("Parlamentarische Materialien", "")
+
+}
+
+pub fn yes_no_votes_regex() -> Regex {
+    Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*.*Ja.*-Sti.men[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.en[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
+        .unwrap()
 }
 
 pub type DeclineUrlGegenstand = (String, String, Option<u32>);

@@ -7,12 +7,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url,
-    extract_pro_contra_party_codes_from_string, extract_text_from_html,
-    extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name,
-    person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches,
-    text_utils::remove_multiple_of, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths,
-    ProContra, Scraper, TextExtractor,
+    documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -146,14 +141,19 @@ impl LegislativeInitiatives for AustriaScraper {
         let mut hidden_votes = extract_hidden_votes(legis_content)
             .await
             .unwrap_or_default();
-        
-        // sometimes, the info is missing 
-        if hidden_votes.voted_by_name && !eurovoc_topics.contains(&"namentliche Abstimmung".into()) {
+
+        // sometimes, the info is missing
+        if hidden_votes.voted_by_name && !eurovoc_topics.contains(&"namentliche Abstimmung".into())
+        {
             eurovoc_topics.push("namentliche Abstimmung".into());
         }
         if hidden_votes.voted_by_name && hidden_votes.voted_by_name_data.is_some() {
             let voted_by_name_data = hidden_votes.voted_by_name_data.as_ref().unwrap();
-            accepted = Some(is_accepted_based_on_votes(voted_by_name_data.vote_sum, voted_by_name_data.pro_count, requires_simple_majority)) 
+            accepted = Some(is_accepted_based_on_votes(
+                voted_by_name_data.vote_sum,
+                voted_by_name_data.pro_count,
+                requires_simple_majority,
+            ))
         }
         if accepted.is_none() && was_invisibly_declined {
             accepted = Some(AcceptedState::PreDeclined);
@@ -219,7 +219,11 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 }
 
-pub fn is_accepted_based_on_votes(vote_sum: usize, pro_count: usize, requires_simple_majority: bool) -> AcceptedState {
+pub fn is_accepted_based_on_votes(
+    vote_sum: usize,
+    pro_count: usize,
+    requires_simple_majority: bool,
+) -> AcceptedState {
     let pro_share = pro_count as f64 / vote_sum as f64;
     if requires_simple_majority && pro_share >= 0.5 {
         AcceptedState::Accepted
@@ -278,6 +282,8 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> Option<HiddenVotes> 
 }
 
 pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
+    let is_site_stored_regex = Regex::new(r"SEITE_\d+.html").unwrap();
+
     let mut hidden_votes = HiddenVotes::default();
     // let mut declined_type = None;
     // let mut pro_contra = None;
@@ -332,11 +338,37 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
                 //     _ => panic!("should not be possible hopefully"),
                 // }
                 let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
-                let Some(html_text) = extractor
-                    .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
-                    .await
-                else {
-                    continue;
+                dbg!(protocol_link_obj);
+
+                let html_text = if is_site_stored_regex.is_match(url) {
+                    let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/').unwrap();
+
+                    let Some(site_start) = protocol_link_obj["fund_von"].as_u64() else {
+                        continue;
+                    };
+                    let Some(site_end) = protocol_link_obj["fund_bis"].as_u64() else {
+                        continue;
+                    };
+
+                    match extractor
+                        .text_accumulation(
+                            &url[..last_idx + 1],
+                            site_start as usize..=site_end as usize,
+                            |_, _| false
+                        )
+                        .await
+                    {
+                        Some(html_text) => html_text,
+                        None => continue,
+                    }
+                } else {
+                    match extractor
+                        .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+                        .await
+                    {
+                        Some(html_text) => html_text,
+                        None => continue,
+                    }
                 };
                 if let Some(new_delegate_votes) = extract_votes_by_name(&html_text) {
                     delegate_votes = Some(new_delegate_votes);
@@ -367,9 +399,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
 }
 
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
-    let vote_counts_regex =
-        Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*Ja-Stimmen[:\s]*\s*(\d+)[^\d]*Nein-Stimmen[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
-            .unwrap();
+    let vote_counts_regex = yes_no_votes_regex();
 
     let captures = vote_counts_regex.captures(text).unwrap();
     Some((
@@ -383,29 +413,34 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     ))
 }
 
-fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
+fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {    
+    let yes_no_regex = yes_no_votes_regex();
+    let start_of_yes_no_idx = yes_no_regex.find(from_html_text)?.start();
+    let from_html_text = &from_html_text[start_of_yes_no_idx..];
+
     // println!("variant: {from_html_text}");
     let pro_regex = Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
     let contra_regex = Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     let pro_votes_start_idx = pro_regex.find(from_html_text)?.start();
     let contra_votes_start_idx = contra_regex.find(from_html_text)?.start();
-
+    let from_html_text = from_html_text.chars().collect::<Vec<char>>();
     let pro_open_ended = &from_html_text[pro_votes_start_idx..];
-    let pro_open_ended = &pro_open_ended[pro_open_ended.find(':')? + 1..];
-    let end_pro_idx = pro_open_ended.find('.')?;
+    let pro_open_ended = &pro_open_ended[pro_open_ended.iter().position(|x| *x == ':')? + 1..];
+    let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
     let pro_delegates = &pro_open_ended[..end_pro_idx];
 
-    let pro_delegates = group_names_from_vote_section(pro_delegates);
+    let pro_delegates = group_names_from_vote_section(&pro_delegates.iter().collect::<String>());
     // println!("------------ pro_delegates: {pro_delegates:?}");
     // println!("--------------- text: {from_html_text}");
 
+    dbg!(contra_votes_start_idx);
     let contra_open_ended = &pro_open_ended[contra_votes_start_idx..];
-    let contra_open_ended = &contra_open_ended[contra_open_ended.find(':')? + 1..];
-    let end_contra_idx = contra_open_ended.find('.')?;
+    let contra_open_ended = &contra_open_ended[contra_open_ended.iter().position(|x| *x == ':')? + 1..];
+    let end_contra_idx = contra_open_ended.iter().position(|x| *x == '.')?;
     let contra_delegates = &contra_open_ended[..end_contra_idx];
 
-    let contra_delegates = group_names_from_vote_section(contra_delegates);
+    let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());
 
     // println!("-------------------- contra_delegates: {contra_delegates:?}");
     Some(ProContra {
@@ -518,7 +553,7 @@ mod tests {
 
         let accepted = is_accepted_based_on_votes(120, 50, true);
         assert_eq!(accepted, AcceptedState::Declined);
-        
+
         let accepted = is_accepted_based_on_votes(120, 65, false);
         assert_eq!(accepted, AcceptedState::Declined);
 
@@ -581,8 +616,8 @@ mod tests {
 
         let start = std::time::Instant::now();
 
-        // for gp in ["XXV", "XXIV"] {
-        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        for gp in ["XXIV", "XXIII", "XXII"] {
+        // for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
@@ -946,7 +981,7 @@ mod tests {
             .unwrap();
 
         res.hidden_votes_info.voted_by_name_data.unwrap();
-        assert_eq!(res.accepted, Some(AcceptedState::Accepted)); 
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
     }
     #[tokio::test]
     async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {

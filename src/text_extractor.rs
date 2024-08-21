@@ -1,10 +1,10 @@
+use std::ops::{RangeBounds, RangeInclusive};
+
 use common_scrapes::{PlenarSpeech, Speech};
 use regex::Regex;
 
 use crate::{
-    extract_text_from_html, extract_text_from_html_via_name_attribute,
-    extract_text_from_html_via_name_attribute_finding_optimal_solution,
-    extract_text_from_html_via_name_attribute_next_section, remove_steno_info,
+    extract_text_from_html, extract_text_from_html_via_name_attribute, extract_text_from_html_via_name_attribute_finding_optimal_solution, extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info, remove_steno_info
 };
 
 pub trait HasHTMLUrl {
@@ -104,6 +104,36 @@ impl TextExtractor {
             return text;
         }
         Some(remove_steno_info(&extract_text_from_html(&html)))
+    }
+    // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/164/SEITE_0159.html
+    pub async fn text_accumulation(
+        &mut self,
+        gp_url: &str,
+        site_range: RangeInclusive<usize>,
+        skip_strategy_fn: impl Fn(&str, bool) -> bool,
+    ) -> Option<String> {
+        let mut text_acc = String::new();
+        let mut already_skipped = false;
+        for site in site_range.clone() {
+            let mut count = 0;
+            let mut to_divide = site;
+            while to_divide > 0 {
+                to_divide /= 10;
+                count += 1;
+            }
+
+            let add_zeros = (0..(4-count as i32).max(0)).map(|_| '0').collect::<String>();
+            let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
+            println!("to_fetch: {to_fetch}");
+            if let Some(text) = self.extract_text_from_url(&to_fetch, None).await {
+                if skip_strategy_fn(&text, already_skipped) {
+                    already_skipped = true;
+                    continue
+                }
+                text_acc.push_str(&text);
+            }
+        }
+        Some(remove_plenar_info(&remove_page_info(&text_acc)))
     }
 
     pub async fn extract_text_from_url(
@@ -396,5 +426,16 @@ mod tests {
 
             assert_eq!(extractor.cached_html, None);
         }
+    }
+
+    #[tokio::test]
+    async fn test_text_acc() {
+        // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/185/SEITE_0171.html
+        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let text = text_extractor
+            .text_accumulation("/dokument/XXIV/NRSITZ/185/", 171..=173, |_, _| false)
+            .await;
+        println!("text: {text:?}");
     }
 }

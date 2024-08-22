@@ -9,7 +9,7 @@ fn cache_dir() -> String {
 
 pub async fn get_disk_cache(entry: &str) -> Option<String> {
     if entry.contains("XXVII/") {
-        // return None;
+        return None;
     }
     let cache_path = format!("{}{entry}.json", cache_dir());
     if !tokio::fs::try_exists(&cache_path).await.ok()? {

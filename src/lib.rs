@@ -40,7 +40,6 @@ pub fn remove_page_info(haystack: &str) -> String {
 }
 
 pub fn remove_steno_info(haystack: &str) -> String {
-    println!("haystack: {haystack}");
     // let re = Regex::new(r"Nationalrat, [\S\s]*Stenographisches Protokoll[\S\s]*\d+").unwrap();
     // Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+
     // let re = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?[Seite]{5}? \d+").unwrap();
@@ -55,6 +54,11 @@ pub fn remove_plenar_info(haystack: &str) -> String {
 
 pub fn yes_no_votes_regex() -> Regex {
     Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*.*Ja.*-Sti.men[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.en[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
+        .unwrap()
+}
+
+pub fn yes_no_votes_inside_regex() -> Regex {
+    Regex::new(r"(?i).*Ja.*-Sti.men[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.en[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
         .unwrap()
 }
 

@@ -148,7 +148,7 @@ impl TextExtractor {
                     already_skipped = true;
                     continue;
                 }
-                println!("text_acc: {text}");
+                // println!("text_acc: {text}");
                 // dbg!(&text);
                 text_acc.push_str(&text);
             }

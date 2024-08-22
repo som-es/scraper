@@ -7,18 +7,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
-    documents,
-    error::ScraperError,
-    extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
-    extract_text_from_html, extract_text_from_html_via_name_attribute_next_section,
-    find_optimal_votes_by_name, person_url_to_id,
-    proposals::ProposalScraper,
-    remove_steno_info,
-    speeches::extract_speeches,
-    text_utils::remove_multiple_of,
-    yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper,
-    TextExtractor,
+    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -436,7 +425,7 @@ fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
 }
 
 fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
-    let yes_no_regex = yes_no_votes_regex();
+    let yes_no_regex = yes_no_votes_inside_regex();
     let start_of_yes_no_idx = yes_no_regex
         .find(from_html_text)
         .map(|x| x.end())
@@ -447,6 +436,8 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
     let contra_regex =
         Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
+
+    // println!("next: {from_html_text}");
 
     let pro_match = pro_regex.find(from_html_text)?;
     let pro_votes_start_idx = pro_match.start();
@@ -497,7 +488,8 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
 fn group_names_from_vote_section(names: &str) -> Vec<String> {
     names
         .split([',', ';'])
-        .map(|name| name.trim_matches([' ', '\r', '\n', '\u{ad}']))
+        .map(|name| name.trim_matches([' ', ' ', '\r', '\n', '\u{ad}']))
+        .map(|name| name.trim_matches(char::is_whitespace))
         .map(|name| name.replace('\n', " "))
         .map(|name| name.replace('\u{ad}', ""))
         .map(|name| name.replace('\u{a0}', " "))
@@ -777,6 +769,86 @@ mod tests {
             init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
+    }
+
+    // https://www.parlament.gv.at/gegenstand/XXII/I/451
+    #[tokio::test]
+    async fn test_get_legis_init_xxii_i_451() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXII/I/451")
+            .await
+            .unwrap();
+
+        assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+        
+        #[rustfmt::skip]
+        let lhs = vec![
+                "Achleitner", "Amon", "Auer Jakob", "Auer Klaus Hubert", "Baumgartner-Gabitzer", "Bleckmann", "Böhm", "Bösch", "Brader Alfred", "Brinek", "Bucher", "Dolinschek", "Donabauer Karl", "Donnerbauer Heribert", "Doppler", "Ellmauer", "Eßl", "Fasslabend", "Fekter", "Felzmann", "Franz", "Freund", "Fuhrmann", "Gahr Hermann", "Glaser", "Grander", "Grillitsch", "Großruck", "Hakl", "Haubner", "Hofmann", "Höllerer", "Hornek", "Huainigg", "Hütl", "Ikrath", "Kainz", "Kapeller", "Keuschnigg", "Khol", "Kopf", "Kößl", "Kurzbauer", "Langreiter", "Ledolter", "Lentsch", "Liechtenstein Vincenz", "Lichtenegger Elmar", "Lopatka", "Machne", "Maier Ferdinand", "Mainoni", "Marek", "Mikesch", "Missethon", "Mitterlehner", "Molterer", "Murauer", "Neudeck", "Neugebauer", "Pack", "Partik-Pablé", "Praßl", "Preineder", "Prinz", "Prinzhorn", "Rädler Johann", "Rasinger", "Regler Roderich", "Riener", "Rosenkranz", "Rossmann", "Scheibner", "Scheuch", "Scheucher-Pichler", "Schiefermair", "Schöls", "Schultes", "Schweisgut", "Sieber", "Sonnberger", "Spindelegger Michael", "Stadler", "Steibl Ridi", "Steindl Konrad", "Stummvoll", "Tamandl", "Tancsits", "Turković-Wendl", "Walch", "Wattaul", "Winkler", "Wittauer", "Wöginger", "Wolfmayr", "Zweytick"
+            ];
+        for (buf, r) in init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .pro.iter().zip(&lhs) {
+                    assert_eq!(r, buf);
+                }
+
+    /*
+    Bauer, Bayr, Becher, Binder, Brosz, Broukal, Bures;
+
+Cap, Csörgits;
+
+Eder, Einem;
+
+Faul, Fleckl;
+
+Gaál Anton, Gartlehner, Gaßner, Glawischnig, Gradwohl, Grossmann, Grünewald, Gusenbauer;
+
+Haidlmayr, Heinisch-Hosek, Heinzl, Hoscher;
+
+Jarolim;
+
+Kaipel, Keck, Kogler, Königsberger-Ludwig, Krainer, Kräuter, Krist, Kummerer, Kuntzl;
+
+Lackner, Lapp, Lichtenberger Evelin, Lunacek;
+
+Maier Johann, Mandak, Marizzi, Matznetter, Moser Hans, Muttonen;
+
+Niederwieser, Nürnberger;
+
+Öllinger;
+
+Parnigoni, Pendl, Pfeffer, Pirklhuber, Posch, Prähauser, Prammer, Puswald;
+
+Rada Robert, Reheis, Rest-Hinterseer, Riepl;
+
+Sburny, Scharer, Schasching, Schieder, Schönpass, Schopf, Silhavy, Sima, Spindelberger Erwin, Stadlbauer, Steier, Stoisits;
+
+Trunk;
+
+Van der Bellen;
+
+Walther, Weinzinger, Wimmer, Wittmann, Wurm.
+     */
+
+        #[rustfmt::skip]
+        let rhs = vec![
+            "Bauer", "Bayr", "Becher", "Binder", "Brosz", "Broukal", "Bures", "Cap", "Csörgits", "Eder", "Einem", "Faul", "Fleckl", "Gaál Anton", "Gartlehner", "Gaßner", "Glawischnig", "Gradwohl", "Grossmann", "Grünewald", "Gusenbauer", "Haidlmayr", "Heinisch-Hosek", "Heinzl", "Hoscher", "Jarolim", "Kaipel", "Keck", "Kogler", "Königsberger-Ludwig", "Krainer", "Kräuter", "Krist", "Kummerer", "Kuntzl", "Lackner", "Lapp", "Lichtenberger Evelin", "Lunacek", "Maier Johann", "Mandak", "Marizzi", "Matznetter", "Moser Hans", "Muttonen", "Niederwieser", "Nürnberger", "Öllinger", "Parnigoni", "Pendl", "Pfeffer", "Pirklhuber", "Posch", "Prähauser", "Prammer", "Puswald", "Rada Robert", "Reheis", "Rest-Hinterseer", "Riepl", "Sburny", "Scharer", "Schasching", "Schieder", "Schönpass", "Schopf",
+            "Silhavy", "Sima", "Spindelberger Erwin", "Stadlbauer", "Steier", "Stoisits", "Trunk", "Van der Bellen", "Walther", "Weinzinger", "Wimmer", "Wittmann", "Wurm"
+        ];
+
+        assert_eq!(init.hidden_votes_info
+            .clone()
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap()
+            .contra, rhs);
     }
 
     // https://www.parlament.gv.at/gegenstand/XX/I/1428

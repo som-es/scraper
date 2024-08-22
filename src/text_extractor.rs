@@ -4,6 +4,7 @@ use common_scrapes::{PlenarSpeech, Speech};
 use regex::Regex;
 
 use crate::{
+    caching::{disk_caching, get_disk_cache},
     extract_text_from_html, extract_text_from_html_via_name_attribute,
     extract_text_from_html_via_name_attribute_finding_optimal_solution,
     extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info,
@@ -86,10 +87,21 @@ impl TextExtractor {
         &mut self,
         url: &str,
         key: Option<&str>,
+        cache_key: &str,
         attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
     ) -> Option<String> {
         let response = self.client.get(url).send().await.unwrap();
-        let mut html = response.text().await.ok()?;
+        let mut html = match get_disk_cache(cache_key).await {
+            Some(html) => html,
+            None => {
+                let html = response.text().await.ok()?;
+                if let Err(e) = disk_caching(cache_key, &html).await {
+                    log::warn!("could not cache {cache_key}: {e:?}")
+                }
+                html
+            }
+        };
+        // let mut html = response.text().await.ok()?;
         let start = html.find("<style>").unwrap_or_default();
         let end = html.find("</style>").unwrap_or_default();
         html.replace_range(start..end, "");
@@ -157,8 +169,16 @@ impl TextExtractor {
             None
         };
 
+        let cache_key = match key {
+            Some(key) => key,
+            None => speech.html_url(),
+        };
+
         match &self.state {
-            State::NoCache => self.get_html(&url, key, search_strategy_fn).await,
+            State::NoCache => {
+                self.get_html(&url, key, cache_key, search_strategy_fn)
+                    .await
+            }
             State::Cached(prev_url) => {
                 if prev_url.as_ref().map(|url| url.as_str()) == key {
                     let html = self.cached_html.as_ref().unwrap();
@@ -170,7 +190,8 @@ impl TextExtractor {
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
-                    self.get_html(&url, key, search_strategy_fn).await
+                    self.get_html(&url, key, cache_key, search_strategy_fn)
+                        .await
                 }
             }
         }

@@ -7,7 +7,18 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
+    caching::{disk_caching, get_disk_cache_json},
+    documents,
+    error::ScraperError,
+    extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
+    extract_text_from_html, extract_text_from_html_via_name_attribute_next_section,
+    find_optimal_votes_by_name, person_url_to_id,
+    proposals::ProposalScraper,
+    remove_steno_info,
+    speeches::extract_speeches,
+    text_utils::remove_multiple_of,
+    yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper,
+    TextExtractor,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -50,7 +61,7 @@ pub trait LegislativeInitiatives: Scraper {
                     log::warn!("could cache raw {proposal_path}: {e:?}")
                 }
                 raw_proposal
-            },
+            }
         };
         Self::raw_legis_into_legis(raw)
             .await

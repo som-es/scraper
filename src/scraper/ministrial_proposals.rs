@@ -6,8 +6,13 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    documents, error::ScraperError, extract_from_gegenstand_url, extract_text_from_html,
-    legis_init::extract_topics, person_url_to_id, proposals::ProposalsPayload,
+    caching::{disk_caching, get_disk_cache_json},
+    documents,
+    error::ScraperError,
+    extract_from_gegenstand_url, extract_text_from_html,
+    legis_init::extract_topics,
+    person_url_to_id,
+    proposals::ProposalsPayload,
 };
 
 use super::{AustriaScraper, Scraper};
@@ -67,8 +72,19 @@ pub trait MinistrialProposalScraper: Scraper {
         &self,
         gegenstand_info: GegenstandInfo,
     ) -> Result<MinistrialProposal, ScraperError> {
-        let raw_proposal = self.get_gegenstand_info(&gegenstand_info.path).await?;
-        Self::raw_ministrial_prop_into_ministrial_prop(raw_proposal, gegenstand_info)
+        let raw = match get_disk_cache_json(&gegenstand_info.path).await {
+            Some(raw) => raw,
+            None => {
+                let raw_proposal = self.get_gegenstand_info(&gegenstand_info.path).await?;
+                if let Err(e) = disk_caching(&gegenstand_info.path, raw_proposal.to_string()).await
+                {
+                    log::warn!("could cache raw {}: {e:?}", gegenstand_info.path)
+                }
+                raw_proposal
+            }
+        };
+
+        Self::raw_ministrial_prop_into_ministrial_prop(raw, gegenstand_info)
             .ok_or(ScraperError::InvalidProposalInfoError)
     }
 }

@@ -3,6 +3,7 @@ use std::ops::Deref;
 use ::scraper::{ElementRef, Html, Selector};
 use regex::Regex;
 
+mod caching;
 mod config;
 mod document;
 pub mod error;
@@ -11,7 +12,6 @@ mod scraper;
 mod speeches;
 mod text_extractor;
 mod text_utils;
-mod caching;
 mod url;
 
 pub use text_extractor::*;

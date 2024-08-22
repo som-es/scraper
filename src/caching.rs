@@ -7,15 +7,19 @@ fn cache_dir() -> String {
     std::env::var("SCRAPER_CACHE_DIR").unwrap_or("./caching".into())
 }
 
-pub async fn get_disk_cache(entry: &str) -> Option<String> { 
+pub async fn get_disk_cache(entry: &str) -> Option<String> {
     if entry.contains("XXVII/") {
-        return None;
+        // return None;
     }
     let cache_path = format!("{}{entry}.json", cache_dir());
     if !tokio::fs::try_exists(&cache_path).await.ok()? {
         return None;
     }
-    let last_modified = tokio::fs::metadata(&cache_path).await.ok()?.modified().ok()?;
+    let last_modified = tokio::fs::metadata(&cache_path)
+        .await
+        .ok()?
+        .modified()
+        .ok()?;
     let last_modified_duration = SystemTime::now().duration_since(last_modified).ok()?;
     if last_modified_duration.as_secs() > 60 * 60 * 24 * 7 {
         return None;
@@ -33,5 +37,7 @@ pub async fn disk_caching(entry: &str, data: impl AsRef<[u8]>) -> std::io::Resul
 }
 
 pub async fn get_disk_cache_json(entry: &str) -> Option<Value> {
-    get_disk_cache(entry).await.map(|x| serde_json::from_str(&x).ok())?
+    get_disk_cache(entry)
+        .await
+        .map(|x| serde_json::from_str(&x).ok())?
 }

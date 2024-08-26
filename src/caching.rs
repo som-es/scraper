@@ -7,8 +7,14 @@ fn cache_dir() -> String {
     std::env::var("SCRAPER_CACHE_DIR").unwrap_or("./caching".into())
 }
 
+#[inline]
+fn ignore_cache_xxvii() -> bool {
+    std::env::var("SCRAPER_IGNORE_CACHE_XXVII").unwrap_or("true".into()) == "true"
+}
+
 pub async fn get_disk_cache(entry: &str) -> Option<String> {
-    if entry.contains("XXVII/") {
+    if entry.contains("XXVII/") && ignore_cache_xxvii() {
+        // ignores cache
         return None;
     }
     let cache_path = format!("{}{entry}.json", cache_dir());

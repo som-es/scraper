@@ -158,9 +158,7 @@ impl LegislativeInitiatives for AustriaScraper {
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
-        let (sitzung_id, hidden_votes) = extract_hidden_votes(legis_content)
-            .await;
-        sitzung_id.unwrap();
+        let (plenary_session, hidden_votes) = extract_hidden_votes(legis_content).await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
 
         // sometimes, the info is missing
@@ -195,6 +193,11 @@ impl LegislativeInitiatives for AustriaScraper {
                 _ => {}
             }
         };
+
+        // /gegenstand/XXII/A/231
+        // if accepted.is_some() {
+        //     sitzung_id.unwrap();
+        // }
 
         // if !voted_by_name && eurovoc_topics.contains(&"namentliche Abstimmung".to_string()) {
         //     println!("--> this is interesting")
@@ -231,6 +234,7 @@ impl LegislativeInitiatives for AustriaScraper {
             requires_simple_majority,
             proposal,
             hidden_votes_info: hidden_votes,
+            plenary_session,
         })
     }
 
@@ -285,7 +289,14 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
 
 pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
-    for phase in legis_content.get("phase").unwrap().as_array().unwrap() {
+    for phase in legis_content
+        .get("phase")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .rev()
+    {
         let Some(stages) = phase.get("stages") else {
             continue;
         };
@@ -303,12 +314,15 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option
 }
 
 pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<HiddenVotes>) {
+    let sitzung_id_regex = Regex::new(r"(\d+). Sitzung").unwrap();
     let is_site_stored_regex = Regex::new(r"SEITE_\d+.html").unwrap();
 
     let mut hidden_votes = HiddenVotes::default();
-    let mut sitzung_id = None;
+    let mut plenary_session = None;
 
     for stage in stages.as_array().unwrap().iter().rev() {
+        let fsth = stage["fsth"].as_array().cloned().unwrap_or_default();
+
         let Some(text) = stage["text"].as_str() else {
             continue;
         };
@@ -319,6 +333,26 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
         {
             continue;
         }
+
+        // extract fitting sitzung id
+        for protocol_link_obj in fsth.iter() {
+            match protocol_link_obj["sitzung_id"].as_u64() {
+                Some(sitzung_id_inner) => {
+                    plenary_session = Some(sitzung_id_inner);
+                    break;
+                }
+                None => continue,
+            }
+        }
+
+        if plenary_session.is_none() {
+            if let Some(captures) = sitzung_id_regex.captures(text) {
+                if let Some(capture) = captures.get(1) {
+                    plenary_session = Some(capture.as_str().parse::<u64>().unwrap())
+                }
+            }
+        }
+
         if text.contains("Gesetzesvorschlag in zweiter Lesung") {
             hidden_votes.vote_type = Some(VoteType::Second)
         } else if text.contains("Gesetzesvorschlag in dritter Lesung") {
@@ -335,19 +369,6 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
         } else {
             // need to find fitting type, some stages are bs
             continue;
-        }
-
-        let fsth = stage["fsth"].as_array().cloned().unwrap_or_default();
-
-        // extract fitting sitzung id
-        for protocol_link_obj in fsth.iter() {
-            match protocol_link_obj["sitzung_id"].as_u64() {
-                Some(sitzung_id_inner) => {
-                    sitzung_id = Some(sitzung_id_inner);
-                    break;
-                }
-                None => continue,
-            }
         }
 
         if text.to_lowercase().contains("namentlich") {
@@ -430,7 +451,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
         }
     }
 
-    (sitzung_id, Some(hidden_votes))
+    (plenary_session, Some(hidden_votes))
 }
 
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {

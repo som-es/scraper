@@ -29,25 +29,28 @@ impl HasHTMLUrl for &str {
 
 impl HasHTMLUrl for Speech {
     fn html_url(&self) -> &str {
-        self.spoken_text_html_urls
+        &self.spoken_text_html_urls
             .first()
             .expect("Speech has no HTML URL")
+            .document_url
     }
 }
 
 impl HasHTMLUrl for &PlenarSpeech {
     fn html_url(&self) -> &str {
-        self.spoken_text_html_urls
+        &self.spoken_text_html_urls
             .first()
             .expect("PlenarSpeech has no HTML URL")
+            .document_url
     }
 }
 
 impl HasHTMLUrl for PlenarSpeech {
     fn html_url(&self) -> &str {
-        self.spoken_text_html_urls
+        &self.spoken_text_html_urls
             .first()
             .expect("PlenarSpeech has no HTML URL")
+            .document_url
     }
 }
 
@@ -91,7 +94,7 @@ impl TextExtractor {
         attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
-        let response = self.client.get(url).send().await.unwrap();
+        let response = self.client.get(url).send().await.ok()?;
         let mut html = match get_disk_cache(cache_key).await {
             Some(html) => html,
             None => {
@@ -150,14 +153,17 @@ impl TextExtractor {
                 .collect::<String>();
             let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
             dbg!(&to_fetch);
-            if let Some(text) = self.extract_text_from_url(&to_fetch, None, only_text).await {
-                if skip_strategy_fn(&text, already_skipped) {
-                    already_skipped = true;
-                    continue;
+            match self.extract_text_from_url(&to_fetch, None, only_text).await {
+                Some(text) => {
+                    if skip_strategy_fn(&text, already_skipped) {
+                        already_skipped = true;
+                        continue;
+                    }
+                    // println!("text_acc: {text}");
+                    // dbg!(&text);
+                    text_acc.push_str(&text);
                 }
-                // println!("text_acc: {text}");
-                // dbg!(&text);
-                text_acc.push_str(&text);
+                None => break,
             }
         }
         Some(remove_plenar_info(&remove_page_info(&text_acc)))
@@ -416,7 +422,7 @@ mod tests {
                 assert!(text.contains("den Praxiseinsatz bereits in sehr bewährter Weise"))
             }
 
-            if speech.spoken_text_html_urls[0].contains("BR/BR") && once {
+            if speech.spoken_text_html_urls[0].document_url.contains("BR/BR") && once {
                 assert_ne!(prev_html, extractor.cached_html);
                 once = false;
             }

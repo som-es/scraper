@@ -1,14 +1,18 @@
-use common_scrapes::{Opinion, Speech};
+use common_scrapes::{Opinion, Speech, SpeechTextInfo};
 use serde_json::Value;
 
-fn extract_spoken_text_html_urls(rede: &Value) -> Vec<String> {
+fn extract_spoken_text_html_urls(rede: &Value) -> Vec<SpeechTextInfo> {
     rede.get(2)
         .map(|spoken_text_infos| {
             spoken_text_infos
                 .as_array()
                 .unwrap_or(&vec![])
                 .iter()
-                .flat_map(|info| Some(info["url"].as_str()?.to_string()))
+                .flat_map(|info| Some(SpeechTextInfo {
+                    site_start: info["fund_von"].as_u64(),
+                    site_end: info["fund_bis"].as_u64(),
+                    document_url: info["url"].as_str()?.to_string(),
+                }))
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default()

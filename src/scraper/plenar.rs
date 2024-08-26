@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(plenar.inr, 211);
         assert_eq!(plenar.debates[0].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
         assert_eq!(
-            plenar.debates[0].speeches[0].spoken_text_html_urls[0],
+            plenar.debates[0].speeches[0].spoken_text_html_urls[0].document_url,
             "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html"
         );
         assert_eq!(plenar.debates[0].speeches[0].duration_in_seconds, 831);
@@ -297,7 +297,7 @@ mod tests {
         );
         assert_eq!(
             plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4].spoken_text_html_urls
-                [0],
+                [0].document_url,
             "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html"
         );
 

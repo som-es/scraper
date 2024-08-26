@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use common_scrapes::{Opinion, PlenarSpeech, Speech};
+use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Speech};
 use serde_json::{json, Value};
 
 use crate::{
@@ -10,10 +10,11 @@ use crate::{
         extract_call_to_order_id_from_path, extract_call_to_order_paths_from_stages,
         CallToOrderInfo,
     },
+    documents,
     error::ScraperError,
     person_url_to_id,
     speeches::extract_speeches_from_stages,
-    AustriaScraper, GegenstandPaths, Scraper,
+    AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -46,15 +47,17 @@ pub trait Plenar: Scraper {
 
     fn plenar_paths(&self, plenar_infos: Value) -> Result<GegenstandPaths, ScraperError>;
 
-    fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo>;
+    async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo>;
 
     async fn get_plenar(&self, plenar_path: &str) -> Result<PlenarInfo, ScraperError> {
         let raw_proposal = self.get_gegenstand_info(plenar_path).await?;
         Self::raw_plenar_into_plenar_info(raw_proposal)
+            .await
             .ok_or(ScraperError::PlenarGegenstandParseError)
     }
 }
 
+#[async_trait]
 impl Plenar for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_007&listeId=undefined&showAll=true";
@@ -68,7 +71,7 @@ impl Plenar for AustriaScraper {
             .ok_or(ScraperError::ProposalParseError)
     }
 
-    fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo> {
+    async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo> {
         let description = raw_plenar["meta"]["description"]
             .as_str()
             .unwrap()
@@ -109,6 +112,18 @@ impl Plenar for AustriaScraper {
         } else {
             &[]
         };
+
+        let raw_documents = plenar_content_0["documents"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+
+        let documents = match documents(&raw_documents) {
+            Some(d) => d,
+            None => {
+                vec![]
+            }
+        };
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);
@@ -125,6 +140,29 @@ impl Plenar for AustriaScraper {
             legislative_period: gp_code,
         })
     }
+}
+
+async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
+    for document in documents {
+        if document.ftype == FileType::HTML
+            && document.title.to_lowercase().contains("stenographisches")
+        {
+            return extract_absences_from_document(document).await;
+        }
+    }
+    None
+}
+
+async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
+    let mut extractor = TextExtractor::default();
+    let text = extractor
+        .extract_text_from_url(&doc.link, None, true)
+        .await?;
+    extract_absences_from_text(&text)
+}
+
+fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
+    todo!()
 }
 
 fn extract_call_to_order_info_from_stages(
@@ -297,7 +335,8 @@ mod tests {
         );
         assert_eq!(
             plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4].spoken_text_html_urls
-                [0].document_url,
+                [0]
+            .document_url,
             "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html"
         );
 

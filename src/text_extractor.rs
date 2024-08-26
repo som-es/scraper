@@ -29,7 +29,8 @@ impl HasHTMLUrl for &str {
 
 impl HasHTMLUrl for Speech {
     fn html_url(&self) -> &str {
-        &self.spoken_text_html_urls
+        &self
+            .spoken_text_html_urls
             .first()
             .expect("Speech has no HTML URL")
             .document_url
@@ -38,7 +39,8 @@ impl HasHTMLUrl for Speech {
 
 impl HasHTMLUrl for &PlenarSpeech {
     fn html_url(&self) -> &str {
-        &self.spoken_text_html_urls
+        &self
+            .spoken_text_html_urls
             .first()
             .expect("PlenarSpeech has no HTML URL")
             .document_url
@@ -47,7 +49,8 @@ impl HasHTMLUrl for &PlenarSpeech {
 
 impl HasHTMLUrl for PlenarSpeech {
     fn html_url(&self) -> &str {
-        &self.spoken_text_html_urls
+        &self
+            .spoken_text_html_urls
             .first()
             .expect("PlenarSpeech has no HTML URL")
             .document_url
@@ -422,7 +425,11 @@ mod tests {
                 assert!(text.contains("den Praxiseinsatz bereits in sehr bewährter Weise"))
             }
 
-            if speech.spoken_text_html_urls[0].document_url.contains("BR/BR") && once {
+            if speech.spoken_text_html_urls[0]
+                .document_url
+                .contains("BR/BR")
+                && once
+            {
                 assert_ne!(prev_html, extractor.cached_html);
                 once = false;
             }

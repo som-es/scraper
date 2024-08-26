@@ -8,11 +8,13 @@ fn extract_spoken_text_html_urls(rede: &Value) -> Vec<SpeechTextInfo> {
                 .as_array()
                 .unwrap_or(&vec![])
                 .iter()
-                .flat_map(|info| Some(SpeechTextInfo {
-                    site_start: info["fund_von"].as_u64(),
-                    site_end: info["fund_bis"].as_u64(),
-                    document_url: info["url"].as_str()?.to_string(),
-                }))
+                .flat_map(|info| {
+                    Some(SpeechTextInfo {
+                        site_start: info["fund_von"].as_u64(),
+                        site_end: info["fund_bis"].as_u64(),
+                        document_url: info["url"].as_str()?.to_string(),
+                    })
+                })
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default()

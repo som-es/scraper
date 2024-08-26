@@ -455,7 +455,6 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
     (plenary_session, Some(hidden_votes))
 }
 
-
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     let vote_counts_regex = yes_no_votes_regex();
 

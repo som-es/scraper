@@ -770,6 +770,19 @@ mod tests {
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
     }
+    #[tokio::test]
+    async fn test_get_legis_init_xxi_a_412() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXI/A/412")
+            .await
+            .unwrap();
+
+        assert!(init.hidden_votes_info.voted_by_name);
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+    }
+
 
     // https://www.parlament.gv.at/gegenstand/XXII/I/451
     #[tokio::test]
@@ -797,44 +810,6 @@ mod tests {
                 .pro.iter().zip(&lhs) {
                     assert_eq!(r, buf);
                 }
-
-    /*
-    Bauer, Bayr, Becher, Binder, Brosz, Broukal, Bures;
-
-Cap, Csörgits;
-
-Eder, Einem;
-
-Faul, Fleckl;
-
-Gaál Anton, Gartlehner, Gaßner, Glawischnig, Gradwohl, Grossmann, Grünewald, Gusenbauer;
-
-Haidlmayr, Heinisch-Hosek, Heinzl, Hoscher;
-
-Jarolim;
-
-Kaipel, Keck, Kogler, Königsberger-Ludwig, Krainer, Kräuter, Krist, Kummerer, Kuntzl;
-
-Lackner, Lapp, Lichtenberger Evelin, Lunacek;
-
-Maier Johann, Mandak, Marizzi, Matznetter, Moser Hans, Muttonen;
-
-Niederwieser, Nürnberger;
-
-Öllinger;
-
-Parnigoni, Pendl, Pfeffer, Pirklhuber, Posch, Prähauser, Prammer, Puswald;
-
-Rada Robert, Reheis, Rest-Hinterseer, Riepl;
-
-Sburny, Scharer, Schasching, Schieder, Schönpass, Schopf, Silhavy, Sima, Spindelberger Erwin, Stadlbauer, Steier, Stoisits;
-
-Trunk;
-
-Van der Bellen;
-
-Walther, Weinzinger, Wimmer, Wittmann, Wurm.
-     */
 
         #[rustfmt::skip]
         let rhs = vec![

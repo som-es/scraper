@@ -409,6 +409,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
                             &url[..last_idx + 1],
                             site_start as usize..=site_end as usize,
                             |_, _| false,
+                            true,
                         )
                         .await
                     {
@@ -417,7 +418,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
                     }
                 } else {
                     match extractor
-                        .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+                        .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
                         .await
                     {
                         Some(html_text) => html_text,

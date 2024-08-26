@@ -89,6 +89,7 @@ impl TextExtractor {
         key: Option<&str>,
         cache_key: &str,
         attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
+        only_text: bool,
     ) -> Option<String> {
         let response = self.client.get(url).send().await.unwrap();
         let mut html = match get_disk_cache(cache_key).await {
@@ -119,7 +120,12 @@ impl TextExtractor {
             self.cached_html = Some(html);
             return text;
         }
-        Some(remove_steno_info(&extract_text_from_html(&html)))
+        let text = if only_text {
+            html
+        } else {
+            remove_steno_info(&extract_text_from_html(&html))
+        };
+        Some(text)
     }
     // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/164/SEITE_0159.html
     pub async fn text_accumulation(
@@ -127,6 +133,7 @@ impl TextExtractor {
         gp_url: &str,
         site_range: RangeInclusive<usize>,
         skip_strategy_fn: impl Fn(&str, bool) -> bool,
+        only_text: bool,
     ) -> Option<String> {
         let mut text_acc = String::new();
         let mut already_skipped = false;
@@ -143,7 +150,7 @@ impl TextExtractor {
                 .collect::<String>();
             let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
             dbg!(&to_fetch);
-            if let Some(text) = self.extract_text_from_url(&to_fetch, None).await {
+            if let Some(text) = self.extract_text_from_url(&to_fetch, None, only_text).await {
                 if skip_strategy_fn(&text, already_skipped) {
                     already_skipped = true;
                     continue;
@@ -160,6 +167,7 @@ impl TextExtractor {
         &mut self,
         speech: &impl HasHTMLUrl,
         search_strategy_fn: Option<fn(&str, &str) -> Option<String>>,
+        only_text: bool,
     ) -> Option<String> {
         let url = format!("{}{}", self.base_url, speech.html_url());
 
@@ -176,7 +184,7 @@ impl TextExtractor {
 
         match &self.state {
             State::NoCache => {
-                self.get_html(&url, key, cache_key, search_strategy_fn)
+                self.get_html(&url, key, cache_key, search_strategy_fn, only_text)
                     .await
             }
             State::Cached(prev_url) => {
@@ -190,7 +198,7 @@ impl TextExtractor {
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
-                    self.get_html(&url, key, cache_key, search_strategy_fn)
+                    self.get_html(&url, key, cache_key, search_strategy_fn, only_text)
                         .await
                 }
             }
@@ -256,7 +264,7 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         for speech in init.speeches {
             println!("!!!!!!!! speech url {}", speech.html_url());
-            let text = extractor.extract_text_from_url(&speech, None).await;
+            let text = extractor.extract_text_from_url(&speech, None, true).await;
             println!("----------- text: {:?}", text);
         }
     }
@@ -269,6 +277,7 @@ mod tests {
             .extract_text_from_url(
                 &"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145",
                 None,
+                true,
             )
             .await
             .unwrap();
@@ -280,7 +289,10 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let url = "/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
-        let res = extractor.extract_text_from_url(&url, None).await.unwrap();
+        let res = extractor
+            .extract_text_from_url(&url, None, true)
+            .await
+            .unwrap();
         println!("res: {res}");
     }
 
@@ -290,7 +302,7 @@ mod tests {
 
         let url = "/dokument/XXVII/NRSITZ/139/fnameorig_1463126.html#TEXTOBJ_260400";
         let res = extractor
-            .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+            .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await
             .unwrap();
         println!("res: {res}");
@@ -301,9 +313,9 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let url = "/dokument/XXVII/NRSITZ/213/fnameorig_1632713.html#TEXTOBJ_296821";
-        // let res = extractor.extract_text_from_url(&url, None).await.unwrap();
+        // let res = extractor.extract_text_from_url(&url, None, true).await.unwrap();
         let res = extractor
-            .extract_text_from_url(&url, Some(find_optimal_votes_by_name))
+            .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await
             .unwrap();
         println!("res: {res}");
@@ -324,7 +336,7 @@ mod tests {
                     continue;
                 }
                 let text = extractor
-                    .extract_text_from_url(&speech, None)
+                    .extract_text_from_url(&speech, None, true)
                     .await
                     .unwrap();
                 println!("{}", text);
@@ -341,6 +353,7 @@ mod tests {
             .extract_text_from_url(
                 &"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
                 None,
+                true,
             )
             .await
             .unwrap();
@@ -352,7 +365,7 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let res = extractor
-            .extract_text_from_url(&"/dokument/XXV/NRSITZ/55/fnameorig_397751.html", None)
+            .extract_text_from_url(&"/dokument/XXV/NRSITZ/55/fnameorig_397751.html", None, true)
             .await
             .unwrap();
 
@@ -373,6 +386,7 @@ mod tests {
                 &"/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html",
                 Some(find_optimal_votes_by_name),
                 // None
+                true,
             )
             .await;
         println!("res: {res:?}");
@@ -393,7 +407,7 @@ mod tests {
         let mut once = false;
         for speech in init.speeches {
             let text = extractor
-                .extract_text_from_url(&speech, None)
+                .extract_text_from_url(&speech, None, true)
                 .await
                 .unwrap();
             let url = format!("{}{}", extractor.base_url, speech.html_url());
@@ -425,7 +439,7 @@ mod tests {
 
         for speech in init.speeches {
             let text = extractor
-                .extract_text_from_url(&speech, None)
+                .extract_text_from_url(&speech, None, true)
                 .await
                 .unwrap();
             let url = format!("{}{}", extractor.base_url, speech.html_url());
@@ -463,7 +477,7 @@ mod tests {
         let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let text = text_extractor
-            .text_accumulation("/dokument/XXIV/NRSITZ/185/", 171..=173, |_, _| false)
+            .text_accumulation("/dokument/XXIV/NRSITZ/185/", 171..=173, |_, _| false, true)
             .await;
         println!("text: {text:?}");
     }

@@ -7,7 +7,18 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string, extract_text_from_html, extract_text_from_html_via_name_attribute_next_section, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, remove_steno_info, speeches::extract_speeches, text_utils::remove_multiple_of, yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
+    caching::{disk_caching, get_disk_cache_json},
+    documents,
+    error::ScraperError,
+    extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
+    extract_text_from_html, extract_text_from_html_via_name_attribute_next_section,
+    find_optimal_votes_by_name, person_url_to_id,
+    proposals::ProposalScraper,
+    remove_steno_info,
+    speeches::extract_speeches,
+    text_utils::remove_multiple_of,
+    yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand,
+    GegenstandPaths, ProContra, Scraper, TextExtractor,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -147,9 +158,10 @@ impl LegislativeInitiatives for AustriaScraper {
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
 
-        let mut hidden_votes = extract_hidden_votes(legis_content)
-            .await
-            .unwrap_or_default();
+        let (sitzung_id, hidden_votes) = extract_hidden_votes(legis_content)
+            .await;
+        sitzung_id.unwrap();
+        let mut hidden_votes = hidden_votes.unwrap_or_default();
 
         // sometimes, the info is missing
         if hidden_votes.voted_by_name && !eurovoc_topics.contains(&"namentliche Abstimmung".into())
@@ -271,8 +283,8 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
     most_fitting_date
 }
 
-pub async fn extract_hidden_votes(legis_content: &Value) -> Option<HiddenVotes> {
-    let mut most_fitting_votes = None;
+pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option<HiddenVotes>) {
+    let mut most_fitting_votes = (None, None);
     for phase in legis_content.get("phase").unwrap().as_array().unwrap() {
         let Some(stages) = phase.get("stages") else {
             continue;
@@ -290,13 +302,12 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> Option<HiddenVotes> 
     most_fitting_votes
 }
 
-pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
+pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<HiddenVotes>) {
     let is_site_stored_regex = Regex::new(r"SEITE_\d+.html").unwrap();
 
     let mut hidden_votes = HiddenVotes::default();
-    // let mut declined_type = None;
-    // let mut pro_contra = None;
-    // let mut voted_by_name = false;
+    let mut sitzung_id = None;
+
     for stage in stages.as_array().unwrap().iter().rev() {
         let Some(text) = stage["text"].as_str() else {
             continue;
@@ -326,11 +337,24 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
             continue;
         }
 
+        let fsth = stage["fsth"].as_array().cloned().unwrap_or_default();
+
+        // extract fitting sitzung id
+        for protocol_link_obj in fsth.iter() {
+            match protocol_link_obj["sitzung_id"].as_u64() {
+                Some(sitzung_id_inner) => {
+                    sitzung_id = Some(sitzung_id_inner);
+                    break;
+                }
+                None => continue,
+            }
+        }
+
         if text.to_lowercase().contains("namentlich") {
             let (vote_sum, pro_count, contra_count, invalid_count) =
                 extract_vote_count(&text).unwrap();
             let mut delegate_votes = None;
-            for protocol_link_obj in stage["fsth"].as_array().cloned().unwrap_or_default().iter() {
+            for protocol_link_obj in fsth.iter() {
                 let Some(url) = protocol_link_obj["url"].as_str() else {
                     continue;
                 };
@@ -406,7 +430,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> Option<HiddenVotes> {
         }
     }
 
-    Some(hidden_votes)
+    (sitzung_id, Some(hidden_votes))
 }
 
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
@@ -783,7 +807,6 @@ mod tests {
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
     }
 
-
     // https://www.parlament.gv.at/gegenstand/XXII/I/451
     #[tokio::test]
     async fn test_get_legis_init_xxii_i_451() {
@@ -796,20 +819,24 @@ mod tests {
 
         assert!(init.hidden_votes_info.voted_by_name);
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
-        
+
         #[rustfmt::skip]
         let lhs = vec![
                 "Achleitner", "Amon", "Auer Jakob", "Auer Klaus Hubert", "Baumgartner-Gabitzer", "Bleckmann", "Böhm", "Bösch", "Brader Alfred", "Brinek", "Bucher", "Dolinschek", "Donabauer Karl", "Donnerbauer Heribert", "Doppler", "Ellmauer", "Eßl", "Fasslabend", "Fekter", "Felzmann", "Franz", "Freund", "Fuhrmann", "Gahr Hermann", "Glaser", "Grander", "Grillitsch", "Großruck", "Hakl", "Haubner", "Hofmann", "Höllerer", "Hornek", "Huainigg", "Hütl", "Ikrath", "Kainz", "Kapeller", "Keuschnigg", "Khol", "Kopf", "Kößl", "Kurzbauer", "Langreiter", "Ledolter", "Lentsch", "Liechtenstein Vincenz", "Lichtenegger Elmar", "Lopatka", "Machne", "Maier Ferdinand", "Mainoni", "Marek", "Mikesch", "Missethon", "Mitterlehner", "Molterer", "Murauer", "Neudeck", "Neugebauer", "Pack", "Partik-Pablé", "Praßl", "Preineder", "Prinz", "Prinzhorn", "Rädler Johann", "Rasinger", "Regler Roderich", "Riener", "Rosenkranz", "Rossmann", "Scheibner", "Scheuch", "Scheucher-Pichler", "Schiefermair", "Schöls", "Schultes", "Schweisgut", "Sieber", "Sonnberger", "Spindelegger Michael", "Stadler", "Steibl Ridi", "Steindl Konrad", "Stummvoll", "Tamandl", "Tancsits", "Turković-Wendl", "Walch", "Wattaul", "Winkler", "Wittauer", "Wöginger", "Wolfmayr", "Zweytick"
             ];
-        for (buf, r) in init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap()
-                .delegates_pro_contra
-                .unwrap()
-                .pro.iter().zip(&lhs) {
-                    assert_eq!(r, buf);
-                }
+        for (buf, r) in init
+            .hidden_votes_info
+            .clone()
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap()
+            .pro
+            .iter()
+            .zip(&lhs)
+        {
+            assert_eq!(r, buf);
+        }
 
         #[rustfmt::skip]
         let rhs = vec![
@@ -817,13 +844,16 @@ mod tests {
             "Silhavy", "Sima", "Spindelberger Erwin", "Stadlbauer", "Steier", "Stoisits", "Trunk", "Van der Bellen", "Walther", "Weinzinger", "Wimmer", "Wittmann", "Wurm"
         ];
 
-        assert_eq!(init.hidden_votes_info
-            .clone()
-            .voted_by_name_data
-            .unwrap()
-            .delegates_pro_contra
-            .unwrap()
-            .contra, rhs);
+        assert_eq!(
+            init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+                .unwrap()
+                .contra,
+            rhs
+        );
     }
 
     // https://www.parlament.gv.at/gegenstand/XX/I/1428

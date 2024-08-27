@@ -3,13 +3,22 @@ use std::collections::BTreeMap;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Speech};
+use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json}, call_to_order::{
+    caching::{disk_caching, get_disk_cache_json},
+    call_to_order::{
         extract_call_to_order_id_from_path, extract_call_to_order_paths_from_stages,
         CallToOrderInfo,
-    }, documents, error::ScraperError, person_url_to_id, speeches::extract_speeches_from_stages, AustriaScraper, GegenstandPaths, Scraper, TextExtractor
+    },
+    documents,
+    error::ScraperError,
+    filter::filter_name_extraction,
+    person_url_to_id,
+    speeches::extract_speeches_from_stages,
+    text_utils::remove_multiple_of,
+    AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -171,16 +180,60 @@ async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
 }
 
 fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
-    if text.len() < 1000 {
+    // remove this later -> only for testing purposes
+    if text.len() < 50000 {
         return None;
     }
-//     println!("-------------------------------------------------------------------
-    
-//     text: {}
-// ---------------------------------    
-//     ", &text);
-    text.find("verhindert gemeldet").unwrap();
-    None
+    let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
+    let absence_match = absence_marker_regex.find(text)?;
+
+    let open_ended_absence = &text[absence_match.start()..];
+    let info = &open_ended_absence[..open_ended_absence
+        .find(".\n")
+        .unwrap()
+        .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))];
+
+    let info = info
+        .split(',')
+        .into_iter()
+        .map(|x| x.split("und"))
+        .flatten()
+        .map(|x| {
+            x.split_inclusive(char::is_whitespace)
+                .inspect(|x| println!("x: {x:?}res"))
+                .filter(|split| {
+                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || {
+                        let mut ret = false;
+                        for val in [
+                            "verhindert",
+                            "gemeldet",
+                            "für",
+                            "die",
+                            "heutige",
+                            "Sitzung",
+                            "ist",
+                            "niemand",
+                            "sind",
+                            "Abgeordneten",
+                            "heute",
+                        ] {
+                            if split.contains(val) {
+                                println!("split true");
+                                ret = true;
+                                break;
+                            }
+                        }
+                        ret
+                    })
+                })
+        })
+        .map(|x| x.collect::<String>())
+        .collect::<Vec<_>>();
+
+    let info = filter_name_extraction(info.iter().map(|x| x.as_str())).collect::<Vec<_>>();
+    println!("info: {info:?}");
+
+    Some(info)
 }
 
 fn extract_call_to_order_info_from_stages(
@@ -314,21 +367,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_look_all_plenar_gegenstand_paths() {
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
 
-        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
 
-        let paths = scraper
-            .plenar_paths(plenar_infos)
-            .expect("Failed to get paths");
-        for path in paths {
-            println!("path: {path}");
-            // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
+            let plenar_infos = scraper.post_plenar_payload().await.unwrap();
 
-            // newer ones do not provide a document
+            let paths = scraper
+                .plenar_paths(plenar_infos)
+                .expect("Failed to get paths");
+            for path in paths {
+                println!("path: {path}");
+                // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
-            let plenar_info = scraper.get_plenar(&path).await.unwrap();
-            // println!("plenar_info: {plenar_info:?}");
+                // newer ones do not provide a document
+
+                let plenar_info = scraper.get_plenar(&path).await.unwrap();
+                // println!("plenar_info: {plenar_info:?}");
+            }
         }
     }
 

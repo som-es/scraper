@@ -12,6 +12,7 @@ use crate::{
     error::ScraperError,
     extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
     extract_text_from_html, extract_text_from_html_via_name_attribute_next_section,
+    filter::filter_name_extraction,
     find_optimal_votes_by_name, person_url_to_id,
     proposals::ProposalScraper,
     remove_steno_info,
@@ -532,15 +533,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
 }
 
 fn group_names_from_vote_section(names: &str) -> Vec<String> {
-    names
-        .split([',', ';'])
-        .map(|name| name.trim_matches([' ', ' ', '\r', '\n', '\u{ad}']))
-        .map(|name| name.trim_matches(char::is_whitespace))
-        .map(|name| name.replace('\n', " "))
-        .map(|name| name.replace('\u{ad}', ""))
-        .map(|name| name.replace('\u{a0}', " "))
-        .map(|name| remove_multiple_of(&name, ' '))
-        .collect()
+    filter_name_extraction(names.split([',', ';'])).collect()
 }
 
 fn extract_majority_on_indicators(legis_content: &Value) -> Option<bool> {

@@ -97,16 +97,16 @@ impl TextExtractor {
         attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
-        let response = match self.client.get(url).send().await {
-            Ok(res) => res,
-            Err(e) => {
-                println!("url: {url} Error: {e:?}");
-                return None;
-            },
-        };
         let mut html = match get_disk_cache(cache_key).await {
             Some(html) => html,
             None => {
+                let response = match self.client.get(url).send().await {
+                    Ok(res) => res,
+                    Err(e) => {
+                        println!("url: {url} Error: {e:?}");
+                        return None;
+                    }
+                };
                 let html = response.text().await.ok()?;
                 if let Err(e) = disk_caching(cache_key, &html).await {
                     log::warn!("could not cache {cache_key}: {e:?}")
@@ -114,6 +114,7 @@ impl TextExtractor {
                 html
             }
         };
+
         // let mut html = response.text().await.ok()?;
         let start = html.find("<style>").unwrap_or_default();
         let end = html.find("</style>").unwrap_or_default();

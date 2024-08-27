@@ -7,6 +7,7 @@ mod caching;
 mod config;
 mod document;
 pub mod error;
+pub mod filter;
 mod request;
 mod scraper;
 mod speeches;

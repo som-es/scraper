@@ -199,41 +199,37 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         .map(|x| x.split("und"))
         .flatten()
         .map(|x| {
-            x.split_inclusive(char::is_whitespace)
-                .inspect(|x| println!("x: {x:?}res"))
-                .filter(|split| {
-                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || {
-                        let mut ret = false;
-                        for val in [
-                            "verhindert",
-                            "gemeldet",
-                            "für",
-                            "die",
-                            "heutige",
-                            "Sitzung",
-                            "ist",
-                            "niemand",
-                            "sind",
-                            "Abgeordneten",
-                            "heute",
-                        ] {
-                            if split.contains(val) {
-                                println!("split true");
-                                ret = true;
-                                break;
-                            }
+            x.split_inclusive(char::is_whitespace).filter(|split| {
+                !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || {
+                    let mut ret = false;
+                    for val in [
+                        "verhindert",
+                        "gemeldet",
+                        "für",
+                        "die",
+                        "heutige",
+                        "Sitzung",
+                        "ist",
+                        "niemand",
+                        "sind",
+                        "Abgeordneten",
+                        "heute",
+                    ] {
+                        if split.contains(val) {
+                            ret = true;
+                            break;
                         }
-                        ret
-                    })
+                    }
+                    ret
                 })
+            })
         })
         .map(|x| x.collect::<String>())
         .collect::<Vec<_>>();
 
-    let info = filter_name_extraction(info.iter().map(|x| x.as_str())).collect::<Vec<_>>();
-    println!("info: {info:?}");
-
-    Some(info)
+    Some(filter_name_extraction(info.iter().map(|x| x.as_str()))
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<_>>())
 }
 
 fn extract_call_to_order_info_from_stages(

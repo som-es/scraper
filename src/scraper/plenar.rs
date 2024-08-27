@@ -6,15 +6,10 @@ use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Speech};
 use serde_json::{json, Value};
 
 use crate::{
-    call_to_order::{
+    caching::{disk_caching, get_disk_cache_json}, call_to_order::{
         extract_call_to_order_id_from_path, extract_call_to_order_paths_from_stages,
         CallToOrderInfo,
-    },
-    documents,
-    error::ScraperError,
-    person_url_to_id,
-    speeches::extract_speeches_from_stages,
-    AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
+    }, documents, error::ScraperError, person_url_to_id, speeches::extract_speeches_from_stages, AustriaScraper, GegenstandPaths, Scraper, TextExtractor
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -50,8 +45,18 @@ pub trait Plenar: Scraper {
     async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo>;
 
     async fn get_plenar(&self, plenar_path: &str) -> Result<PlenarInfo, ScraperError> {
-        let raw_proposal = self.get_gegenstand_info(plenar_path).await?;
-        Self::raw_plenar_into_plenar_info(raw_proposal)
+        let raw = match get_disk_cache_json(plenar_path).await {
+            Some(raw) => raw,
+            None => {
+                let raw_plenar = self.get_gegenstand_info(plenar_path).await?;
+                if let Err(e) = disk_caching(plenar_path, raw_plenar.to_string()).await {
+                    log::warn!("could cache raw {plenar_path}: {e:?}")
+                }
+                raw_plenar
+            }
+        };
+
+        Self::raw_plenar_into_plenar_info(raw)
             .await
             .ok_or(ScraperError::PlenarGegenstandParseError)
     }
@@ -124,6 +129,9 @@ impl Plenar for AustriaScraper {
                 vec![]
             }
         };
+
+        let absences = extract_absences(&documents).await;
+
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);
@@ -144,6 +152,7 @@ impl Plenar for AustriaScraper {
 
 async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
     for document in documents {
+        println!("doc: {document:?}");
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
         {
@@ -154,15 +163,24 @@ async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
 }
 
 async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
-    let mut extractor = TextExtractor::default();
+    let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
     let text = extractor
-        .extract_text_from_url(&doc.link, None, true)
+        .extract_text_from_url(&doc.link, None, false)
         .await?;
     extract_absences_from_text(&text)
 }
 
 fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
-    todo!()
+    if text.len() < 1000 {
+        return None;
+    }
+//     println!("-------------------------------------------------------------------
+    
+//     text: {}
+// ---------------------------------    
+//     ", &text);
+    text.find("verhindert gemeldet").unwrap();
+    None
 }
 
 fn extract_call_to_order_info_from_stages(
@@ -306,8 +324,11 @@ mod tests {
         for path in paths {
             println!("path: {path}");
             // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
+
+            // newer ones do not provide a document
+
             let plenar_info = scraper.get_plenar(&path).await.unwrap();
-            println!("plenar_info: {plenar_info:?}");
+            // println!("plenar_info: {plenar_info:?}");
         }
     }
 

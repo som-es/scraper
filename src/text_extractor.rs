@@ -97,7 +97,13 @@ impl TextExtractor {
         attribute_extraction_fn: Option<fn(&str, &str) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
-        let response = self.client.get(url).send().await.ok()?;
+        let response = match self.client.get(url).send().await {
+            Ok(res) => res,
+            Err(e) => {
+                println!("url: {url} Error: {e:?}");
+                return None;
+            },
+        };
         let mut html = match get_disk_cache(cache_key).await {
             Some(html) => html,
             None => {

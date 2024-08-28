@@ -36,7 +36,8 @@ pub struct PlenarInfo {
     pub debates: Vec<Debate>,
     pub date: NaiveDateTime,
     pub call_to_orders: Vec<CallToOrderInfo>,
-    pub legislative_period: String,
+    pub gp: String,
+    pub absences: Option<Vec<String>>,
 }
 
 #[async_trait]
@@ -154,7 +155,8 @@ impl Plenar for AustriaScraper {
             debates,
             call_to_orders,
             date,
-            legislative_period: gp_code,
+            gp: gp_code,
+            absences,
         })
     }
 }
@@ -187,49 +189,103 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
     let absence_match = absence_marker_regex.find(text)?;
 
-    let open_ended_absence = &text[absence_match.start()..];
+    
+    let mut start_idx = absence_match.start();
+
+    while text.as_bytes()[start_idx] != b'\n' {
+        start_idx -= 1;
+    }
+
+    let open_ended_absence = &text[start_idx..];
     let info = &open_ended_absence[..open_ended_absence
         .find(".\n")
         .unwrap()
-        .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))];
+        .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
+        .min(open_ended_absence.find(". (").unwrap_or(usize::MAX))];
 
     let info = info
         .split(',')
         .into_iter()
         .map(|x| x.split("und"))
         .flatten()
+        .map(|x| x.split("sowie"))
+        .flatten()
         .map(|x| {
-            x.split_inclusive(char::is_whitespace).filter(|split| {
-                !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || {
-                    let mut ret = false;
-                    for val in [
-                        "verhindert",
-                        "gemeldet",
-                        "für",
-                        "die",
-                        "heutige",
-                        "Sitzung",
-                        "ist",
-                        "niemand",
-                        "sind",
-                        "Abgeordneten",
-                        "heute",
-                    ] {
-                        if split.contains(val) {
-                            ret = true;
-                            break;
+            x.split_inclusive(char::is_whitespace)
+                // .inspect(|x| println!("pre x: {x:?}, {}", x.chars().filter(|x| x.is_alphabetic()).count()))
+                .filter(|split| {
+                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || split.contains('.') || {
+                        let mut ret = false;
+                        for val in [
+                            "verhindert",
+                            "gemeldet",
+                            "gemeldet:",
+                            "für",
+                            "die",
+                            "heutige",
+                            "Sitzung",
+                            "ist",
+                            "niemand",
+                            "sind",
+                            "Mitglieder",
+                            "Hohen",
+                            "Hauses",
+                            "Abgeordnete:",
+                            "Abgeordnete,",
+                            "Abgeordneten",
+                            "Abgeordneten:",
+                            "heute",
+                            "Abgeordneter",
+                            "Abgeordnete",
+                            "Herr",
+                            "Nationalrates",
+                            "Präsident",
+                            "Präsidentin",
+                            "unsere",
+                            "leider",
+                            "erkrankte",
+                            "weiters",
+                            "auch",
+                            "Zweite",
+                            "heutigen",
+                            "Sitzungstag",
+                            "Frau",
+                            "gebe",
+                            "bekannt",
+                            "folgende",
+                            "diesem",
+                            "Sinne",
+                            "Pilz:",
+                            "doch",
+                            "nicht",
+                            "Kickl!",
+                            "weitere",
+                            "Zwischenrufe",
+                            "Grünen)",
+                            "insgesamt",
+                            "42",
+                            "nämlich",
+                            "ganze",
+                        ] {
+                            if split.trim_matches(char::is_whitespace) == val {
+                                ret = true;
+                                break;
+                            }
                         }
-                    }
-                    ret
+                        ret
+                    })
                 })
-            })
+                .inspect(|x| println!("after x: {x:?}"))
         })
         .map(|x| x.collect::<String>())
+        // .inspect(|x| println!("x: {x:?}"))
         .collect::<Vec<_>>();
 
-    Some(filter_name_extraction(info.iter().map(|x| x.as_str()))
-        .filter(|x| !x.is_empty())
-        .collect::<Vec<_>>())
+    Some(
+        filter_name_extraction(info.iter().map(|x| x.as_str()))
+            .filter(|x| !x.is_empty())
+            .collect::<Vec<_>>(),
+    )
 }
 
 fn extract_call_to_order_info_from_stages(
@@ -380,7 +436,7 @@ mod tests {
                 // newer ones do not provide a document
 
                 let plenar_info = scraper.get_plenar(&path).await.unwrap();
-                // println!("plenar_info: {plenar_info:?}");
+                println!("plenar_info: {:?}", plenar_info.absences);
             }
         }
     }
@@ -394,7 +450,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(plenar.legislative_period, "XXVII");
+        assert_eq!(plenar.gp, "XXVII");
         assert_eq!(plenar.ityp, "NRSITZ");
         assert_eq!(plenar.inr, 211);
         assert_eq!(plenar.debates[0].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");

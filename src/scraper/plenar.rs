@@ -196,12 +196,19 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         start_idx -= 1;
     }
 
-    let open_ended_absence = &text[start_idx..];
+    let open_ended_absence = &text[start_idx..].replace('\u{a0}', " ");
+    // println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
     let info = &open_ended_absence[..open_ended_absence
         .find(".\n")
         .unwrap()
         .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(". (").unwrap_or(usize::MAX))];
+        .min(open_ended_absence.find(".  \n").unwrap_or(usize::MAX))
+        // need to find the specific absence entry (again)
+        // .min(open_ended_absence.find(". (").unwrap_or(usize::MAX))
+    ];
+
+    println!("-------------
+    info: {info:?}");
 
     let info = info
         .split(',')
@@ -217,6 +224,9 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                     !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || split.contains('.') || {
                         let mut ret = false;
                         for val in [
+                            "dass",
+                            "MMSc",
+                            "diplômé",
                             "verhindert",
                             "gemeldet",
                             "gemeldet:",
@@ -249,6 +259,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                             "Zweite",
                             "heutigen",
                             "Sitzungstag",
+                            "Sitzungen",
                             "Frau",
                             "gebe",
                             "bekannt",
@@ -282,6 +293,9 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                             "42",
                             "nämlich",
                             "ganze",
+                            "vertreten",
+                            "durch",
+                            "Vizekanzler"
                         ] {
                             if split.trim_matches(char::is_whitespace) == val {
                                 ret = true;
@@ -456,6 +470,33 @@ mod tests {
             }
         }
     }
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxvii_nrsitz_85() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/85")
+            .await
+            .unwrap();
+
+        
+        println!("plenar: {plenar:?}");
+    }
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxvii_nrsitz_19() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/19")
+            .await
+            .unwrap();
+        
+        println!("plenar: {plenar:?}");
+    }
+
+
+
+
 
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxvii_nrsitz_211() {

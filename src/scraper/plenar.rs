@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
@@ -189,7 +189,6 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
     let absence_match = absence_marker_regex.find(text)?;
 
-    
     let mut start_idx = absence_match.start();
 
     while text.as_bytes()[start_idx] != b'\n' {
@@ -204,11 +203,90 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
         .min(open_ended_absence.find(".  \n").unwrap_or(usize::MAX))
         // need to find the specific absence entry (again)
-        // .min(open_ended_absence.find(". (").unwrap_or(usize::MAX))
-    ];
+        // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
+        .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))];
 
-    println!("-------------
-    info: {info:?}");
+    println!(
+        "-------------
+    info: {info:?}"
+    );
+
+    let skip_words = [
+        "dass",
+        "MMSc",
+        "diplômé",
+        "verhindert",
+        "gemeldet",
+        "gemeldet:",
+        "für",
+        "die",
+        "heutige",
+        "Sitzung",
+        "ist",
+        "niemand",
+        "sind",
+        "Mitglieder",
+        "Hohen",
+        "Hauses",
+        "Abgeordnete:",
+        "Abgeordnete,",
+        "Abgeordneten",
+        "Abgeordneten:",
+        "heute",
+        "Abgeordneter",
+        "Abgeordnete",
+        "Herr",
+        "Nationalrates",
+        "Präsident",
+        "Präsidentin",
+        "unsere",
+        "leider",
+        "erkrankte",
+        "weiters",
+        "auch",
+        "Zweite",
+        "heutigen",
+        "Sitzungstag",
+        "Sitzungen",
+        "Frau",
+        "gebe",
+        "bekannt",
+        "folgende",
+        "diesem",
+        "Sinne",
+        "Pilz:",
+        "doch",
+        "nicht",
+        "Kickl!",
+        "weitere",
+        "Zwischenrufe",
+        "Zwischenruf",
+        "(Rufe",
+        "Heiterkeit",
+        "wird",
+        "immer",
+        "automatisch",
+        "entschuldigt!)",
+        "Kollege",
+        "herzlichen",
+        "Dank!",
+        "sollten",
+        "darüber",
+        "unterhalten",
+        "warum",
+        "fehlend",
+        "eingetragen",
+        "Grünen)",
+        "insgesamt",
+        "42",
+        "nämlich",
+        "ganze",
+        "vertreten",
+        "durch",
+        "Vizekanzler",
+    ]
+    .into_iter()
+    .collect::<HashSet<_>>();
 
     let info = info
         .split(',')
@@ -221,91 +299,17 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
             x.split_inclusive(char::is_whitespace)
                 // .inspect(|x| println!("pre x: {x:?}, {}", x.chars().filter(|x| x.is_alphabetic()).count()))
                 .filter(|split| {
-                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3 || split.contains('.') || {
-                        let mut ret = false;
-                        for val in [
-                            "dass",
-                            "MMSc",
-                            "diplômé",
-                            "verhindert",
-                            "gemeldet",
-                            "gemeldet:",
-                            "für",
-                            "die",
-                            "heutige",
-                            "Sitzung",
-                            "ist",
-                            "niemand",
-                            "sind",
-                            "Mitglieder",
-                            "Hohen",
-                            "Hauses",
-                            "Abgeordnete:",
-                            "Abgeordnete,",
-                            "Abgeordneten",
-                            "Abgeordneten:",
-                            "heute",
-                            "Abgeordneter",
-                            "Abgeordnete",
-                            "Herr",
-                            "Nationalrates",
-                            "Präsident",
-                            "Präsidentin",
-                            "unsere",
-                            "leider",
-                            "erkrankte",
-                            "weiters",
-                            "auch",
-                            "Zweite",
-                            "heutigen",
-                            "Sitzungstag",
-                            "Sitzungen",
-                            "Frau",
-                            "gebe",
-                            "bekannt",
-                            "folgende",
-                            "diesem",
-                            "Sinne",
-                            "Pilz:",
-                            "doch",
-                            "nicht",
-                            "Kickl!",
-                            "weitere",
-                            "Zwischenrufe",
-                            "Zwischenruf",
-                            "(Rufe",
-                            "Heiterkeit",
-                            "wird",
-                            "immer",
-                            "automatisch",
-                            "entschuldigt!)",
-                            "Kollege",
-                            "herzlichen",
-                            "Dank!",
-                            "sollten",
-                            "darüber",
-                            "unterhalten",
-                            "warum",
-                            "fehlend",
-                            "eingetragen",
-                            "Grünen)",
-                            "insgesamt",
-                            "42",
-                            "nämlich",
-                            "ganze",
-                            "vertreten",
-                            "durch",
-                            "Vizekanzler"
-                        ] {
-                            if split.trim_matches(char::is_whitespace) == val {
+                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
+                        || split.contains('.')
+                        || {
+                            let mut ret = false;
+                            if skip_words.contains(split.trim_matches(char::is_whitespace)) {
                                 ret = true;
-                                break;
                             }
-                        }
-                        ret
-                    })
+                            ret
+                        })
                 })
-                // .inspect(|x| println!("after x: {x:?}"))
+            // .inspect(|x| println!("after x: {x:?}"))
         })
         .map(|x| x.collect::<String>())
         // .inspect(|x| println!("x: {x:?}"))
@@ -479,7 +483,6 @@ mod tests {
             .await
             .unwrap();
 
-        
         println!("plenar: {plenar:?}");
     }
     #[tokio::test]
@@ -490,13 +493,9 @@ mod tests {
             .get_plenar("/gegenstand/XXVII/NRSITZ/19")
             .await
             .unwrap();
-        
+
         println!("plenar: {plenar:?}");
     }
-
-
-
-
 
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxvii_nrsitz_211() {

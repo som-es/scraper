@@ -261,6 +261,22 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                             "Kickl!",
                             "weitere",
                             "Zwischenrufe",
+                            "Zwischenruf",
+                            "(Rufe",
+                            "Heiterkeit",
+                            "wird",
+                            "immer",
+                            "automatisch",
+                            "entschuldigt!)",
+                            "Kollege",
+                            "herzlichen",
+                            "Dank!",
+                            "sollten",
+                            "darüber",
+                            "unterhalten",
+                            "warum",
+                            "fehlend",
+                            "eingetragen",
                             "Grünen)",
                             "insgesamt",
                             "42",
@@ -275,7 +291,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                         ret
                     })
                 })
-                .inspect(|x| println!("after x: {x:?}"))
+                // .inspect(|x| println!("after x: {x:?}"))
         })
         .map(|x| x.collect::<String>())
         // .inspect(|x| println!("x: {x:?}"))

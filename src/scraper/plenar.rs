@@ -204,7 +204,9 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         .min(open_ended_absence.find(".  \n").unwrap_or(usize::MAX))
         // need to find the specific absence entry (again)
         // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
-        .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))];
+        .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))
+        .min(open_ended_absence.find(", die ich").unwrap_or(usize::MAX))
+    ];
 
     println!(
         "-------------
@@ -258,6 +260,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "doch",
         "nicht",
         "Kickl!",
+        "Klubvorsitzende",
+        "Klubvorsitzender",
         "weitere",
         "Zwischenrufe",
         "Zwischenruf",

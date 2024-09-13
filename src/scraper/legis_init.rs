@@ -11,13 +11,10 @@ use crate::{
     documents,
     error::ScraperError,
     extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
-    extract_text_from_html, extract_text_from_html_via_name_attribute_next_section,
-    filter::filter_name_extraction,
+    extract_text_from_html, filter::filter_name_extraction,
     find_optimal_votes_by_name, person_url_to_id,
     proposals::ProposalScraper,
-    remove_steno_info,
     speeches::extract_speeches,
-    text_utils::remove_multiple_of,
     yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand,
     GegenstandPaths, ProContra, Scraper, TextExtractor,
 };
@@ -73,10 +70,32 @@ pub trait LegislativeInitiatives: Scraper {
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
-        "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=10103&showAll=true";
+        "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
 
     fn legis_payload(&self) -> Self::Payload {
-        json!({"GP": self.scrape_info.gp, "NRBR": self.scrape_info.council_type})
+        json!({
+            "GP": self.scrape_info.gp, 
+            "NRBR": self.scrape_info.council_type,
+            "DOKTYP": [
+                "A(E)",
+                "A",
+                "AA",
+                "AEA",
+                "AMIN",
+                "UEAM",
+                "UEA",
+                "BUA",
+                "ARH2",
+                "AVB",
+                "URH2"
+            ],
+            "VHG": [
+                "ANTR"
+            ],
+            "DATUM_VON": [
+                Option::<String>::None, Option::<String>::None
+            ],
+        })
     }
 
     async fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative> {
@@ -240,7 +259,7 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError> {
-        self.gegenstand_paths(initiatives, 12)
+        self.gegenstand_paths(initiatives, 12+2)
             .ok_or(ScraperError::LegisInitParseError)
     }
 }
@@ -649,14 +668,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_legis_init() {
+    async fn test_legis_init_all() {
         let scraper = AustriaScraper::default();
 
         let initiatives = scraper.post_legis_payload().await.unwrap();
         let paths = scraper.legis_paths(initiatives).unwrap();
         assert!(paths.len() >= 10);
         for path in &paths {
-            println!("path: {path:?}");
+            if path.contains("3431") {
+                println!("path: {path:?}");
+            }
+            // println!("path: {path:?}");
         }
         println!("paths: {}", paths.len());
     }
@@ -1663,4 +1685,19 @@ mod tests {
 
         // gegenstand/XXVII/I/2269
     }
+
+    #[tokio::test]
+    async fn test_xxvii_hidden_votes_maybe_not_in_db() {
+        // https://www.parlament.gv.at/gegenstand/XXVII/A/3431
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3431")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        res.hidden_votes_info.pro_contra_parties.unwrap();
+
+    }
+
 }

@@ -199,7 +199,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
             // proposals are inversed declined warum auch immer !
             match (hidden_votes.vote_type, &mut hidden_votes.pro_contra_parties) {
-                (Some(VoteType::Proposal), Some(pro_contra)) => {
+                (Some(VoteType::ReversingProposal), Some(pro_contra)) => {
                     core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
                     speeches = speeches
                         .into_iter()
@@ -380,6 +380,8 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
         } else if text.contains("erster Lesung") {
             hidden_votes.vote_type = Some(VoteType::First)
         } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
+            hidden_votes.vote_type = Some(VoteType::ReversingProposal)
+        } else if text.contains("antrag") {
             hidden_votes.vote_type = Some(VoteType::Proposal)
         } else if text.contains("Sitzung des Nationalrates")
             && text.contains("Genehmigung")
@@ -1697,7 +1699,22 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
         res.hidden_votes_info.pro_contra_parties.unwrap();
-
     }
+
+    // https://www.parlament.gv.at/gegenstand/XXVII/A/3874
+
+    #[tokio::test]
+    async fn test_xxvii_a_3874() {
+        // https://www.parlament.gv.at/gegenstand/XXVII/A/3874
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3874")
+            .await
+            .unwrap();
+        let pro_contras = res.hidden_votes_info.pro_contra_parties.unwrap();
+        assert_eq!(pro_contras.pro, ["S", "F"]);
+    }
+
 
 }

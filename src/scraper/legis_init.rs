@@ -1717,4 +1717,19 @@ mod tests {
     }
 
 
+    #[tokio::test]
+    async fn test_dienstrecht_novelle_oevp_fail() {
+        // https://www.parlament.gv.at/gegenstand/XXVII/I/2711
+
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/2711")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        // let pro_contras = res.hidden_votes_info.pro_contra_parties.unwrap();
+        // assert_eq!(pro_contras.pro, ["S", "F"]);
+    }
+
 }

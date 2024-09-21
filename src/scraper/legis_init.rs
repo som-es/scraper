@@ -113,6 +113,7 @@ impl LegislativeInitiatives for AustriaScraper {
         let legis_content = &raw_legis["content"];
 
         let ityp = legis_content["ityp"].as_str()?.to_string();
+        let doktyp = legis_content["doktyp"].as_str()?.to_string();
         let inr = legis_content["inr"].as_u64()?;
         let gp = legis_content["gp_code"].as_str()?.to_string();
 
@@ -241,6 +242,7 @@ impl LegislativeInitiatives for AustriaScraper {
             description,
             emphasis,
             inr,
+            doktyp,
             // council: todo!(),
             gp,
             ityp,

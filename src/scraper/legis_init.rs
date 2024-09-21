@@ -71,12 +71,16 @@ pub trait LegislativeInitiatives: Scraper {
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
+        // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
 
     fn legis_payload(&self) -> Self::Payload {
         json!({
             "GP": self.scrape_info.gp, 
             "NRBR": self.scrape_info.council_type,
             "DOKTYP": [
+                "VOLKBG",
+                "RV",
+                "RVS",
                 "A(E)",
                 "A",
                 "AA",
@@ -85,6 +89,7 @@ impl LegislativeInitiatives for AustriaScraper {
                 "UEAM",
                 "UEA",
                 "BUA",
+                "BRA",
                 "ARH2",
                 "AVB",
                 "URH2"

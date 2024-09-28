@@ -20,6 +20,7 @@ pub use text_extractor::*;
 pub use document::*;
 
 pub use common_scrapes::*;
+use text_utils::remove_paran_contents;
 
 pub use crate::scraper::*;
 pub mod serde_json {
@@ -158,17 +159,13 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
 
     let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
 
-    let x = document.select(&selector).collect::<Vec<_>>();
-
     document
         .select(&selector)
         .flat_map(|node| {
-            println!("x: {}", ElementRef::wrap(node.parent()?)?.html());
-            Some(
-                ElementRef::wrap(node.parent()?.parent()?)?
-                    .text()
-                    .collect::<String>(),
-            )
+            let html = ElementRef::wrap(node.parent()?.parent()?)?.html();
+            let (_, text) = remove_paran_contents(&html, '<', '>');
+            let text = text.replace("&nbsp;", " ");
+            Some(text) 
         })
         .collect::<String>()
 }

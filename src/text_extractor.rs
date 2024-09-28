@@ -140,6 +140,11 @@ impl TextExtractor {
         };
         Some(text)
     }
+
+    pub async fn speech_extraction() {
+        
+    }
+
     // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/164/SEITE_0159.html
     pub async fn text_accumulation(
         &mut self,
@@ -266,6 +271,22 @@ mod tests {
         find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar,
         AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
     };
+
+    // https://www.parlament.gv.at/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028
+    #[tokio::test]
+    async fn text_another_speech_extraction() {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let res = extractor
+            .extract_text_from_url(
+                &"/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028",
+                None,
+                true,
+            )
+            .await
+            .unwrap();
+        println!("res: {res}");
+    }
 
     #[tokio::test]
     async fn test_text_extractor_i_1954() {

@@ -288,6 +288,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "vertreten",
         "durch",
         "Vizekanzler",
+        "entschuldigt",
+        "damit",
     ]
     .into_iter()
     .collect::<HashSet<_>>();

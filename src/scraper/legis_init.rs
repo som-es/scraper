@@ -1544,6 +1544,10 @@ mod tests {
 
         assert_eq!(init.topics, vec!["Arbeit".to_string()]);
 
+        for speech in &init.speeches {
+            println!("speech: {speech:?}");
+        }
+
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
         assert_eq!(init.id, "XXVII/A/3021");
         assert_eq!(init.ityp, "A");

@@ -165,7 +165,7 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
             let html = ElementRef::wrap(node.parent()?.parent()?)?.html();
             let (_, text) = remove_paran_contents(&html, '<', '>');
             let text = text.replace("&nbsp;", " ");
-            Some(text) 
+            Some(text)
         })
         .collect::<String>()
 }

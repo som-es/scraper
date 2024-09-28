@@ -1,6 +1,6 @@
 use std::ops::{RangeBounds, RangeInclusive};
 
-use common_scrapes::{PlenarSpeech, Speech};
+use common_scrapes::{PlenarSpeech, Speech, SpeechTextInfo};
 use regex::Regex;
 
 use crate::{
@@ -141,8 +141,29 @@ impl TextExtractor {
         Some(text)
     }
 
-    pub async fn speech_extraction() {
-        
+    pub async fn speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
+        if speech_info.document_url.contains("SEITE_") {
+            let url = &speech_info.document_url;
+            let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/').unwrap();
+
+            let Some(site_start) = speech_info.site_start else {
+                return None;
+            };
+            let Some(site_end) = speech_info.site_end else {
+                return None;
+            };
+
+            self.text_accumulation(
+                &url[..last_idx + 1],
+                site_start as usize..=site_end as usize,
+                |_, _| false,
+                true,
+            )
+            .await
+        } else {
+            self.extract_text_from_url(&speech_info.document_url, None, true)
+                .await
+        }
     }
 
     // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/164/SEITE_0159.html
@@ -289,6 +310,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn text_another_speech_extraction_with_actual_pages() {
+        let scraper = AustriaScraper::default();
+        // /gegenstand/XXIII/I/682
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let legis_init = scraper
+            .get_legis_init("/gegenstand/XXIII/I/682")
+            .await
+            .unwrap();
+        for speech in legis_init.speeches {
+            let speech_info = &speech.spoken_text_html_urls[0];
+            println!("speech_info: {speech_info:?}");
+            // let text = extractor.speech_extraction(speech_info).await.unwrap();
+            // println!("text: {text}");
+        }
+    }
+
+    #[tokio::test]
     async fn test_text_extractor_i_1954() {
         let scraper = AustriaScraper::default();
 
@@ -302,7 +340,7 @@ mod tests {
         for speech in init.speeches {
             println!("!!!!!!!! speech url {}", speech.html_url());
             let text = extractor.extract_text_from_url(&speech, None, true).await;
-            println!("----------- text: {:?}", text);
+            println!("----------- text: {}", text.unwrap());
         }
     }
 

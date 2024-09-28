@@ -47,12 +47,22 @@ pub fn extract_speeches_from_stages(stages: &Value) -> Option<Vec<Vec<Speech>>> 
     )
 }
 
-pub fn extract_speeches(legis_content: &Value) -> Option<Vec<Speech>> {
+pub fn extract_speeches(legis_content: &Value, only_nr: bool) -> Option<Vec<Speech>> {
     Some(
         legis_content
             .get("phase")?
             .as_array()?
             .iter()
+            .filter(|phase| {
+                if only_nr {
+                    phase["name"]
+                        .as_str()
+                        .unwrap()
+                        .contains("Plenarberatungen NR")
+                } else {
+                    true
+                }
+            })
             .flat_map(|phase| phase.get("stages"))
             .flat_map(extract_speeches_from_stages)
             .flatten()

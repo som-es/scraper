@@ -11,7 +11,8 @@ use crate::{
     documents,
     error::ScraperError,
     extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
-    extract_text_from_html, filter::filter_name_extraction,
+    extract_text_from_html,
+    filter::filter_name_extraction,
     find_optimal_votes_by_name, person_url_to_id,
     proposals::ProposalScraper,
     speeches::extract_speeches,
@@ -71,11 +72,11 @@ pub trait LegislativeInitiatives: Scraper {
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
-        // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
+    // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
 
     fn legis_payload(&self) -> Self::Payload {
         json!({
-            "GP": self.scrape_info.gp, 
+            "GP": self.scrape_info.gp,
             "NRBR": self.scrape_info.council_type,
             "DOKTYP": [
                 "VOLKBG",
@@ -142,7 +143,7 @@ impl LegislativeInitiatives for AustriaScraper {
         let mut eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
         let other_keyword_topics = extract_topics(legis_content, "headwords").unwrap_or_default();
 
-        let mut speeches = extract_speeches(legis_content).unwrap_or_default();
+        let mut speeches = extract_speeches(legis_content, true).unwrap_or_default();
         let date = extract_date(legis_content)?;
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
@@ -266,7 +267,7 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError> {
-        self.gegenstand_paths(initiatives, 12+2)
+        self.gegenstand_paths(initiatives, 12 + 2)
             .ok_or(ScraperError::LegisInitParseError)
     }
 }
@@ -1727,7 +1728,6 @@ mod tests {
         assert_eq!(pro_contras.pro, ["S", "F"]);
     }
 
-
     #[tokio::test]
     async fn test_dienstrecht_novelle_oevp_fail() {
         // https://www.parlament.gv.at/gegenstand/XXVII/I/2711
@@ -1742,5 +1742,4 @@ mod tests {
         // let pro_contras = res.hidden_votes_info.pro_contra_parties.unwrap();
         // assert_eq!(pro_contras.pro, ["S", "F"]);
     }
-
 }

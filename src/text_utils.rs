@@ -25,7 +25,11 @@ pub fn inner_text_to_href_link(html: &str) -> HashMap<String, String> {
     todo!()
 }
 
-pub fn remove_paran_contents(text: &str, opening_paran: char, closening_paran: char) -> (Vec<String>, String) {
+pub fn remove_paran_contents(
+    text: &str,
+    opening_paran: char,
+    closening_paran: char,
+) -> (Vec<String>, String) {
     let mut stack: Vec<(char, usize)> = Vec::new();
     let mut paran_infos: Vec<(usize, usize)> = Vec::new();
     let mut paran_contents_string_components: Vec<String> = Vec::new();
@@ -59,7 +63,11 @@ mod tests {
 
     #[test]
     fn test_remove_paran_contents() {
-        let (_, text) = remove_paran_contents("Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)", '(', ')');
+        let (_, text) = remove_paran_contents(
+            "Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)",
+            '(',
+            ')',
+        );
         println!("text: {text}");
     }
 

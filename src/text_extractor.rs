@@ -134,9 +134,9 @@ impl TextExtractor {
             return text;
         }
         let text = if only_text {
-            html
-        } else {
             remove_steno_info(&extract_text_from_html(&html))
+        } else {
+            html
         };
         Some(text)
     }

@@ -176,7 +176,7 @@ async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
 async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
     let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
     let text = extractor
-        .extract_text_from_url(&doc.link, None, false)
+        .extract_text_from_url(&doc.link, None, true)
         .await?;
     extract_absences_from_text(&text)
 }

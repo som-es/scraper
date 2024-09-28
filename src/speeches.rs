@@ -74,7 +74,7 @@ pub fn extract_speeches(legis_content: &Value, only_nr: bool) -> Option<Vec<Spee
 pub fn extract_speech(speech: &Value) -> Option<Speech> {
     let spoken_text_html_urls = extract_spoken_text_html_urls(speech);
 
-    println!("speech: {}", serde_json::to_string_pretty(speech).unwrap());
+    // println!("speech: {}", serde_json::to_string_pretty(speech).unwrap());
 
     let a_tag_delegate_url = speech[0].as_str()?;
     let delegate_id = extract_person_id_from_a_tag(a_tag_delegate_url)?;

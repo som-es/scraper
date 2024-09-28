@@ -195,12 +195,17 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         start_idx -= 1;
     }
 
+    let print = &text[start_idx..start_idx + 400];
+    println!("print: {print}");
+
     let open_ended_absence = &text[start_idx..].replace('\u{a0}', " ");
     // println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
     let info = &open_ended_absence[..open_ended_absence
         .find(".\n")
-        .unwrap()
+        .unwrap_or(usize::MAX)
         .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
+        .min(open_ended_absence.find(".\r\n").unwrap_or(usize::MAX))
+        .min(open_ended_absence.find(". \r\n").unwrap_or(usize::MAX))
         .min(open_ended_absence.find(".  \n").unwrap_or(usize::MAX))
         // need to find the specific absence entry (again)
         // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
@@ -479,6 +484,39 @@ mod tests {
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_absences_for_xxvii_247() {
+        let scraper = AustriaScraper::default();
+        let plenar_info = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/247")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            [
+                "Martin Engelberg",
+                "Reinhold\rLopatka",
+                "Petra Bayr",
+                "Julia Elisabeth",
+                "Klaus Köchl",
+                "Michael Seemayer",
+                "Petra Tanzler",
+                "Hubert Fuchs",
+                "Herbert\rKickl",
+                "Christian Ragger",
+                "Wolfgang Zanger",
+                "Ernst-Dziedzic",
+                "Heike Grebien",
+                "Bedrana Ribo",
+                "Karin Doppelbauer",
+                "Fiona Fiedler",
+                "Julia Seidl"
+            ],
+            *plenar_info.absences.unwrap().clone()
+        );
+    }
+
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxvii_nrsitz_85() {
         let scraper = AustriaScraper::default();

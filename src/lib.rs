@@ -77,13 +77,15 @@ fn extract_from_gegenstand_url(text: &str) -> Option<DeclineUrlGegenstand> {
 }
 
 pub fn extract_text_from_html(html: &str) -> String {
-    let fragment = Html::parse_fragment(html);
+    let (_, text) = remove_paran_contents(&html, '<', '>');
+    html_escape::decode_html_entities(&text).to_string()
+    // let fragment = Html::parse_fragment(html);
 
-    fragment
-        .tree
-        .nodes()
-        .flat_map(|node| node.value().as_text().map(|text| text.deref()))
-        .collect::<String>()
+    // fragment
+    //     .tree
+    //     .nodes()
+    //     .flat_map(|node| node.value().as_text().map(|text| text.deref()))
+    //     .collect::<String>()
 }
 
 /// used if the id does not directly point to the text, but to an element that is completely outside the text
@@ -163,8 +165,9 @@ pub fn extract_text_from_html_via_name_attribute(html: &str, name_attribute: &st
         .select(&selector)
         .flat_map(|node| {
             let html = ElementRef::wrap(node.parent()?.parent()?)?.html();
-            let (_, text) = remove_paran_contents(&html, '<', '>');
-            let text = text.replace("&nbsp;", " ");
+            let text = extract_text_from_html(&html);
+            // let (_, text) = remove_paran_contents(&html, '<', '>');
+            // let text = text.replace("&nbsp;", " ");
             Some(text)
         })
         .collect::<String>()
@@ -201,7 +204,13 @@ fn extract_text_from_html_via_name_attribute_next_section(
     for _ in 0..sections * 4 {
         node = node.next_sibling()?;
     }
-    Some(ElementRef::wrap(node)?.text().collect::<String>())
+    let html = ElementRef::wrap(node)?.html();
+    // let (_, text) = remove_paran_contents(&html, '<', '>');
+    // Some(text.replace("&nbsp;", " "))
+    Some(extract_text_from_html(&html))
+
+    // Some(ElementRef::wrap(node)?.text().collect::<String>())
+
     // document
     //     .select(&selector)
     //     .flat_map(|node| {

@@ -1,6 +1,8 @@
 use common_scrapes::{Opinion, Speech, SpeechTextInfo};
 use serde_json::Value;
 
+use crate::extract_text_from_html;
+
 fn extract_spoken_text_html_urls(rede: &Value) -> Vec<SpeechTextInfo> {
     rede.get(2)
         .map(|spoken_text_infos| {
@@ -78,6 +80,7 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
 
     let a_tag_delegate_url = speech[0].as_str()?;
     let delegate_id = extract_person_id_from_a_tag(a_tag_delegate_url)?;
+    let delegate_display_name = extract_text_from_html(a_tag_delegate_url);
 
     let opinion = speech[1].as_str().unwrap_or("None");
 
@@ -90,6 +93,7 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
 
     Some(Speech {
         delegate_id,
+        delegate_display_name,
         opinion,
         spoken_text_html_urls,
     })

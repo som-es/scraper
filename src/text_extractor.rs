@@ -149,8 +149,10 @@ impl TextExtractor {
             let Some(site_start) = speech_info.site_start else {
                 return None;
             };
-            let Some(site_end) = speech_info.site_end else {
-                return None;
+
+            let site_end = match speech_info.site_end {
+                Some(end) => end,
+                None => site_start,
             };
 
             self.text_accumulation(
@@ -321,8 +323,8 @@ mod tests {
         for speech in legis_init.speeches {
             let speech_info = &speech.spoken_text_html_urls[0];
             println!("speech_info: {speech_info:?}");
-            // let text = extractor.speech_extraction(speech_info).await.unwrap();
-            // println!("text: {text}");
+            let text = extractor.speech_extraction(speech_info).await.unwrap();
+            println!("text: {text}");
         }
     }
 

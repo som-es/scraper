@@ -212,6 +212,7 @@ impl LegislativeInitiatives for AustriaScraper {
                         .into_iter()
                         .map(|speech| Speech {
                             delegate_id: speech.delegate_id,
+                            delegate_display_name: speech.delegate_display_name,
                             opinion: speech.opinion.invert(),
                             spoken_text_html_urls: speech.spoken_text_html_urls,
                         })

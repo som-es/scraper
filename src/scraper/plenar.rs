@@ -357,15 +357,15 @@ fn extract_call_to_order_info_from_stages(
     call_to_orders
 }
 
-#[macro_export]
-macro_rules! key_from_speeches {
-    ($speeches:ident) => {
-        $speeches
-            .iter()
-            .map(|speech| speech.delegate_id)
-            .collect::<Vec<u64>>()
-    };
-}
+// #[macro_export]
+// macro_rules! key_from_speeches {
+//     ($speeches:ident) => {
+//         $speeches
+//             .iter()
+//             .map(|speech| speech.delegate_id)
+//             .collect::<Vec<u64>>()
+//     };
+// }
 
 fn combine_speech_info(
     debates_with_speeches: Vec<(String, Vec<PlenarSpeech>)>,
@@ -373,12 +373,29 @@ fn combine_speech_info(
 ) -> Vec<Debate> {
     let document_link_speeches = document_link_speeches
         .into_iter()
-        .map(|speeches| (crate::key_from_speeches!(speeches), speeches))
+        .map(|speeches| {
+            (
+                speeches
+                    .iter()
+                    .map(|speech| speech.delegate_id)
+                    .collect::<Vec<_>>(),
+                speeches,
+            )
+        })
         .collect::<BTreeMap<_, _>>();
 
     let debates_with_speeches_keys = debates_with_speeches
         .into_iter()
-        .map(|(about, speeches)| (crate::key_from_speeches!(speeches), about, speeches))
+        .map(|(about, speeches)| {
+            (
+                speeches
+                    .iter()
+                    .map(|speech| speech.speech.delegate_id)
+                    .collect::<Vec<_>>(),
+                about,
+                speeches,
+            )
+        })
         .collect::<Vec<_>>();
 
     let mut debates = vec![];
@@ -390,9 +407,7 @@ fn combine_speech_info(
         for (debate_speech, document_link_speech) in
             debate_speeches.iter_mut().zip(document_link_speeches)
         {
-            debate_speech.opinion = document_link_speech.opinion.clone();
-            debate_speech.spoken_text_html_urls =
-                document_link_speech.spoken_text_html_urls.clone();
+            debate_speech.speech = document_link_speech.clone();
         }
         debates.push(Debate {
             about,
@@ -428,12 +443,15 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
                             + duration[1].parse::<u32>().ok()?;
 
                         Some(PlenarSpeech {
-                            delegate_id,
+                            // TODO: get spoken text html urls, use content[0]
+                            speech: Speech {
+                                delegate_id,
+                                delegate_display_name: String::new(),
+                                opinion: Opinion::None,
+                                spoken_text_html_urls: vec![],
+                            },
                             ty,
                             duration_in_seconds,
-                            // TODO: get spoken text html urls, use content[0]
-                            spoken_text_html_urls: vec![],
-                            opinion: Opinion::None,
                         })
                     })
                     .collect::<Vec<_>>(),
@@ -554,7 +572,7 @@ mod tests {
         assert_eq!(plenar.inr, 211);
         assert_eq!(plenar.debates[0].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
         assert_eq!(
-            plenar.debates[0].speeches[0].spoken_text_html_urls[0].document_url,
+            plenar.debates[0].speeches[0].speech.spoken_text_html_urls[0].document_url,
             "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html"
         );
         assert_eq!(plenar.debates[0].speeches[0].duration_in_seconds, 831);
@@ -563,9 +581,10 @@ mod tests {
             300
         );
         assert_eq!(
-            plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4].spoken_text_html_urls
-                [0]
-            .document_url,
+            plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4]
+                .speech
+                .spoken_text_html_urls[0]
+                .document_url,
             "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html"
         );
 
@@ -602,27 +621,27 @@ mod tests {
 
         // assert_eq!(plenar.debates[1].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
         let first_speech = &plenar.debates[0].speeches[0];
-        assert_eq!(first_speech.delegate_id, 5642);
-        assert_eq!(first_speech.opinion, Opinion::Against);
+        assert_eq!(first_speech.speech.delegate_id, 5642);
+        assert_eq!(first_speech.speech.opinion, Opinion::Against);
 
         let opinion_none_speech = &plenar.debates[0].speeches[2];
-        assert_eq!(opinion_none_speech.delegate_id, 83127);
-        assert_eq!(opinion_none_speech.opinion, Opinion::None);
+        assert_eq!(opinion_none_speech.speech.delegate_id, 83127);
+        assert_eq!(opinion_none_speech.speech.opinion, Opinion::None);
         assert_eq!(opinion_none_speech.duration_in_seconds, 5 * 60 + 12);
 
         let next_debate_speech = &plenar.debates[1].speeches[1];
-        assert_eq!(next_debate_speech.delegate_id, 2006);
-        assert_eq!(next_debate_speech.opinion, Opinion::Infavor);
+        assert_eq!(next_debate_speech.speech.delegate_id, 2006);
+        assert_eq!(next_debate_speech.speech.opinion, Opinion::Infavor);
         assert_eq!(next_debate_speech.duration_in_seconds, 5 * 60 + 32);
 
         let last_speech_of_next_debate = plenar.debates[1].speeches.last().unwrap();
-        assert_eq!(last_speech_of_next_debate.delegate_id, 83299);
-        assert_eq!(last_speech_of_next_debate.opinion, Opinion::Infavor);
+        assert_eq!(last_speech_of_next_debate.speech.delegate_id, 83299);
+        assert_eq!(last_speech_of_next_debate.speech.opinion, Opinion::Infavor);
         assert_eq!(last_speech_of_next_debate.duration_in_seconds, 2 * 60 + 20);
 
         let next_debate_speech = &plenar.debates[2].speeches[0];
-        assert_eq!(next_debate_speech.delegate_id, 8178);
-        assert_eq!(next_debate_speech.opinion, Opinion::Against);
+        assert_eq!(next_debate_speech.speech.delegate_id, 8178);
+        assert_eq!(next_debate_speech.speech.opinion, Opinion::Against);
         assert_eq!(next_debate_speech.duration_in_seconds, 4 * 60 + 28);
     }
 
@@ -663,7 +682,7 @@ mod tests {
             .unwrap();
         for debate in plenar.debates {
             for speech in debate.speeches {
-                if speech.delegate_id != 72959 {
+                if speech.speech.delegate_id != 72959 {
                     continue;
                 }
                 // let text = extractor.extract_text_from_url(&speech).await;

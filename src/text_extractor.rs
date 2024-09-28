@@ -4,7 +4,13 @@ use common_scrapes::{PlenarSpeech, Speech, SpeechTextInfo};
 use regex::Regex;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache}, extract_text_from_html, extract_text_from_html_via_name_attribute, extract_text_from_html_via_name_attribute_finding_optimal_solution, extract_text_from_html_via_name_attribute_next_section, filter::filter_name_extraction, remove_page_info, remove_plenar_info, remove_steno_info, text_utils::remove_paran_contents
+    caching::{disk_caching, get_disk_cache},
+    extract_text_from_html, extract_text_from_html_via_name_attribute,
+    extract_text_from_html_via_name_attribute_finding_optimal_solution,
+    extract_text_from_html_via_name_attribute_next_section,
+    filter::filter_name_extraction,
+    remove_page_info, remove_plenar_info, remove_steno_info,
+    text_utils::remove_paran_contents,
 };
 
 pub trait HasHTMLUrl {
@@ -36,6 +42,7 @@ impl HasHTMLUrl for Speech {
 impl HasHTMLUrl for &PlenarSpeech {
     fn html_url(&self) -> &str {
         &self
+            .speech
             .spoken_text_html_urls
             .first()
             .expect("PlenarSpeech has no HTML URL")
@@ -46,6 +53,7 @@ impl HasHTMLUrl for &PlenarSpeech {
 impl HasHTMLUrl for PlenarSpeech {
     fn html_url(&self) -> &str {
         &self
+            .speech
             .spoken_text_html_urls
             .first()
             .expect("PlenarSpeech has no HTML URL")
@@ -143,7 +151,8 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
-        let unfitted_speech = filter_name_extraction([unfitted_speech].iter().map(|x| x.as_str())).collect::<String>();
+        let unfitted_speech = filter_name_extraction([unfitted_speech].iter().map(|x| x.as_str()))
+            .collect::<String>();
         // println!("unfitted_speech: {unfitted_speech:?}");
 
         let (_, name) = remove_paran_contents(name, '(', ')');
@@ -438,7 +447,7 @@ mod tests {
             .unwrap();
         for debate in plenar.debates {
             for speech in debate.speeches {
-                if speech.delegate_id != 72959 {
+                if speech.speech.delegate_id != 72959 {
                     continue;
                 }
                 let text = extractor

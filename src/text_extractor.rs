@@ -4,11 +4,7 @@ use common_scrapes::{PlenarSpeech, Speech, SpeechTextInfo};
 use regex::Regex;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache},
-    extract_text_from_html, extract_text_from_html_via_name_attribute,
-    extract_text_from_html_via_name_attribute_finding_optimal_solution,
-    extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info,
-    remove_steno_info,
+    caching::{disk_caching, get_disk_cache}, extract_text_from_html, extract_text_from_html_via_name_attribute, extract_text_from_html_via_name_attribute_finding_optimal_solution, extract_text_from_html_via_name_attribute_next_section, filter::filter_name_extraction, remove_page_info, remove_plenar_info, remove_steno_info, text_utils::remove_paran_contents
 };
 
 pub trait HasHTMLUrl {
@@ -141,7 +137,36 @@ impl TextExtractor {
         Some(text)
     }
 
-    pub async fn speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
+    pub async fn speech_extraction_with_fit(
+        &mut self,
+        speech_info: &SpeechTextInfo,
+        name: &str,
+    ) -> Option<String> {
+        let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
+        let unfitted_speech = filter_name_extraction([unfitted_speech].iter().map(|x| x.as_str())).collect::<String>();
+        // println!("unfitted_speech: {unfitted_speech:?}");
+
+        let (_, name) = remove_paran_contents(name, '(', ')');
+        let start_at_delegate_speech_idx = unfitted_speech.find(&name);
+
+        match start_at_delegate_speech_idx {
+            Some(start_at_delegate_speech_idx) => {
+                let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
+
+                let president_regex = Regex::new(r"Präsident(?:[^P])*?:").unwrap();
+                let end_speech_idx = president_regex
+                    .find(start_at_delegate_speech)
+                    .map(|x| x.start())
+                    .unwrap_or(start_at_delegate_speech.len());
+
+                let fitted_speech = start_at_delegate_speech[..end_speech_idx].to_string();
+                Some(fitted_speech)
+            }
+            None => Some(unfitted_speech),
+        }
+    }
+
+    pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
         if speech_info.document_url.contains("SEITE_") {
             let url = &speech_info.document_url;
             let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/').unwrap();
@@ -322,9 +347,13 @@ mod tests {
             .unwrap();
         for speech in legis_init.speeches {
             let speech_info = &speech.spoken_text_html_urls[0];
-            println!("speech_info: {speech_info:?}");
-            let text = extractor.speech_extraction(speech_info).await.unwrap();
-            println!("text: {text}");
+            println!("speech_info: {speech:?}");
+            // let text = extractor.raw_speech_extraction(speech_info).await.unwrap();
+            let text = extractor
+                .speech_extraction_with_fit(speech_info, &speech.delegate_display_name)
+                .await
+                .unwrap();
+            println!("text: {text:?}");
         }
     }
 

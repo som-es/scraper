@@ -162,7 +162,7 @@ impl TextExtractor {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
-                let president_regex = Regex::new(r"Präsident(?:[^P])*?:").unwrap();
+                let president_regex = Regex::new(r"\nPräsident(?:[^P])*?:").unwrap();
                 let end_speech_idx = president_regex
                     .find(start_at_delegate_speech)
                     .map(|x| x.start())
@@ -362,7 +362,7 @@ mod tests {
                 .speech_extraction_with_fit(speech_info, &speech.delegate_display_name)
                 .await
                 .unwrap();
-            println!("text: {text:?}");
+            println!("---------------- text: {text:?}");
         }
     }
 

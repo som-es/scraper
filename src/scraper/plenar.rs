@@ -195,8 +195,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         start_idx -= 1;
     }
 
-    let print = &text[start_idx..start_idx + 400];
-    println!("print: {print}");
+    // let print = &text[start_idx..start_idx + 400];
+    // println!("print: {print}");
 
     let open_ended_absence = &text[start_idx..].replace('\u{a0}', " ");
     // println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
@@ -264,6 +264,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "doch",
         "nicht",
         "Kickl!",
+        "keine",
         "Klubvorsitzende",
         "Klubvorsitzender",
         "weitere",
@@ -462,9 +463,9 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
 
 #[cfg(test)]
 mod tests {
-    use common_scrapes::Opinion;
+    use common_scrapes::{Document, Opinion};
 
-    use crate::AustriaScraper;
+    use crate::{plenar::extract_absences_from_document, AustriaScraper};
 
     use super::Plenar;
 
@@ -689,5 +690,14 @@ mod tests {
                 // println!("{}", text);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_absences_extraction_from_doc() {
+        let link = "/dokument/XXIII/NRSITZ/72/fnameorig_144783.html".to_string();
+        let doc = Document { title: "nix".into(), link, ftype: common_scrapes::FileType::HTML };
+
+        let absences = extract_absences_from_document(&doc).await.unwrap();
+        println!("absences: {absences:?}");
     }
 }

@@ -214,7 +214,7 @@ impl TextExtractor {
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
         if speech_info.document_url.contains("SEITE_") {
             let url = &speech_info.document_url;
-            let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/').unwrap();
+            let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/')?;
 
             let Some(site_start) = speech_info.site_start else {
                 return None;

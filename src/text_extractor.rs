@@ -156,24 +156,51 @@ impl TextExtractor {
         let unfitted_speech = filter_name_extraction([unfitted_speech].iter().map(|x| x.as_str()))
             .collect::<String>();
 
-
         // println!("unfitted_speech: {unfitted_speech:?}");
 
         let (_, name) = remove_paran_contents(name, '(', ')');
         let start_at_delegate_speech_idx = unfitted_speech.find(&name);
 
-        println!("start_at_delegate_speech_idx: {:?}", start_at_delegate_speech_idx);
+        println!(
+            "start_at_delegate_speech_idx: {:?}",
+            start_at_delegate_speech_idx
+        );
 
         match start_at_delegate_speech_idx {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
                 let president_regex = Regex::new(r"\nPräsident(?:[^P])*?:.*[Nn]ächste.*").unwrap();
-                let end_speech_idx = president_regex
+                let president_last_regex =
+                    Regex::new(r"\nPräsident(?:[^P])*?:.*[lL]etzte.*").unwrap();
+                let president_no_one_left =
+                    Regex::new(r"\nPräsident(?:[^P])*?:[\s\S]*niemand.*geschlossen").unwrap();
+                let only_president = Regex::new(r"\nPräsident(?:[^P])*?:").unwrap();
+
+                let mut end_speech_idx = president_regex
                     .find(start_at_delegate_speech)
                     .map(|x| x.start())
-                    .unwrap_or(start_at_delegate_speech.len());
+                    .unwrap_or(start_at_delegate_speech.len())
+                    .min(
+                        president_last_regex
+                            .find(start_at_delegate_speech)
+                            .map(|x| x.start())
+                            .unwrap_or(start_at_delegate_speech.len()),
+                    )
+                    .min(
+                        president_no_one_left
+                            .find(start_at_delegate_speech)
+                            .map(|x| x.start())
+                            .unwrap_or(start_at_delegate_speech.len()),
+                    );
 
+                if end_speech_idx == start_at_delegate_speech.len() {
+                    // last "greedy" try - this is not always correct 
+                    end_speech_idx = only_president
+                        .find(start_at_delegate_speech)
+                        .map(|x| x.start())
+                        .unwrap_or(start_at_delegate_speech.len())
+                }
                 let fitted_speech = start_at_delegate_speech[..end_speech_idx].to_string();
                 Some(fitted_speech)
             }

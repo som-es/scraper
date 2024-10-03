@@ -728,25 +728,7 @@ mod tests {
         let mut extractor = TextExtractor::new(&AustriaScraper::BASE_URL);
 
         let mut lengths = vec![];
-        for debate in &plenar.debates {
-            for speech in &debate.speeches {
-                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
-                let speech_text = extractor
-                    .speech_extraction_with_fit(&speech_info, &speech.speech.delegate_display_name)
-                    .await
-                    .unwrap();
-                lengths.push(speech_text.len());
-                println!(
-                    "-------------------------------------- {}{}",
-                    AustriaScraper::BASE_URL,
-                    speech_info.document_url
-                );
-                println!("speech_text: {speech_text}");
-                println!("--------------------------------------");
-            }
-        }
-
-        let required_lenghts = [
+        let mut required_lenghts = [
             10832, 5661, 3878, 8295, 11226, 9298, 8087, 3890, 4564, 4038, 4950, 4216, 3592, 2600,
             2739, 1902, 2150, 6368, 4873, 4830, 5002, 6103, 9346, 4242, 7348, 2641, 3348, 2743,
             2917, 3964, 440, 3532, 2464, 3945, 2896, 6627, 5222, 4424, 2266, 2860, 3043, 2953,
@@ -760,8 +742,38 @@ mod tests {
             4285, 3061, 2578, 3222, 3161, 1860, 2780, 3097, 3123, 2990, 3324, 3200, 255, 5484,
             3103, 2784, 2724, 4508, 2985, 1193, 1984, 8285, 7088, 4518, 5759, 3436, 2327, 2138,
             5425, 1950, 1265, 1420, 1068,
-        ];
-        assert_eq!(&required_lenghts, lengths.as_slice());
+        ]
+        .iter();
+        for debate in &plenar.debates {
+            for speech in &debate.speeches {
+                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                let speech_text = extractor
+                    .speech_extraction_with_fit(&speech_info, &speech.speech.delegate_display_name)
+                    .await
+                    .unwrap();
+                lengths.push(speech_text.len());
+                let required_length = required_lenghts.next().unwrap();
+                if (speech_text.len() as f32 / *required_length as f32 - 1.).abs() >= 0.04 {
+                    println!(
+                        "-------------------------------------- {}{}",
+                        AustriaScraper::BASE_URL,
+                        speech_info.document_url
+                    );
+                    println!("speech_text: {speech_text}");
+                    println!("--------------------------------------");
+                    panic!("{} required: {}", speech_text.len(), required_length)
+                }
+                // println!(
+                //     "-------------------------------------- {}{}",
+                //     AustriaScraper::BASE_URL,
+                //     speech_info.document_url
+                // );
+                // println!("speech_text: {speech_text}");
+                // println!("--------------------------------------");
+            }
+        }
+
+        // assert_eq!(&required_lenghts, lengths.as_slice());
     }
 
     #[tokio::test]

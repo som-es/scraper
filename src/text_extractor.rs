@@ -163,22 +163,17 @@ impl TextExtractor {
         let (_, name) = remove_paran_contents(name, '(', ')');
         let start_at_delegate_speech_idx = unfitted_speech.find(&name);
 
-        println!(
-            "start_at_delegate_speech_idx: {:?}",
-            start_at_delegate_speech_idx
-        );
-
         match start_at_delegate_speech_idx {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
                 let president_regex =
-                    Regex::new(r"\nPräsident(?:[^P!\.])*?:.*[Nn]ächste.*").unwrap();
+                    Regex::new(r"\nPräsident(?:[^P!,])*?:.*[Nn]ächste.*").unwrap();
                 let president_last_regex =
-                    Regex::new(r"\nPräsident(?:[^P!\.])*?:.*[lL]etzte.*").unwrap();
+                    Regex::new(r"\nPräsident(?:[^P!,])*?:.*[lL]etzte.*").unwrap();
                 let president_no_one_left =
-                    Regex::new(r"\nPräsident(?:[^P!\.])*?:[\s\S]*niemand.*geschlossen").unwrap();
-                let only_president = Regex::new(r"\nPräsident(?:[^P!\.])*?:").unwrap();
+                    Regex::new(r"\nPräsident(?:[^P!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
+                let only_president = Regex::new(r"\nPräsident(?:[^P!,])*?:").unwrap();
 
                 let mut end_speech_idx = president_regex
                     .find(start_at_delegate_speech)

@@ -689,9 +689,9 @@ mod tests {
                     .await
                     .unwrap();
                 lengths.push(speech_text.len());
-                // println!("-------------------------------------- {}{}", AustriaScraper::BASE_URL, speech_info.document_url);
-                // println!("speech_text: {speech_text}");
-                // println!("--------------------------------------");
+                println!("-------------------------------------- {}{}", AustriaScraper::BASE_URL, speech_info.document_url);
+                println!("speech_text: {speech_text}");
+                println!("--------------------------------------");
             }
         }
 

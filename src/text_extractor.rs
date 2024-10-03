@@ -10,7 +10,7 @@ use crate::{
     extract_text_from_html_via_name_attribute_next_section,
     filter::filter_name_extraction,
     remove_page_info, remove_plenar_info, remove_steno_info,
-    text_utils::remove_paran_contents,
+    text_utils::{remove_multiple_of, remove_paran_contents},
 };
 
 pub trait HasHTMLUrl {
@@ -151,10 +151,12 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
+
+        let unfitted_speech = unfitted_speech.replace('\u{ad}', "");
+        let unfitted_speech = unfitted_speech.replace('\u{a0}', " ");
         let unfitted_speech = unfitted_speech.replace("\r\n", "\n");
-        let unfitted_speech = unfitted_speech.replace("\r", "\n");
-        let unfitted_speech = filter_name_extraction([unfitted_speech].iter().map(|x| x.as_str()))
-            .collect::<String>();
+        let unfitted_speech = unfitted_speech.replace('\r', "\n");
+        let unfitted_speech = remove_multiple_of(&unfitted_speech, '\n');
 
         // println!("unfitted_speech: {unfitted_speech:?}");
 
@@ -175,7 +177,7 @@ impl TextExtractor {
                     Regex::new(r"\nPräsident(?:[^P])*?:.*[lL]etzte.*").unwrap();
                 let president_no_one_left =
                     Regex::new(r"\nPräsident(?:[^P])*?:[\s\S]*niemand.*geschlossen").unwrap();
-                let only_president = Regex::new(r"\nPräsident(?:[^P])*?:").unwrap();
+                let only_president = Regex::new(r"\nPräsident(?:[^P!\.])*?:").unwrap();
 
                 let mut end_speech_idx = president_regex
                     .find(start_at_delegate_speech)

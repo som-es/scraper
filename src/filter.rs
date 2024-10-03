@@ -9,5 +9,5 @@ pub fn filter_name_extraction<'a>(
         .map(|name| name.replace('\u{ad}', ""))
         .map(|name| name.replace('\u{a0}', " "))
         .map(|name| remove_multiple_of(&name, ' '))
-        // .map(|name| remove_multiple_of(&name, '\n'))
+    // .map(|name| remove_multiple_of(&name, '\n'))
 }

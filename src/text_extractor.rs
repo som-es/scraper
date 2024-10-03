@@ -172,11 +172,12 @@ impl TextExtractor {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
-                let president_regex = Regex::new(r"\nPräsident(?:[^P])*?:.*[Nn]ächste.*").unwrap();
+                let president_regex =
+                    Regex::new(r"\nPräsident(?:[^P!\.])*?:.*[Nn]ächste.*").unwrap();
                 let president_last_regex =
-                    Regex::new(r"\nPräsident(?:[^P])*?:.*[lL]etzte.*").unwrap();
+                    Regex::new(r"\nPräsident(?:[^P!\.])*?:.*[lL]etzte.*").unwrap();
                 let president_no_one_left =
-                    Regex::new(r"\nPräsident(?:[^P])*?:[\s\S]*niemand.*geschlossen").unwrap();
+                    Regex::new(r"\nPräsident(?:[^P!\.])*?:[\s\S]*niemand.*geschlossen").unwrap();
                 let only_president = Regex::new(r"\nPräsident(?:[^P!\.])*?:").unwrap();
 
                 let mut end_speech_idx = president_regex
@@ -197,11 +198,16 @@ impl TextExtractor {
                     );
 
                 if end_speech_idx == start_at_delegate_speech.len() {
-                    // last "greedy" try - this is not always correct 
+                    // last "greedy" try - this is not always correct
                     end_speech_idx = only_president
-                        .find(start_at_delegate_speech)
+                        .find_iter(start_at_delegate_speech)
+                        .last()
                         .map(|x| x.start())
-                        .unwrap_or(start_at_delegate_speech.len())
+                        .unwrap_or(start_at_delegate_speech.len());
+                    if end_speech_idx <= 150 {
+                        // nummer sicher
+                        end_speech_idx = start_at_delegate_speech.len();
+                    }
                 }
                 let fitted_speech = start_at_delegate_speech[..end_speech_idx].to_string();
                 Some(fitted_speech)

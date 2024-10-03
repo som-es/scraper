@@ -27,7 +27,7 @@ pub async fn get_disk_cache(entry: &str) -> Option<String> {
         .modified()
         .ok()?;
     let last_modified_duration = SystemTime::now().duration_since(last_modified).ok()?;
-    if last_modified_duration.as_secs() > 60 * 60 * 24 * 7 {
+    if last_modified_duration.as_secs() > 60 * 60 * 24 * 30 {
         return None;
     }
 

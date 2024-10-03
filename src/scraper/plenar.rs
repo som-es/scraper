@@ -465,7 +465,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
 mod tests {
     use common_scrapes::{Document, Opinion};
 
-    use crate::{plenar::extract_absences_from_document, AustriaScraper};
+    use crate::{plenar::extract_absences_from_document, AustriaScraper, Scraper, TextExtractor};
 
     use super::Plenar;
 
@@ -612,7 +612,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxii_nrsitz_117() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXII/NRSITZ/117")
+            .await
+            .unwrap();
+        let mut extractor = TextExtractor::new(&AustriaScraper::BASE_URL);
+
+        let mut lengths = vec![];
+        for debate in &plenar.debates {
+            for speech in &debate.speeches {
+                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                let speech_text = extractor.speech_extraction_with_fit(&speech_info, &speech.speech.delegate_display_name).await.unwrap();
+                lengths.push(speech_text.len());
+                println!("-------------------------------------- {}, {}{}", speech.speech.delegate_display_name, AustriaScraper::BASE_URL, speech_info.document_url);
+                println!("speech_text: {speech_text}");
+                println!("--------------------------------------");
+            }
+        }
+    }
+
+
+
+    #[tokio::test]
     async fn test_get_plenar_gegenstand_xxvii_nrsitz_117() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
         let scraper = AustriaScraper::default();
 
         let plenar = scraper
@@ -644,6 +671,24 @@ mod tests {
         assert_eq!(next_debate_speech.speech.delegate_id, 8178);
         assert_eq!(next_debate_speech.speech.opinion, Opinion::Against);
         assert_eq!(next_debate_speech.duration_in_seconds, 4 * 60 + 28);
+
+        let mut extractor = TextExtractor::new(&AustriaScraper::BASE_URL);
+
+
+        let mut lengths = vec![];
+        for debate in &plenar.debates {
+            for speech in &debate.speeches {
+                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                let speech_text = extractor.speech_extraction_with_fit(&speech_info, &speech.speech.delegate_display_name).await.unwrap();
+                lengths.push(speech_text.len());
+                // println!("-------------------------------------- {}{}", AustriaScraper::BASE_URL, speech_info.document_url);
+                // println!("speech_text: {speech_text}");
+                // println!("--------------------------------------");
+            }
+        }
+
+        let required_lenghts = [10832usize, 5661, 3878, 8295, 11226, 9298, 8087, 3890, 4564, 4038, 4950, 4216, 3592, 2600, 2739, 1902, 2150, 6368, 4873, 4830, 5002, 6103, 9346, 4242, 7348, 2641, 3348, 2743, 2917, 3964, 440, 3532, 2464, 3945, 2896, 6627, 5222, 4424, 2266, 2860, 3043, 2953, 4623, 3139, 4498, 2449, 1973, 1536, 5548, 2939, 2135, 1875, 4010, 3828, 18815, 5729, 13164, 7177, 4682, 4641, 6584, 5366, 5089, 3362, 3956, 5698, 6243, 4292, 5468, 4922, 6495, 5364, 4746, 8129, 4569, 5283, 4702, 7174, 3447, 4147, 4492, 5104, 1315, 4355, 5224, 3165, 3388, 4848, 1631, 2517, 3096, 2989, 2428, 3643, 3599, 1893, 2878, 2712, 2562, 5737, 6611, 3943, 4050, 1812, 1960, 3379, 2407, 3243, 3065, 3699, 3102, 6188, 4963, 2536, 1856, 6821, 7616, 3209, 3915, 2276, 2855, 4114, 3718, 4115, 3974, 2238, 1284, 3041, 1661, 4066, 3815, 2966, 3395, 2212, 2464, 4087, 3612, 3172, 2496, 4265, 4285, 3061, 2578, 3222, 3161, 1860, 2780, 3097, 3123, 2990, 3324, 3200, 255, 5484, 3103, 2784, 2724, 4508, 2985, 1193, 1984, 8285, 7088, 4518, 5759, 3436, 2327, 2138, 5425, 1950, 1265, 1420, 1068];
+        assert_eq!(&required_lenghts, lengths.as_slice());
     }
 
     #[tokio::test]

@@ -151,18 +151,24 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
+        let unfitted_speech = unfitted_speech.replace("\r\n", "\n");
+        let unfitted_speech = unfitted_speech.replace("\r", "\n");
         let unfitted_speech = filter_name_extraction([unfitted_speech].iter().map(|x| x.as_str()))
             .collect::<String>();
+
+
         // println!("unfitted_speech: {unfitted_speech:?}");
 
         let (_, name) = remove_paran_contents(name, '(', ')');
         let start_at_delegate_speech_idx = unfitted_speech.find(&name);
 
+        println!("start_at_delegate_speech_idx: {:?}", start_at_delegate_speech_idx);
+
         match start_at_delegate_speech_idx {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
-                let president_regex = Regex::new(r"\nPräsident(?:[^P])*?:").unwrap();
+                let president_regex = Regex::new(r"\nPräsident(?:[^P])*?:.*[Nn]ächste.*").unwrap();
                 let end_speech_idx = president_regex
                     .find(start_at_delegate_speech)
                     .map(|x| x.start())
@@ -232,7 +238,6 @@ impl TextExtractor {
                         continue;
                     }
                     // println!("text_acc: {text}");
-                    // dbg!(&text);
                     text_acc.push_str(&text);
                 }
                 None => break,

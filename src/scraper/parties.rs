@@ -24,7 +24,7 @@ impl Parties for AustriaScraper {
         let mut votes = HashSet::new();
         for path in legis_paths.iter().rev() {
             // println!("path: {path}");
-            let Ok(legis_init) = self.get_legis_init(&path).await else {
+            let Ok(legis_init) = self.get_legis_init(path).await else {
                 continue;
             };
             if legis_init.votes.is_empty() {
@@ -35,7 +35,7 @@ impl Parties for AustriaScraper {
         }
 
         for path in legis_paths.iter() {
-            let Ok(legis_init) = self.get_legis_init(&path).await else {
+            let Ok(legis_init) = self.get_legis_init(path).await else {
                 continue;
             };
             if legis_init.votes.is_empty() {

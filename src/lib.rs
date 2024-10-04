@@ -77,7 +77,7 @@ fn extract_from_gegenstand_url(text: &str) -> Option<DeclineUrlGegenstand> {
 }
 
 pub fn extract_text_from_html(html: &str) -> String {
-    let (_, text) = remove_paran_contents(&html, '<', '>');
+    let (_, text) = remove_paran_contents(html, '<', '>');
     html_escape::decode_html_entities(&text).to_string()
     // let fragment = Html::parse_fragment(html);
 

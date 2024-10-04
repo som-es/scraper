@@ -133,7 +133,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let delegate_ids = names
             .iter()
-            .flat_map(|name| name["url"].as_str().map(|url| person_url_to_id(url)))
+            .flat_map(|name| name["url"].as_str().map(person_url_to_id))
             .flatten()
             .collect::<Vec<u64>>();
 
@@ -205,20 +205,17 @@ impl LegislativeInitiatives for AustriaScraper {
             accepted = Some(AcceptedState::PreDeclined);
 
             // proposals are inversed declined warum auch immer !
-            match (hidden_votes.vote_type, &mut hidden_votes.pro_contra_parties) {
-                (Some(VoteType::ReversingProposal), Some(pro_contra)) => {
-                    core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
-                    speeches = speeches
-                        .into_iter()
-                        .map(|speech| Speech {
-                            delegate_id: speech.delegate_id,
-                            delegate_display_name: speech.delegate_display_name,
-                            opinion: speech.opinion.invert(),
-                            spoken_text_html_urls: speech.spoken_text_html_urls,
-                        })
-                        .collect();
-                }
-                _ => {}
+            if let (Some(VoteType::ReversingProposal), Some(pro_contra)) = (hidden_votes.vote_type, &mut hidden_votes.pro_contra_parties) {
+                core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
+                speeches = speeches
+                    .into_iter()
+                    .map(|speech| Speech {
+                        delegate_id: speech.delegate_id,
+                        delegate_display_name: speech.delegate_display_name,
+                        opinion: speech.opinion.invert(),
+                        spoken_text_html_urls: speech.spoken_text_html_urls,
+                    })
+                    .collect();
             }
         };
 
@@ -281,7 +278,7 @@ pub fn is_accepted_based_on_votes(
     let pro_share = pro_count as f64 / vote_sum as f64;
     if requires_simple_majority && pro_share >= 0.5 {
         AcceptedState::Accepted
-    } else if !requires_simple_majority && pro_share >= 2 as f64 / 3 as f64 {
+    } else if !requires_simple_majority && pro_share >= 2_f64 / 3_f64 {
         AcceptedState::Accepted
     } else {
         AcceptedState::Declined
@@ -404,7 +401,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
 
         if text.to_lowercase().contains("namentlich") {
             let (vote_sum, pro_count, contra_count, invalid_count) =
-                extract_vote_count(&text).unwrap();
+                extract_vote_count(text).unwrap();
             let mut delegate_votes = None;
             for protocol_link_obj in fsth.iter() {
                 let Some(url) = protocol_link_obj["url"].as_str() else {
@@ -553,7 +550,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let contra_delegates = &contra_open_ended[..end_contra_idx];
 
     // let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());
-    let contra_delegates = group_names_from_vote_section(&contra_delegates);
+    let contra_delegates = group_names_from_vote_section(contra_delegates);
 
     // println!("-------------------- contra_delegates: {contra_delegates:?}");
     Some(ProContra {
@@ -706,7 +703,7 @@ mod tests {
         assert_eq!(legis_init.delegate_ids, vec![5439, 87001]);
         assert!(!legis_init.requires_simple_majority);
         assert_eq!(legis_init.accepted.unwrap(), AcceptedState::PreDeclined);
-        assert!(legis_init.speeches.len() > 0);
+        assert!(!legis_init.speeches.is_empty());
         let party_codes = legis_init.hidden_votes_info.pro_contra_parties.unwrap();
         assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
         assert_eq!(
@@ -1629,7 +1626,7 @@ mod tests {
     // /gegenstand/XXVII/A/3945
     #[tokio::test]
     async fn test_legis_init_voted_by_name_xxvii_a_3945() {
-        let mut scraper = AustriaScraper::default();
+        let scraper = AustriaScraper::default();
         let res = scraper
             .get_legis_init("/gegenstand/XXVII/A/3945")
             .await
@@ -1640,7 +1637,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {
-        let mut scraper = AustriaScraper::default();
+        let scraper = AustriaScraper::default();
 
         let res = scraper
             .get_legis_init("/gegenstand/XXVII/I/2269")

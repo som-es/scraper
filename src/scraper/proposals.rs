@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 
 use chrono::{NaiveDate, NaiveDateTime};
-use common_scrapes::{Document, Proposal, ProposalType};
-use serde_derive::{Deserialize, Serialize};
+use common_scrapes::{Proposal, ProposalType};
 use serde_json::{json, Value};
 
 use crate::{
@@ -192,11 +191,11 @@ impl ProposalScraper for AustriaScraper {
 #[cfg(test)]
 mod tests {
     use crate::{
-        proposals::{Document, ProposalType, ProposalsPayload},
+        proposals::{ProposalType, ProposalsPayload},
         scraper::{proposals::ProposalScraper, AustriaScraper},
     };
 
-    use common_scrapes::FileType;
+    use common_scrapes::{Document, FileType};
 
     #[tokio::test]
     async fn test_post_proposal_payload() {

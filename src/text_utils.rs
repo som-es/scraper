@@ -5,14 +5,9 @@ use scraper::{html, Selector};
 pub fn remove_multiple_of(text: &str, of: char) -> String {
     let mut had_of_before = false;
     text.chars()
-        .into_iter()
         .filter(|x| {
             let res = had_of_before;
-            if *x == of {
-                had_of_before = true
-            } else {
-                had_of_before = false;
-            }
+            had_of_before = *x == of;
             !res || !had_of_before
         })
         .collect::<String>()

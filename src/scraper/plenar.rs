@@ -17,7 +17,6 @@ use crate::{
     filter::filter_name_extraction,
     person_url_to_id,
     speeches::extract_speeches_from_stages,
-    text_utils::remove_multiple_of,
     AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
 };
 
@@ -133,12 +132,7 @@ impl Plenar for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let documents = match documents(&raw_documents) {
-            Some(d) => d,
-            None => {
-                vec![]
-            }
-        };
+        let documents = documents(&raw_documents).unwrap_or_default();
 
         let absences = extract_absences(&documents).await;
 
@@ -307,11 +301,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 
     let info = info
         .split(',')
-        .into_iter()
-        .map(|x| x.split("und"))
-        .flatten()
-        .map(|x| x.split("sowie"))
-        .flatten()
+        .flat_map(|x| x.split("und"))
+        .flat_map(|x| x.split("sowie"))
         .map(|x| {
             x.split_inclusive(char::is_whitespace)
                 // .inspect(|x| println!("pre x: {x:?}, {}", x.chars().filter(|x| x.is_alphabetic()).count()))
@@ -469,7 +460,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
 
 #[cfg(test)]
 mod tests {
-    use common_scrapes::{Document, Opinion, SpeechTextInfo};
+    use common_scrapes::{Document, Opinion};
 
     use crate::{plenar::extract_absences_from_document, AustriaScraper, Scraper, TextExtractor};
 
@@ -632,7 +623,7 @@ mod tests {
                 .expect("Failed to get paths");
             for path in paths {
                 let plenar = scraper.get_plenar(&path).await.unwrap();
-                let mut extractor = TextExtractor::new(&AustriaScraper::BASE_URL);
+                let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
                 for debate in &plenar.debates {
                     for speech in &debate.speeches {
@@ -642,7 +633,7 @@ mod tests {
                         let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
                         let speech_text = extractor
                             .speech_extraction_with_fit(
-                                &speech_info,
+                                speech_info,
                                 &speech.speech.delegate_display_name,
                             )
                             .await
@@ -673,14 +664,14 @@ mod tests {
             .get_plenar("/gegenstand/XXII/NRSITZ/117")
             .await
             .unwrap();
-        let mut extractor = TextExtractor::new(&AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let mut lengths = vec![];
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
                 let speech_text = extractor
-                    .speech_extraction_with_fit(&speech_info, &speech.speech.delegate_display_name)
+                    .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
                     .await
                     .unwrap();
                 lengths.push(speech_text.len());
@@ -731,7 +722,7 @@ mod tests {
         assert_eq!(next_debate_speech.speech.opinion, Opinion::Against);
         assert_eq!(next_debate_speech.duration_in_seconds, 4 * 60 + 28);
 
-        let mut extractor = TextExtractor::new(&AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let mut lengths = vec![];
         let mut required_lenghts = [
@@ -754,7 +745,7 @@ mod tests {
             for speech in &debate.speeches {
                 let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
                 let speech_text = extractor
-                    .speech_extraction_with_fit(&speech_info, &speech.speech.delegate_display_name)
+                    .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
                     .await
                     .unwrap();
                 lengths.push(speech_text.len());
@@ -797,7 +788,7 @@ mod tests {
             println!("path: {path} ---");
             let plenar = scraper.get_plenar(&path).await.unwrap();
 
-            let Some(debates) = plenar.debates.get(0) else {
+            let Some(debates) = plenar.debates.first() else {
                 println!("empty speeches");
                 continue;
             };

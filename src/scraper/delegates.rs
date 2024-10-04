@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 
 use crate::{error::ScraperError, request::request};
 
-use super::{AustriaScraper, GegenstandPaths, Scraper};
+use super::{AustriaScraper, Scraper};
 
 pub const PERSON_PATH_IDX: usize = 4;
 pub const BEREICHE_IDX: usize = 6;
@@ -184,7 +184,7 @@ impl DelegateScraper for AustriaScraper {
             extract_birthdate(&person_info["content"]["biografie"]["kurzbiografie"]["gebtext"]);
 
         // choose newest mandate
-        let newest_mandate = mandates.get(0);
+        let newest_mandate = mandates.first();
 
         let party = newest_mandate.and_then(|mandate| mandate.party.clone());
 
@@ -325,7 +325,7 @@ pub fn extract_birthdate(raw_birthinfo: &Value) -> Option<NaiveDate> {
     let date_matcher: Regex = Regex::new("(\\d{2}\\.){2}\\d{4}").ok()?;
     let date = date_matcher.find(raw_birthinfo.as_str()?)?;
 
-    Some(NaiveDate::parse_from_str(&date.as_str(), "%d.%m.%Y").ok()?)
+    NaiveDate::parse_from_str(date.as_str(), "%d.%m.%Y").ok()
 }
 
 #[cfg(test)]

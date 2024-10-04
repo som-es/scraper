@@ -5,11 +5,9 @@ use regex::Regex;
 
 use crate::{
     caching::{disk_caching, get_disk_cache},
-    extract_text_from_html, extract_text_from_html_via_name_attribute,
-    extract_text_from_html_via_name_attribute_finding_optimal_solution,
-    extract_text_from_html_via_name_attribute_next_section,
-    filter::filter_name_extraction,
-    remove_page_info, remove_plenar_info, remove_steno_info,
+    extract_text_from_html, extract_text_from_html_via_name_attribute_finding_optimal_solution,
+    extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info,
+    remove_steno_info,
     text_utils::{remove_multiple_of, remove_paran_contents},
 };
 
@@ -160,13 +158,19 @@ impl TextExtractor {
 
         let (_, name) = remove_paran_contents(name, '(', ')');
         let name = name.trim_matches(char::is_whitespace);
-        let name = name
+        let name_regex = name
             .split_whitespace()
-            .map(|split| format!(r"{split}\s*"))
-            .collect::<String>();
-        let name = name.trim_matches(char::is_whitespace);
+            .fold(String::new(), |mut output, split| {
+                use std::fmt::Write;
+                let _ = write!(output, r"{split}\s*");
+                output
+            });
+
+        let name_regex = Regex::new(&name_regex).unwrap();
+
         // dbg!(&name);
-        let start_at_delegate_speech_idx = unfitted_speech.find(name);
+        // let start_at_delegate_speech_idx = unfitted_speech.find(name);
+        let start_at_delegate_speech_idx = name_regex.find(&unfitted_speech).map(|x| x.start());
 
         dbg!(start_at_delegate_speech_idx);
 
@@ -268,9 +272,7 @@ impl TextExtractor {
                 count += 1;
             }
 
-            let add_zeros = (0..(4 - count as i32).max(0))
-                .map(|_| '0')
-                .collect::<String>();
+            let add_zeros = (0..(4 - count).max(0)).map(|_| '0').collect::<String>();
             let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
             dbg!(&to_fetch);
             match self.extract_text_from_url(&to_fetch, None, only_text).await {
@@ -319,7 +321,7 @@ impl TextExtractor {
                     let f = search_strategy_fn.unwrap_or(
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     );
-                    return f(html, url).map(|text| remove_steno_info(&text));
+                    f(html, url).map(|text| remove_steno_info(&text))
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
@@ -366,12 +368,11 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
             }
         }
     }
-    return None;
+    None
 }
 
 #[cfg(test)]
 mod tests {
-    use common_scrapes::SpeechTextInfo;
 
     use crate::{
         find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar,

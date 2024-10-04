@@ -50,11 +50,11 @@ pub async fn extract_gov_official(
     let id = extract_id_from_unnecessary_link(raw_official[9].as_str()?)?;
 
     let start_date =
-        chrono::NaiveDate::parse_from_str(&function_and_dates.start_date, "%d.%m.%Y").ok()?;
+        chrono::NaiveDate::parse_from_str(function_and_dates.start_date, "%d.%m.%Y").ok()?;
 
     let end_date = function_and_dates
         .end_date
-        .and_then(|end_date| chrono::NaiveDate::parse_from_str(&end_date, "%d.%m.%Y").ok());
+        .and_then(|end_date| chrono::NaiveDate::parse_from_str(end_date, "%d.%m.%Y").ok());
 
     let delegate = delegate_scraper
         .get_delegate(format!("/person/{id}").as_str().into())

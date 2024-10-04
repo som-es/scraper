@@ -116,7 +116,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_speech_missing_text() {
+    async fn test_speech_missing_text1() {
         // fixed
         std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
@@ -125,10 +125,14 @@ mod tests {
             site_end: Some(38),
             document_url: "/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html".into(),
         };
-        extractor
+        let text = extractor
             .speech_extraction_with_fit(&speech_info, "Mag. Elisabeth Grossmann (S)")
             .await
             .unwrap();
+
+        let len = text.len();
+        println!("text: {text}, len: {len}");
+        assert_eq!(len, 5220);
     }
 
     //
@@ -145,7 +149,9 @@ mod tests {
             .speech_extraction_with_fit(&speech_info, "Erwin Angerer (F)")
             .await
             .unwrap();
-        println!("text: {text}");
+        let len = text.len();
+        assert_eq!(len, 412);
+        println!("text: {text}, len: {len}");
     }
 
     #[tokio::test]
@@ -163,7 +169,10 @@ mod tests {
             .speech_extraction_with_fit(&speech_info, "Mag. Dr. Matthias Strolz (N)")
             .await
             .unwrap();
-        println!("text: {text}");
+
+        let len = text.len();
+        assert_eq!(len, 4864);
+        // println!("text: {text}, len: {len}");
     }
     // Mag. Dr. Matthias Strolz (N)
 }

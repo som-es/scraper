@@ -205,9 +205,16 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
         .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))
         .min(open_ended_absence.find(", die ich").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(". (Ruf bei der ÖVP: ... alle von der SPÖ!)").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(". (s. auch S. 32)").unwrap_or(usize::MAX))
-    ];
+        .min(
+            open_ended_absence
+                .find(". (Ruf bei der ÖVP: ... alle von der SPÖ!)")
+                .unwrap_or(usize::MAX),
+        )
+        .min(
+            open_ended_absence
+                .find(". (s. auch S. 32)")
+                .unwrap_or(usize::MAX),
+        )];
 
     println!(
         "-------------
@@ -294,7 +301,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "damit",
         "Kollegen",
         "Kolleginnen",
-        "einige"
+        "einige",
     ]
     .into_iter()
     .collect::<HashSet<_>>();
@@ -729,10 +736,10 @@ mod tests {
             10832, 5661, 3878, 8295, 11226, 9298, 8087, 3890, 4564, 4038, 4950, 4216, 3592, 2600,
             2739, 1902, 2150, 6368, 4873, 4830, 5002, 6103, 9346, 4242, 7348, 2641, 3348, 2743,
             2917, 3964, 440, 3532, 2464, 3945, 2896, 6627, 5222, 4424, 2266, 2860, 3043, 2953,
-            4623, 3139, 4498, 2449, 1973, 1536, 5548, 2939, 2135, 1875, 4010, 3828, 18815, 5729,
+            4623, 3139, 4498, 2449, 1973, 1600, 5548, 2939, 2135, 1875, 4010, 3828, 18815, 5729,
             13164, 7177, 4682, 4641, 6584, 5366, 5089, 3362, 3956, 5698, 6243, 4292, 5468, 4922,
             6495, 5364, 4746, 8129, 4569, 5283, 4702, 7174, 3447, 4147, 4492, 5104, 1315, 4355,
-            5224, 3165, 3388, 4848, 1631, 2517, 3096, 2989, 2428, 3643, 3599, 1893, 2878, 2712,
+            5224, 3165, 3388, 4848, 1536, 2517, 3096, 2989, 2428, 3643, 3599, 1893, 2878, 2712,
             2562, 5737, 6611, 3943, 4050, 1812, 1960, 3379, 2407, 3243, 3065, 3699, 3102, 6188,
             4963, 2536, 1856, 6821, 7616, 3209, 3915, 2276, 2855, 4114, 3718, 4115, 3974, 2238,
             1284, 3041, 1661, 4066, 3815, 2966, 3395, 2212, 2464, 4087, 3612, 3172, 2496, 4265,
@@ -752,7 +759,8 @@ mod tests {
                 let required_length = required_lenghts.next().unwrap();
                 if (speech_text.len() as f32 / *required_length as f32 - 1.).abs() >= 0.04 {
                     println!(
-                        "-------------------------------------- {}{}",
+                        "{} -------------------------------------- {}{}",
+                        &speech.speech.delegate_display_name,
                         AustriaScraper::BASE_URL,
                         speech_info.document_url
                     );

@@ -101,6 +101,10 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
 
 #[cfg(test)]
 mod tests {
+    use common_scrapes::SpeechTextInfo;
+
+    use crate::{AustriaScraper, Scraper, TextExtractor};
+
     use super::extract_person_id_from_a_tag;
 
     #[test]
@@ -109,5 +113,14 @@ mod tests {
             r#"<a href="/person/52687" target="_blank">Alois Stöger, diplômé (S)</a>"#,
         );
         assert_eq!(id, Some(52687))
+    }
+
+    #[tokio::test]
+    async fn test_speech_missing_text() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let speech_info = SpeechTextInfo { site_start: Some(36), site_end: Some(38), document_url: "/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html".into() };
+        let text = extractor.speech_extraction_with_fit(&speech_info, "Mag. Elisabeth Grossmann (S)").await.unwrap();
+        println!("text: {text}");
     }
 }

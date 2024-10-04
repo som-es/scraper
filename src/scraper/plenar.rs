@@ -469,7 +469,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
 
 #[cfg(test)]
 mod tests {
-    use common_scrapes::{Document, Opinion};
+    use common_scrapes::{Document, Opinion, SpeechTextInfo};
 
     use crate::{plenar::extract_absences_from_document, AustriaScraper, Scraper, TextExtractor};
 

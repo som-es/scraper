@@ -158,10 +158,12 @@ impl TextExtractor {
         let unfitted_speech = unfitted_speech.replace('\r', "\n");
         let unfitted_speech = remove_multiple_of(&unfitted_speech, '\n');
 
-        // println!("unfitted_speech: {unfitted_speech:?}");
-
         let (_, name) = remove_paran_contents(name, '(', ')');
-        let start_at_delegate_speech_idx = unfitted_speech.find(&name);
+        let name = name.trim_matches(char::is_whitespace);
+        // dbg!(&name);
+        let start_at_delegate_speech_idx = unfitted_speech.find(name);
+
+        dbg!(start_at_delegate_speech_idx);
 
         match start_at_delegate_speech_idx {
             Some(start_at_delegate_speech_idx) => {
@@ -212,7 +214,12 @@ impl TextExtractor {
     }
 
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
-        if speech_info.document_url.contains("SEITE_") {
+        // therei s: "https://www.parlament.gv.at/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html" too
+        if speech_info
+            .document_url
+            .to_ascii_uppercase()
+            .contains("SEITE_")
+        {
             let url = &speech_info.document_url;
             let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/')?;
 
@@ -359,6 +366,8 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
 
 #[cfg(test)]
 mod tests {
+    use common_scrapes::SpeechTextInfo;
+
     use crate::{
         find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar,
         AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,

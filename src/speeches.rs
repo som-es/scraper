@@ -117,10 +117,53 @@ mod tests {
 
     #[tokio::test]
     async fn test_speech_missing_text() {
+        // fixed
         std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
-        let speech_info = SpeechTextInfo { site_start: Some(36), site_end: Some(38), document_url: "/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html".into() };
-        let text = extractor.speech_extraction_with_fit(&speech_info, "Mag. Elisabeth Grossmann (S)").await.unwrap();
+        let speech_info = SpeechTextInfo {
+            site_start: Some(36),
+            site_end: Some(38),
+            document_url: "/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html".into(),
+        };
+        extractor
+            .speech_extraction_with_fit(&speech_info, "Mag. Elisabeth Grossmann (S)")
+            .await
+            .unwrap();
+    }
+
+    //
+    #[tokio::test]
+    async fn test_speech_missing_text2() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let speech_info = SpeechTextInfo {
+            site_start: Some(270),
+            site_end: None,
+            document_url: "/dokument/XXVII/NRSITZ/89/fnameorig_981234.html#Seite_0270.html".into(),
+        };
+        let text = extractor
+            .speech_extraction_with_fit(&speech_info, "Erwin Angerer (F)")
+            .await
+            .unwrap();
         println!("text: {text}");
     }
+
+    #[tokio::test]
+    async fn test_speech_missing_text3() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let speech_info = SpeechTextInfo {
+            site_start: Some(16),
+            site_end: Some(18),
+            document_url: "/dokument/XXV/NRSITZ/125/fnameorig_562456.html#Seite_0016.html".into(),
+        };
+
+        let text = extractor
+            .speech_extraction_with_fit(&speech_info, "Mag. Dr. Matthias Strolz (N)")
+            .await
+            .unwrap();
+        println!("text: {text}");
+    }
+    // Mag. Dr. Matthias Strolz (N)
 }

@@ -160,6 +160,11 @@ impl TextExtractor {
 
         let (_, name) = remove_paran_contents(name, '(', ')');
         let name = name.trim_matches(char::is_whitespace);
+        let name = name
+            .split_whitespace()
+            .map(|split| format!(r"{split}\s*"))
+            .collect::<String>();
+        let name = name.trim_matches(char::is_whitespace);
         // dbg!(&name);
         let start_at_delegate_speech_idx = unfitted_speech.find(name);
 

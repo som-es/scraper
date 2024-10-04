@@ -467,6 +467,8 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech
 
 #[cfg(test)]
 mod tests {
+    use std::iter;
+
     use common_scrapes::{Document, Opinion};
 
     use crate::{plenar::extract_absences_from_document, AustriaScraper, Scraper, TextExtractor};
@@ -674,6 +676,16 @@ mod tests {
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let mut lengths = vec![];
+        let mut required_lengths = [
+            14849, 12113, 9967, 12443, 9509, 11478, 10661, 9885, 9146, 12137, 6351, 7442, 5794,
+            7882, 10698, 6696, 8055, 6606, 3952, 4820, 2847, 4475, 4653, 3411, 6138, 6327, 2633,
+            7536, 3480, 3287, 3128, 6117, 7095, 8463, 7306, 1015, 8520, 6135, 7353, 5449, 2367,
+            7333, 5780, 5496, 6049, 5612, 4539, 2275, 3605, 4296, 2371, 3379, 3472, 10134, 5185,
+            7992, 3920, 2025, 3330, 6944, 2324, 3966, 2189, 3852, 4305, 2931, 4050, 2356, 3615,
+            3031, 2246, 3016, 2717, 1408, 2049, 1989, 2416, 1823, 1803, 2173, 2071, 1978, 1657,
+            5448, 2092, 4084, 1604, 2214, 1940, 4432, 2082, 3262, 3519, 2385, 2468, 2442,
+        ]
+        .iter();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
@@ -682,16 +694,30 @@ mod tests {
                     .await
                     .unwrap();
                 lengths.push(speech_text.len());
-                println!(
-                    "-------------------------------------- {}, {}{}",
-                    speech.speech.delegate_display_name,
-                    AustriaScraper::BASE_URL,
-                    speech_info.document_url
-                );
-                println!("speech_text: {speech_text}");
-                println!("--------------------------------------");
+                let required_length = required_lengths.next().unwrap();
+                if (speech_text.len() as f32 / *required_length as f32 - 1.).abs() >= 0.04 {
+                    println!(
+                        "{} -------------------------------------- {}{}",
+                        &speech.speech.delegate_display_name,
+                        AustriaScraper::BASE_URL,
+                        speech_info.document_url
+                    );
+                    println!("speech_text: {speech_text}");
+                    println!("--------------------------------------");
+                    panic!("{} required: {}", speech_text.len(), required_length)
+                }
+                // println!(
+                //     "-------------------------------------- {}, {}{}",
+                //     speech.speech.delegate_display_name,
+                //     AustriaScraper::BASE_URL,
+                //     speech_info.document_url
+                // );
+                // println!("speech_text: {speech_text}");
+                // println!("--------------------------------------");
             }
         }
+
+        // println!("lengths: {lengths:?}");
     }
 
     #[tokio::test]

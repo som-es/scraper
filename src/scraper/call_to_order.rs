@@ -52,7 +52,8 @@ impl CallToOrder for AustriaScraper {
 
         let name = call_to_order_content["names"]
             .as_array()
-            .ok_or(CallToOrderError::NamesNotAnArray)?.first()
+            .ok_or(CallToOrderError::NamesNotAnArray)?
+            .first()
             .ok_or(CallToOrderError::NamesArrayIsEmpty)?;
         let receiver = name["name"]
             .as_str()
@@ -68,7 +69,8 @@ impl CallToOrder for AustriaScraper {
 
         let links_to = if let Some(reference) = call_to_order_content["reference"]
             .as_array()
-            .ok_or(CallToOrderError::ReferenceNotAnArray)?.first()
+            .ok_or(CallToOrderError::ReferenceNotAnArray)?
+            .first()
         {
             let zitation = reference["zitation"]
                 .as_str()

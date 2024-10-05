@@ -205,7 +205,9 @@ impl LegislativeInitiatives for AustriaScraper {
             accepted = Some(AcceptedState::PreDeclined);
 
             // proposals are inversed declined warum auch immer !
-            if let (Some(VoteType::ReversingProposal), Some(pro_contra)) = (hidden_votes.vote_type, &mut hidden_votes.pro_contra_parties) {
+            if let (Some(VoteType::ReversingProposal), Some(pro_contra)) =
+                (hidden_votes.vote_type, &mut hidden_votes.pro_contra_parties)
+            {
                 core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
                 speeches = speeches
                     .into_iter()

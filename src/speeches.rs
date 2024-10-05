@@ -175,7 +175,7 @@ mod tests {
         // println!("text: {text}, len: {len}");
     }
     // Mag. Dr. Matthias Strolz (N)
-    
+
     #[tokio::test]
     async fn test_speech_missing_text4() {
         std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
@@ -195,5 +195,28 @@ mod tests {
         let len = text.len();
         println!("text: {text}, len: {len}");
         assert_eq!(len, 4740);
+    }
+
+    // /dokument/XXVII/NRSITZ/268/A_-_10_14_45_00326331.html
+
+    #[tokio::test]
+    async fn test_speech_missing_text5() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let speech_info = SpeechTextInfo {
+            site_start: None,
+            site_end: None,
+            document_url: "/dokument/XXVII/NRSITZ/268/A_-_10_14_45_00326331.html".into(),
+        };
+
+        let text = extractor
+            .speech_extraction_with_fit(&speech_info, "Kira Grünberg (V)")
+            .await
+            .unwrap();
+
+        let len = text.len();
+        println!("text: {text}, len: {len}");
+        assert_eq!(len, 3898);
     }
 }

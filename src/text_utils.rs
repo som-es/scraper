@@ -29,11 +29,11 @@ pub fn remove_paran_contents(
     let mut paran_infos: Vec<(usize, usize)> = Vec::new();
     let mut paran_contents_string_components: Vec<String> = Vec::new();
 
-    for (idx, char) in text.chars().enumerate() {
-        if char == opening_paran {
+    for (idx, char) in text.bytes().enumerate() {
+        if char as char == opening_paran {
             stack.push((opening_paran, idx));
         }
-        if char == closening_paran && stack.last().map_or(false, |&(c, _)| c == opening_paran) {
+        if char as char == closening_paran && stack.last().map_or(false, |&(c, _)| c == opening_paran) {
             let paran_start_idx = stack.pop().unwrap().1;
             if stack.is_empty() {
                 paran_infos.push((paran_start_idx, idx));
@@ -41,14 +41,23 @@ pub fn remove_paran_contents(
         }
     }
 
-    let mut replace_text = text.to_string();
+    // let mut replace_text = text.to_string();
+    let mut out_text = String::with_capacity(text.len());
+    let mut outer_start = 0;
     for &(start, end) in &paran_infos {
-        let paren_text: String = text.chars().skip(start).take(end - start + 1).collect();
-        replace_text = replace_text.replacen(&paren_text, &"\0".repeat(paren_text.len()), 1);
-        paran_contents_string_components.push(paren_text);
+        // println!("{}", &text[outer_start..start]);
+        out_text.push_str(&text[outer_start..start]);
+        outer_start = end + 1;
+        // let paren_text: String = text.chars().skip(start).take(end - start + 1).collect();
+        // replace_text = replace_text.replacen(&paren_text, &"\0".repeat(paren_text.len()), 1);
+        // paran_contents_string_components.push(paren_text);
+    }
+    if outer_start < text.len() {
+        out_text.push_str(&text[outer_start+1..]);
     }
 
-    let out_text = replace_text.replace('\0', "");
+    // println!("replace: {replace_text2}");
+    // let out_text = replace_text.replace('\0', "");
     (paran_contents_string_components, out_text)
 }
 
@@ -65,6 +74,18 @@ mod tests {
         );
         println!("text: {text}");
     }
+
+    #[test]
+    fn test_remove_paran_contents1() {
+        let (_, text) = remove_paran_contents(
+            "Tim mit kleinen (sehr kleinen) Geräten(sehr, (sehr) sehr wahr) SUPER duper wahr!!",
+            '(',
+            ')',
+        );
+        println!("text: {text}");
+    }
+
+
 
     #[test]
     fn test_remove_multiple_spaces_in_name() {

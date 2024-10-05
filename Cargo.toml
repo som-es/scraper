@@ -29,3 +29,7 @@ html-escape = "0.2.13"
 
 [dev-dependencies]
 #tokio-macros = "1.8.2"
+
+
+[profile.release]
+debug = true

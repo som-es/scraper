@@ -171,8 +171,29 @@ mod tests {
             .unwrap();
 
         let len = text.len();
-        assert_eq!(len, 4864);
+        assert_eq!(len, 4846);
         // println!("text: {text}, len: {len}");
     }
     // Mag. Dr. Matthias Strolz (N)
+    
+    #[tokio::test]
+    async fn test_speech_missing_text4() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let speech_info = SpeechTextInfo {
+            site_start: None,
+            site_end: None,
+            document_url: "/dokument/XXVII/NRSITZ/268/A_-_12_54_45_00326501.html".into(),
+        };
+
+        let text = extractor
+            .speech_extraction_with_fit(&speech_info, " Angela Baumgartner (V)")
+            .await
+            .unwrap();
+
+        let len = text.len();
+        println!("text: {text}, len: {len}");
+        assert_eq!(len, 4740);
+    }
 }

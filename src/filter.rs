@@ -7,6 +7,7 @@ pub fn filter_name_extraction<'a>(
         .map(|name| name.trim_matches(char::is_whitespace))
         .map(|name| name.replace('\n', " "))
         .map(|name| name.replace('\u{ad}', ""))
+        .map(|name| name.replace('\r', ""))
         .map(|name| name.replace('\u{a0}', " "))
         .map(|name| remove_multiple_of(&name, ' '))
     // .map(|name| remove_multiple_of(&name, '\n'))

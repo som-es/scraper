@@ -172,10 +172,10 @@ pub fn extract_text_from_html_via_name_attribute(document: &Html, name_attribute
 }
 
 pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
-    html: &str,
+    document: &Html,
     name_attribute: &str,
 ) -> Option<String> {
-    let document = Html::parse_document(html);
+    // let document = Html::parse_document(html);
     let first_variant = extract_text_from_html_via_name_attribute(&document, name_attribute);
     let second_variant =
         extract_text_from_html_via_name_attribute_next_section(&document, name_attribute, 2, 1)?;

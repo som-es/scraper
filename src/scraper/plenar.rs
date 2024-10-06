@@ -490,7 +490,11 @@ mod tests {
     async fn test_look_all_plenar_gegenstand_paths() {
         let mut scraper = AustriaScraper::default();
 
-        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut all_speeches_count = 0;
+        'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let plenar_infos = scraper.post_plenar_payload().await.unwrap();
@@ -505,9 +509,32 @@ mod tests {
                 // newer ones do not provide a document
 
                 let plenar_info = scraper.get_plenar(&path).await.unwrap();
-                println!("plenar_info: {:?}", plenar_info.absences);
+                for debate in plenar_info.debates {
+                    for speech in debate.speeches {
+                        if let Some(spoken_text_url) = speech.speech.spoken_text_html_urls.first() {
+                            extractor
+                                .speech_extraction_with_fit(
+                                    spoken_text_url,
+                                    &speech.speech.delegate_display_name,
+                                )
+                                .await
+                                .unwrap();
+                            all_speeches_count += 1;
+                        }
+                    }
+                }
+                if all_speeches_count % 100 == 0 {
+                    dbg!("all s c: {all_speeches_count}");
+                    break 'outer;
+                }
+                // let speeches_count: usize = plenar_info.debates.iter().map(|d| d.speeches.len()).sum();
+                // all_speeches_count += speeches_count;
+                // println!("plenar_info: {:?}", plenar_info.absences);
             }
         }
+
+        // 20805
+        println!("speeches: {all_speeches_count}");
     }
 
     #[tokio::test]

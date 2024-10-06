@@ -117,12 +117,23 @@ impl DatePayload {
 
 pub type GegenstandPaths = Vec<String>;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct AustriaScraper {
     client: Client,
     pub text_extractor: TextExtractor,
     pub scrape_info: GeneralScrapeInfo,
     pub proposal_payload: Value,
+}
+
+impl Default for AustriaScraper {
+    fn default() -> Self {
+        Self {
+            client: Default::default(),
+            text_extractor: TextExtractor::new(AustriaScraper::BASE_URL),
+            scrape_info: Default::default(),
+            proposal_payload: Default::default(),
+        }
+    }
 }
 
 impl AustriaScraper {

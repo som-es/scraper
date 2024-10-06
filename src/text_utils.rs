@@ -33,7 +33,9 @@ pub fn remove_paran_contents(
         if char as char == opening_paran {
             stack.push((opening_paran, idx));
         }
-        if char as char == closening_paran && stack.last().map_or(false, |&(c, _)| c == opening_paran) {
+        if char as char == closening_paran
+            && stack.last().map_or(false, |&(c, _)| c == opening_paran)
+        {
             let paran_start_idx = stack.pop().unwrap().1;
             if stack.is_empty() {
                 paran_infos.push((paran_start_idx, idx));
@@ -53,7 +55,7 @@ pub fn remove_paran_contents(
         // paran_contents_string_components.push(paren_text);
     }
     if outer_start < text.len() {
-        out_text.push_str(&text[outer_start+1..]);
+        out_text.push_str(&text[outer_start + 1..]);
     }
 
     // println!("replace: {replace_text2}");
@@ -84,8 +86,6 @@ mod tests {
         );
         println!("text: {text}");
     }
-
-
 
     #[test]
     fn test_remove_multiple_spaces_in_name() {

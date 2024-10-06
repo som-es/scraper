@@ -2,6 +2,7 @@ use std::ops::{RangeBounds, RangeInclusive};
 
 use common_scrapes::{PlenarSpeech, Speech, SpeechTextInfo};
 use regex::Regex;
+use scraper::Html;
 
 use crate::{
     caching::{disk_caching, get_disk_cache},
@@ -73,22 +74,43 @@ enum State {
 /// You can't know if it's an entire protocol of speeches or just an isolated speech.
 ///
 /// In the future, this should be replaced by a more generic solution
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct TextExtractor {
     pub cached_html: Option<String>,
     state: State,
     pub client: reqwest::Client,
     pub base_url: String,
+    pub president_regex: Regex,
+    pub president_last_regex: Regex,
+    pub president_no_one_left: Regex,
+    pub only_president: Regex,
+    pub steno_info_regex: Regex,
 }
 
 impl TextExtractor {
     pub fn new(base_url: &str) -> Self {
+        let president_regex = Regex::new(r"\nPräsident(?:[^P!,])*?:.*[Nn]ächste.*").unwrap();
+        let president_last_regex = Regex::new(r"\nPräsident(?:[^P!,])*?:.*[lL]etzte.*").unwrap();
+        let president_no_one_left =
+            Regex::new(r"\nPräsident(?:[^P!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
+        let only_president = Regex::new(r"\nPräsident(?:[^P!,])*?:").unwrap();
+        let steno_info_regex = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
+
         Self {
             cached_html: None,
             state: State::NoCache,
             client: reqwest::Client::new(),
             base_url: base_url.to_string(),
+            president_regex,
+            president_last_regex,
+            president_no_one_left,
+            only_president,
+            steno_info_regex
         }
+    }
+
+    pub fn remove_steno_info(&self, haystack: &str) -> String {
+        remove_steno_info(haystack, &self.steno_info_regex)
     }
 
     pub async fn get_html(
@@ -131,12 +153,12 @@ impl TextExtractor {
                 url.split('#').nth(1).unwrap(),
             )
             // .inspect(|x| println!("--------------------- {x}\n --------------"))
-            .map(|text| remove_steno_info(&text));
+            .map(|text| self.remove_steno_info(&text));
             self.cached_html = Some(html);
             return text;
         }
         let text = if only_text {
-            remove_steno_info(&extract_text_from_html(&html))
+            self.remove_steno_info(&extract_text_from_html(&html))
         } else {
             html
         };
@@ -172,32 +194,24 @@ impl TextExtractor {
         // let start_at_delegate_speech_idx = unfitted_speech.find(name);
         let start_at_delegate_speech_idx = name_regex.find(&unfitted_speech).map(|x| x.start());
 
-        dbg!(start_at_delegate_speech_idx);
+        // dbg!(start_at_delegate_speech_idx);
 
         match start_at_delegate_speech_idx {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
-                let president_regex =
-                    Regex::new(r"\nPräsident(?:[^P!,])*?:.*[Nn]ächste.*").unwrap();
-                let president_last_regex =
-                    Regex::new(r"\nPräsident(?:[^P!,])*?:.*[lL]etzte.*").unwrap();
-                let president_no_one_left =
-                    Regex::new(r"\nPräsident(?:[^P!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
-                let only_president = Regex::new(r"\nPräsident(?:[^P!,])*?:").unwrap();
-
-                let mut end_speech_idx = president_regex
+                let mut end_speech_idx = self.president_regex
                     .find(start_at_delegate_speech)
                     .map(|x| x.start())
                     .unwrap_or(start_at_delegate_speech.len())
                     .min(
-                        president_last_regex
+                        self.president_last_regex
                             .find(start_at_delegate_speech)
                             .map(|x| x.start())
                             .unwrap_or(start_at_delegate_speech.len()),
                     )
                     .min(
-                        president_no_one_left
+                        self.president_no_one_left
                             .find(start_at_delegate_speech)
                             .map(|x| x.start())
                             .unwrap_or(start_at_delegate_speech.len()),
@@ -205,7 +219,7 @@ impl TextExtractor {
 
                 if end_speech_idx == start_at_delegate_speech.len() {
                     // last "greedy" try - this is not always correct
-                    end_speech_idx = only_president
+                    end_speech_idx = self.only_president
                         .find_iter(start_at_delegate_speech)
                         .last()
                         .map(|x| x.start())
@@ -321,7 +335,7 @@ impl TextExtractor {
                     let f = search_strategy_fn.unwrap_or(
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     );
-                    f(html, url).map(|text| remove_steno_info(&text))
+                    f(html, url).map(|text| self.remove_steno_info(&text))
                 } else {
                     self.cached_html = None;
                     self.state = State::NoCache;
@@ -339,10 +353,11 @@ pub fn find_optimal_votes_by_name(html: &str, name_attribute: &str) -> Option<St
     let probably_contains_votes_no_indicator =
         Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
+    let document = Html::parse_document(html);
     for parent in 1..3 {
         for skip in 0..6 {
             let variant = extract_text_from_html_via_name_attribute_next_section(
-                html,
+                &document,
                 name_attribute,
                 parent,
                 skip,

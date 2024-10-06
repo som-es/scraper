@@ -551,14 +551,14 @@ mod tests {
         assert_eq!(
             [
                 "Martin Engelberg",
-                "Reinhold\rLopatka",
+                "Reinhold Lopatka",
                 "Petra Bayr",
                 "Julia Elisabeth",
                 "Klaus Köchl",
                 "Michael Seemayer",
                 "Petra Tanzler",
                 "Hubert Fuchs",
-                "Herbert\rKickl",
+                "Herbert Kickl",
                 "Christian Ragger",
                 "Wolfgang Zanger",
                 "Ernst-Dziedzic",

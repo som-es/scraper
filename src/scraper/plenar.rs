@@ -86,6 +86,9 @@ impl Plenar for AustriaScraper {
     }
 
     async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo> {
+        // let string = serde_json::to_string_pretty(&raw_plenar).unwrap();
+        // println!("string {string}");
+
         let description = raw_plenar["meta"]["description"]
             .as_str()
             .unwrap()
@@ -94,10 +97,10 @@ impl Plenar for AustriaScraper {
         // TODO: there is even more content! look in insomnia
         let plenar_content_0 = &raw_plenar["content"].as_array().unwrap()[0];
 
-        let ityp = plenar_content_0["ityp"].as_str().unwrap().to_string();
-        let inr = plenar_content_0["inr"].as_u64().unwrap();
+        let ityp = plenar_content_0["ityp"].as_str().unwrap_or("NRSITZ").to_string();
+        let inr = plenar_content_0["inr"].as_u64()?;
 
-        let gp_code = plenar_content_0["gp_code"].as_str().unwrap().to_string();
+        let gp_code = plenar_content_0["gp_code"].as_str()?.to_string();
 
         let title = plenar_content_0["title"]
             .as_str()
@@ -117,7 +120,7 @@ impl Plenar for AustriaScraper {
             call_to_orders = extract_call_to_order_info_from_stages(&ityp, inr, stages);
         }
 
-        let past_debates = if let Some(content_1) = raw_plenar["content"].as_array().unwrap().get(1)
+        let past_debates = if let Some(content_1) = raw_plenar["content"].as_array()?.get(1)
         {
             content_1["past_debates"]
                 .as_array()

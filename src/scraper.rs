@@ -80,7 +80,7 @@ pub struct GeneralScrapeInfo {
 impl Default for GeneralScrapeInfo {
     fn default() -> Self {
         Self {
-            gp: vec!["XXVII".to_string()],
+            gp: vec!["XXVIII".to_string()],
             council_type: vec!["NR".to_string()],
         }
     }

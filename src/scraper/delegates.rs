@@ -454,12 +454,19 @@ mod tests {
 
         let mut delegates = vec![];
 
+        let mut count = 0;
         let persons = scraper.post_persons_payload().await?;
         for person_path in scraper.person_paths(persons).unwrap_or_default() {
             let Ok(delegate) = scraper.get_delegate(person_path).await else {
                 continue;
             };
-            println!("del: {delegate:?}");
+
+            if delegate.is_active && delegate.council == Some("nr".into()) {
+                count += 1;
+                println!("count: {count} del: {}, {:?}", delegate.name, delegate.party);
+            }
+
+            // println!("del: {delegate:?}");
             delegates.push(delegate);
         }
 

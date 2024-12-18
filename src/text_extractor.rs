@@ -1,4 +1,8 @@
-use std::{collections::HashMap, ops::{RangeBounds, RangeInclusive}, sync::{Arc, Mutex, RwLock}};
+use std::{
+    collections::HashMap,
+    ops::{RangeBounds, RangeInclusive},
+    sync::{Arc, Mutex, RwLock},
+};
 
 use common_scrapes::{PlenarSpeech, Speech, SpeechTextInfo};
 use regex::Regex;
@@ -97,7 +101,8 @@ impl TextExtractor {
         let president_no_one_left =
             Regex::new(r"\nPräsident(?:[^P!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
         let only_president = Regex::new(r"\nPräsident(?:[^P!,])*?:").unwrap();
-        let steno_info_regex = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
+        let steno_info_regex =
+            Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
 
         Self {
             cached_html: Default::default(),
@@ -114,7 +119,7 @@ impl TextExtractor {
 
     pub fn parse_html(&mut self, html: &str) -> Html {
         let html = Html::parse_document(html);
-         
+
         // self.html_cache.swap_remove_index(0);
         todo!()
     }
@@ -156,7 +161,7 @@ impl TextExtractor {
 
         if let Some(key) = key {
             self.state = State::Cached(Some(key.to_string()));
-            
+
             let html = Html::parse_document(&html);
 
             let text = attribute_extraction_fn
@@ -212,7 +217,8 @@ impl TextExtractor {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
-                let mut end_speech_idx = self.president_regex
+                let mut end_speech_idx = self
+                    .president_regex
                     .find(start_at_delegate_speech)
                     .map(|x| x.start())
                     .unwrap_or(start_at_delegate_speech.len())
@@ -231,7 +237,8 @@ impl TextExtractor {
 
                 if end_speech_idx == start_at_delegate_speech.len() {
                     // last "greedy" try - this is not always correct
-                    end_speech_idx = self.only_president
+                    end_speech_idx = self
+                        .only_president
                         .find_iter(start_at_delegate_speech)
                         .last()
                         .map(|x| x.start())
@@ -249,7 +256,53 @@ impl TextExtractor {
     }
 
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
-        // therei s: "https://www.parlament.gv.at/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html" too
+        // TODO: therei s: "https://www.parlament.gv.at/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html" too
+        // this is a candidate that does not work as well: /dokument/XXIV/NRSITZ/150/fnameorig_256172.html#RU_94584
+
+        /*let site_start = speech_info.site_start;
+        let mut site_end = speech_info.site_end;
+        if site_end.is_none() {
+            site_end = site_start;
+        }
+
+        match (site_start, site_end) {
+            (Some(site_start), Some(site_end)) => {
+                let url = &speech_info.document_url;
+
+                let info = if speech_info
+                    .document_url
+                    .to_ascii_uppercase()
+                    .contains("SEITE_")
+                    && !speech_info.document_url.contains("#")
+                {
+                    // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/164/SEITE_0159.html
+                    let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/')?;
+                    Some(("SEITE_", last_idx + 1))
+                } else if speech_info.document_url.contains("#") {
+                    let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '#')?;
+                    Some(("Seite_", last_idx + 1))
+                } else {
+                    None
+                };
+
+                if let Some((site_indicator, last_idx)) = info {
+                    return self
+                        .text_accumulation(
+                            &url[..last_idx],
+                            site_start as usize..=site_end as usize,
+                            |_, _| false,
+                            true,
+                            site_indicator,
+                        )
+                        .await;
+                }
+            }
+            _ => {}
+        }
+        return self
+            .extract_text_from_url(&speech_info.document_url, None, true)
+            .await;
+        todo!();*/
         if speech_info
             .document_url
             .to_ascii_uppercase()
@@ -272,6 +325,7 @@ impl TextExtractor {
                 site_start as usize..=site_end as usize,
                 |_, _| false,
                 true,
+                "SEITE_",
             )
             .await
         } else {
@@ -287,6 +341,7 @@ impl TextExtractor {
         site_range: RangeInclusive<usize>,
         skip_strategy_fn: impl Fn(&str, bool) -> bool,
         only_text: bool,
+        site_indicator: &str,
     ) -> Option<String> {
         let mut text_acc = String::new();
         let mut already_skipped = false;
@@ -299,7 +354,7 @@ impl TextExtractor {
             }
 
             let add_zeros = (0..(4 - count).max(0)).map(|_| '0').collect::<String>();
-            let to_fetch = format!("{gp_url}SEITE_{add_zeros}{site}.html");
+            let to_fetch = format!("{gp_url}{site_indicator}{add_zeros}{site}.html");
             dbg!(&to_fetch);
             match self.extract_text_from_url(&to_fetch, None, only_text).await {
                 Some(text) => {
@@ -307,7 +362,6 @@ impl TextExtractor {
                         already_skipped = true;
                         continue;
                     }
-                    // println!("text_acc: {text}");
                     text_acc.push_str(&text);
                 }
                 None => break,
@@ -673,7 +727,13 @@ mod tests {
         let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let text = text_extractor
-            .text_accumulation("/dokument/XXIV/NRSITZ/185/", 171..=173, |_, _| false, true)
+            .text_accumulation(
+                "/dokument/XXIV/NRSITZ/185/",
+                171..=173,
+                |_, _| false,
+                true,
+                "SEITE_",
+            )
             .await;
         println!("text: {text:?}");
     }

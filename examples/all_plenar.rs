@@ -9,7 +9,7 @@ async fn main() {
     std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
     let mut all_speeches_count = 0;
     'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-    // 'outer: for gp in ["XXI", "XX"] {
+        // 'outer: for gp in ["XXI", "XX"] {
         scraper.scrape_info.gp = vec![gp.to_string()];
 
         let plenar_infos = scraper.post_plenar_payload().await.unwrap();

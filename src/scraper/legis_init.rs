@@ -440,6 +440,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
                             site_start as usize..=site_end as usize,
                             |_, _| false,
                             true,
+                            "SEITE_",
                         )
                         .await
                     {
@@ -724,12 +725,12 @@ mod tests {
 
         let start = std::time::Instant::now();
 
+        let mut count = 0;
         // for gp in ["XXIV", "XXIII", "XXII"] {
         for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
-            let mut count = 0;
             for path in scraper.legis_paths(initiatives).unwrap() {
                 println!("path: {path:?}");
                 let Ok(init) = scraper.get_legis_init(&path).await else {

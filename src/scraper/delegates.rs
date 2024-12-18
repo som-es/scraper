@@ -463,7 +463,10 @@ mod tests {
 
             if delegate.is_active && delegate.council == Some("nr".into()) {
                 count += 1;
-                println!("count: {count} del: {}, {:?}", delegate.name, delegate.party);
+                println!(
+                    "count: {count} del: {}, {:?}",
+                    delegate.name, delegate.party
+                );
             }
 
             // println!("del: {delegate:?}");

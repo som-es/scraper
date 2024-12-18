@@ -727,16 +727,18 @@ mod tests {
 
         let mut count = 0;
         // for gp in ["XXIV", "XXIII", "XXII"] {
-        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        for gp in ["XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
             for path in scraper.legis_paths(initiatives).unwrap() {
+                println!();
                 println!("path: {path:?}");
                 let Ok(init) = scraper.get_legis_init(&path).await else {
                     println!("error {}{path}", AustriaScraper::BASE_URL);
                     continue;
                 };
+                println!("init: {init:?}");
                 if init.hidden_votes_info.voted_by_name {
                     println!("init: title: {}, accepted: {:?}, votes: {:?}, id: {:?}, hidden_votes: {:?}, ", init.title, init.accepted, init.votes, init.id, init.hidden_votes_info);
                     println!(" {}{path}", AustriaScraper::BASE_URL,);
@@ -745,6 +747,7 @@ mod tests {
             }
             println!("elapsed: {:?}", start.elapsed());
             println!("count: {count:?}");
+            break;
         }
     }
 

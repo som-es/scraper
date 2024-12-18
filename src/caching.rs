@@ -13,10 +13,10 @@ fn ignore_cache_xxvii() -> bool {
 }
 
 pub async fn get_disk_cache(entry: &str) -> Option<String> {
-    // if entry.contains("XXVII/") && ignore_cache_xxvii() {
+    if entry.contains("XXVIII/") && ignore_cache_xxvii() {
     //     // ignores cache
-    //     return None;
-    // }
+        return None;
+    }
     let cache_path = format!("{}{entry}.json", cache_dir());
     if !tokio::fs::try_exists(&cache_path).await.ok()? {
         return None;

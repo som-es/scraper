@@ -14,7 +14,7 @@ fn ignore_cache_xxvii() -> bool {
 
 pub async fn get_disk_cache(entry: &str) -> Option<String> {
     if entry.contains("XXVIII/") && ignore_cache_xxvii() {
-    //     // ignores cache
+        //     // ignores cache
         return None;
     }
     let cache_path = format!("{}{entry}.json", cache_dir());

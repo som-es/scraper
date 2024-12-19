@@ -72,6 +72,7 @@ pub trait LegislativeInitiatives: Scraper {
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
+        // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
     // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
 
     fn legis_payload(&self) -> Self::Payload {
@@ -93,15 +94,23 @@ impl LegislativeInitiatives for AustriaScraper {
                 "BRA",
                 "ARH2",
                 "AVB",
-                "URH2"
+                "URH2",
+                "ME"
             ],
-            "VHG": [
-                "ANTR"
-            ],
+            // "VHG": [
+            //     "ANTR"
+            // ],
             "DATUM_VON": [
                 Option::<String>::None, Option::<String>::None
             ],
         })
+
+        // json!({
+        //     "GP": self.scrape_info.gp,
+        //     "RGES": [
+        //         "ALLE"
+        //     ]
+        // })
     }
 
     async fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative> {
@@ -727,7 +736,9 @@ mod tests {
 
         let mut count = 0;
         // for gp in ["XXIV", "XXIII", "XXII"] {
-        for gp in ["XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        for gp in [
+            "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+        ] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
@@ -1745,5 +1756,27 @@ mod tests {
         println!("res: {res:?}");
         // let pro_contras = res.hidden_votes_info.pro_contra_parties.unwrap();
         // assert_eq!(pro_contras.pro, ["S", "F"]);
+    }
+
+    #[tokio::test]
+    async fn test_xxvii_erroring_legis_init_xxvii_i_1531() {
+        //https://www.parlament.gv.at/gegenstand/XXVII/I/405
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXVII".to_string()];
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/1531")
+            .await
+            .unwrap();
+        res.hidden_votes_info.pro_contra_parties.unwrap();
+
+        let initiatives = scraper.post_legis_payload().await.unwrap();
+        let paths = scraper.legis_paths(initiatives).unwrap();
+        println!("paths len: {}", paths.len());
+        for path in paths {
+            if path.contains("XXVII/I/1531") {
+                println!("YUHU")
+            }
+        }
     }
 }

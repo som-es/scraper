@@ -17,7 +17,7 @@ use crate::{
     filter::filter_name_extraction,
     person_url_to_id,
     speeches::extract_speeches_from_stages,
-    AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
+    unique_titles, AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -137,9 +137,24 @@ impl Plenar for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let documents = documents(&raw_documents).unwrap_or_default();
+        let mut documents = documents(&raw_documents).unwrap_or_default();
+
+        if let Some(content_2) = raw_plenar["content"].as_array()?.get(2) {
+            if let Some(raw_praesidium) = extract_praesidium_from_progress(&content_2["progress"]) {
+                documents.extend(
+                    extract_praesidium_documents(raw_praesidium)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|mut x| {
+                            x.title = "stenographisches".to_string();
+                            x
+                        }),
+                )
+            }
+        }
 
         let absences = extract_absences(&documents).await;
+        println!("!!!!!!! absences: {absences:?}");
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
@@ -160,9 +175,21 @@ impl Plenar for AustriaScraper {
     }
 }
 
+fn extract_praesidium_from_progress(raw_progress: &Value) -> Option<&Value> {
+    for step in raw_progress.as_array()? {
+        if step["text"].as_str()?.to_lowercase().contains("präsidium") {
+            return Some(step);
+        }
+    }
+    None
+}
+
+fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>> {
+    documents(raw_praesidium["protocol"]["data"]["links"].as_array()?)
+}
+
 async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
     for document in documents {
-        println!("doc: {document:?}");
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
         {
@@ -177,27 +204,47 @@ async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
+    println!("processing noew: absence doc: {doc:?}");
     extract_absences_from_text(&text)
 }
 
 fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     // remove this later -> only for testing purposes
-    if text.len() < 50000 {
-        return None;
-    }
+    // if text.len() < 50000 {
+    //     return None;
+    // }
+
+    let text = &text.replace('\u{a0}', " ");
+    let text = text.replace('\u{ad}', "");
+    let titles = unique_titles();
+
+    let text =text 
+        .split_inclusive(' ')
+        .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
+        .collect::<String>();
+
+
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
-    let absence_match = absence_marker_regex.find(text)?;
+    let absence_match = absence_marker_regex.find(&text)?;
 
     let mut start_idx = absence_match.start();
 
-    while text.as_bytes()[start_idx] != b'\n' {
+    const STOP_CHARS: [u8; 4] = [b'.', b'!', b'\n', b'?'];
+
+    // should handle these "Ich gebe bekannt, dass Frau Dr. Mertel, Frau Dr. Partik-Pablé, Frau Dr. Povysil, Herr Dr. Puttinger und Herr Ing. Maderthaner für die heutige Sitzung als verhindert gemeldet sind."
+    while !STOP_CHARS.contains(&text.as_bytes()[start_idx]) {
         start_idx -= 1;
     }
+
+    let open_ended_absence = &text[start_idx+1..];
+    // println!("open_ended_absence: {}", &open_ended_absence[..500]);
+
 
     // let print = &text[start_idx..start_idx + 400];
     // println!("print: {print}");
 
-    let open_ended_absence = &text[start_idx..].replace('\u{a0}', " ");
+    // open_ended_absence.replace(&["Hi", "Bi"], " ");
+
     // println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
     let info = &open_ended_absence[..open_ended_absence
         .find(".\n")
@@ -210,6 +257,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
         .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))
         .min(open_ended_absence.find(", die ich").unwrap_or(usize::MAX))
+        .min(open_ended_absence.find(", Zuweisungen").unwrap_or(usize::MAX))
+        .min(open_ended_absence.find(".").unwrap_or(usize::MAX))
         .min(
             open_ended_absence
                 .find(". (Ruf bei der ÖVP: ... alle von der SPÖ!)")
@@ -218,7 +267,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         .min(
             open_ended_absence
                 .find(". (s. auch S. 32)")
-                .unwrap_or(usize::MAX),
+                .unwrap_or(open_ended_absence.len()),
         )];
 
     println!(
@@ -307,6 +356,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "Kollegen",
         "Kolleginnen",
         "einige",
+        "nämlich",
     ]
     .into_iter()
     .collect::<HashSet<_>>();
@@ -661,6 +711,17 @@ mod tests {
             .unwrap();
 
         println!("plenar: {plenar:?}");
+        assert_eq!(
+            plenar
+                .absences
+                .unwrap()
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Andreas Kollross", "Petra Vorderwinkler", "Christian Lausch", "Henrike Brandstötter"
+            ]
+        )
     }
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxvii_nrsitz_19() {
@@ -671,6 +732,72 @@ mod tests {
             .await
             .unwrap();
 
+        println!("plenar: {plenar:?}");
+        assert_eq!(
+            plenar
+                .absences
+                .unwrap()
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Hermann Gahr",
+                "Kira Grünberg",
+                "Josef Hechenberger",
+                "Franz Hörl",
+                "Rebecca Kirchbaumer",
+                "Andreas Minnich",
+                "Josef Moser",
+                "Elisabeth Pfurtscheller",
+                "Gabriela Schwarz",
+                "Johann Singer",
+                "Alexandra Tanda"
+            ]
+        );
+    }
+
+    // /gegenstand/XXVIII/NRSITZ/6
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/5")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences,
+            Some(vec![
+                "Giuliani-Sterrer".to_string(),
+                "Herbert".to_string(),
+                "Gmeinbauer".to_string(),
+                "Voglauer".to_string(),
+                "Zadić".to_string()
+            ])
+        );
+        println!("plenar: {plenar:?}");
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxviii_nrsitz_6_absences() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/6")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences,
+            Some(vec![
+                "Marie-Christine Giuliani-Sterrer".to_string(),
+                "Werner Herbert".to_string(),
+                "Daniela Gmeinbauer".to_string(),
+                "Olga Voglauer".to_string(),
+                "Alma Zadić".to_string()
+            ])
+        );
         println!("plenar: {plenar:?}");
     }
 
@@ -1007,6 +1134,22 @@ mod tests {
         };
 
         let absences = extract_absences_from_document(&doc).await.unwrap();
+        println!("absences: {absences:?}");
+        assert_eq!(&absences, &Vec::<String>::new());
+    }
+
+    // 
+    #[tokio::test]
+    async fn test_absences_extraction_from_doc2() {
+        let link = "/dokument/XXIV/NRSITZ/1/fnameorig_144815.html".to_string();
+        let doc = Document {
+            title: "nix".into(),
+            link,
+            ftype: common_scrapes::FileType::HTML,
+        };
+
+        let absences = extract_absences_from_document(&doc).await.unwrap();
+        assert_eq!(absences, vec!["Wilhelm Wolterer".to_string()]);
         println!("absences: {absences:?}");
     }
 }

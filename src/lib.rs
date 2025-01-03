@@ -1,5 +1,6 @@
 use std::{
     cell::LazyCell,
+    collections::HashSet,
     ops::Deref,
     sync::{Mutex, RwLock},
 };
@@ -66,6 +67,47 @@ pub fn yes_no_votes_regex() -> Regex {
 pub fn yes_no_votes_inside_regex() -> Regex {
     Regex::new(r"(?i).*Ja.*-Sti.men[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.en[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
         .unwrap()
+}
+
+pub fn unique_titles() -> HashSet<&'static str> {
+    HashSet::from([
+        "Dipl.-Kffr.",
+        "Dr.in",
+        "LL.M.",
+        "M.A.I.S.",
+        "Dipl.-Kfm.",
+        "mult.",
+        "Mag.",
+        "h.c",
+        "Ing.",
+        "Dr.-Ing.",
+        "J.",
+        "Bakk.",
+        "Mst.",
+        "Dr.",
+        "MMst.",
+        "iur.",
+        "A.",
+        "Mag.",
+        "lic.oec.",
+        "F.",
+        "Mag.a",
+        "L.",
+        "Mst.",
+        "abs.",
+        "Dipl.-Ing.",
+        "MMag.",
+        "Dipl.-Kfm.",
+        "h.c.",
+        "Dr.",
+        "Dipl.-Ing.",
+        "DDDr.",
+        "DDr.",
+        "Dipl.-Vw.",
+        "MMag.",
+        "MMMag.",
+        "Ing.",
+    ])
 }
 
 pub type DeclineUrlGegenstand = (String, String, Option<u32>);

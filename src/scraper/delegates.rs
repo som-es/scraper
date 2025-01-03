@@ -456,10 +456,17 @@ mod tests {
 
         let mut count = 0;
         let persons = scraper.post_persons_payload().await?;
+
+        let mut title_candidates = vec![];
+
         for person_path in scraper.person_paths(persons).unwrap_or_default() {
             let Ok(delegate) = scraper.get_delegate(person_path).await else {
                 continue;
             };
+
+            if delegate.name.contains(".") {
+                title_candidates.push(delegate.name.clone());
+            }
 
             if delegate.is_active && delegate.council == Some("nr".into()) {
                 count += 1;
@@ -473,8 +480,10 @@ mod tests {
             delegates.push(delegate);
         }
 
-        let contents = serde_json::to_string(&delegates).unwrap();
-        std::fs::write("../delegates.json", contents).unwrap();
+        println!("title_candidates: {title_candidates:?}");
+
+        // let contents = serde_json::to_string(&delegates).unwrap();
+        // std::fs::write("../delegates.json", contents).unwrap();
 
         Ok(())
     }

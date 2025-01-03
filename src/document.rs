@@ -48,7 +48,7 @@ pub fn documents(raw_documents: &[Value]) -> Option<Vec<Document>> {
     let mut documents = vec![];
 
     for document in raw_documents {
-        let title = document["title"].as_str()?.to_string();
+        let title = document["title"].as_str().unwrap_or_default().to_string();
         let raw_documents = document["documents"].as_array()?;
 
         for document in raw_documents {

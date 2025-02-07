@@ -425,6 +425,8 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
             && text.to_lowercase().contains("namentliche")
         {
             hidden_votes.vote_type = Some(VoteType::OnlyVotedByName)
+        } else if text.to_lowercase().contains("namentliche abstimmung") {
+            hidden_votes.vote_type = Some(VoteType::AnyNamedVote)
         } else {
             // need to find fitting type, some stages are bs
             continue;
@@ -709,18 +711,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_legis_init_all() {
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXVII".to_string()];
 
         let initiatives = scraper.post_legis_payload().await.unwrap();
         let paths = scraper.legis_paths(initiatives).unwrap();
         assert!(paths.len() >= 10);
+
+        let mut error_count = 0;
         for path in &paths {
-            if path.contains("3431") {
-                println!("path: {path:?}");
+            let x = scraper.get_legis_init(path).await;
+            if x.is_err() {
+                error_count += 1;
+                println!("erorring path: {path}");
             }
+            // if path.contains("3431") {
+                // println!("path: {path:?}");
+            // }
             // println!("path: {path:?}");
         }
         println!("paths: {}", paths.len());
+        println!("error count: {error_count}");
     }
 
     // /gegenstand/XXVII/A/4129

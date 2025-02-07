@@ -22,9 +22,24 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Debate {
-    pub about: String,
+    pub info: DebateInfo,
     pub speeches: Vec<PlenarSpeech>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct LegisUniqueInfo {
+    pub legis_gp: String,
+    pub legis_ityp: String,
+    pub legis_inr: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct DebateInfo {
+    pub about: String,
+    pub references: Vec<LegisUniqueInfo>
+}
+
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct PlenarInfo {
@@ -428,7 +443,7 @@ fn extract_call_to_order_info_from_stages(
 // }
 
 fn combine_speech_info(
-    debates_with_speeches: Vec<(String, Vec<PlenarSpeech>)>,
+    debates_with_speeches: Vec<(DebateInfo, Vec<PlenarSpeech>)>,
     document_link_speeches: Vec<Vec<Speech>>,
 ) -> Vec<Debate> {
     let document_link_speeches = document_link_speeches
@@ -459,7 +474,7 @@ fn combine_speech_info(
         .collect::<Vec<_>>();
 
     let mut debates = vec![];
-    for (debates_key, about, mut debate_speeches) in debates_with_speeches_keys {
+    for (debates_key, debate_info, mut debate_speeches) in debates_with_speeches_keys {
         let document_link_speeches = document_link_speeches
             .get(&debates_key)
             .map(|speeches| speeches.as_slice())
@@ -470,29 +485,35 @@ fn combine_speech_info(
             debate_speech.speech = document_link_speech.clone();
         }
         debates.push(Debate {
-            about,
+            info: debate_info,
             speeches: debate_speeches,
         });
     }
     debates
 }
 
-pub fn extract_speeches(past_debates: &[Value]) -> Vec<(String, Vec<PlenarSpeech>)> {
-    let mut debates = vec![];
-
+pub fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<PlenarSpeech>)> {
     past_debates
         .iter()
         .flat_map(|past_debate| {
             Some((
                 past_debate["text"].as_str()?,
                 past_debate["speeches"].as_array()?,
+                past_debate["agenda"].as_array()?,
             ))
         })
-        .filter(|(_, speeches)| !speeches.is_empty())
-        .flat_map(|(text, speeches)| {
-            debates.push(text.to_string());
+        .filter(|(_, speeches, _)| !speeches.is_empty())
+        .flat_map(|(text, speeches, refs)| {
+            let references = refs.iter().flat_map(|x| Some(LegisUniqueInfo {
+                legis_gp: x["gp_code"].as_str()?.to_string(),
+                legis_ityp: x["ityp"].as_str()?.to_string(),
+                legis_inr: x["inr"].as_i64()? as i32,
+            })).collect::<Vec<_>>();
             Some((
-                text.to_string(),
+                DebateInfo {
+                    about: text.to_string(),
+                    references
+                },
                 speeches
                     .iter()
                     .flat_map(|speech| {
@@ -813,7 +834,7 @@ mod tests {
         assert_eq!(plenar.gp, "XXVII");
         assert_eq!(plenar.ityp, "NRSITZ");
         assert_eq!(plenar.inr, 211);
-        assert_eq!(plenar.debates[0].about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
+        assert_eq!(plenar.debates[0].info.about, "Dringlicher Antrag der Abg. Rendi-Wagner betr. Totalversagen der Bundesregierung im Kampf gegen die Teuerung!");
         assert_eq!(
             plenar.debates[0].speeches[0].speech.spoken_text_html_urls[0].document_url,
             "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html"

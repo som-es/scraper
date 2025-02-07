@@ -299,7 +299,12 @@ pub fn is_accepted_based_on_votes(
 pub fn extract_invisibly_declined(
     legis_content: &Value,
 ) -> Option<(bool, Option<DeclineUrlGegenstand>)> {
-    let status_description = legis_content["status"]["description"].as_str()?;
+    let status_description = legis_content["status"]["description"].as_str();
+
+    let Some(status_description) = status_description else {
+        return Some((false, None))
+    };
+
     if status_description.contains("abgelehnt") {
         return Some((true, extract_from_gegenstand_url(status_description)));
     }
@@ -309,6 +314,12 @@ pub fn extract_invisibly_declined(
 
 pub fn extract_date(legis_content: &Value) -> Option<&str> {
     let mut most_fitting_date = None;
+    if legis_content.get("phase").is_none() {
+        if let Some(stages) = legis_content.get("stages") {
+            most_fitting_date = extract_most_fitting_date(stages)
+        }
+        return most_fitting_date
+    }
     for phase in legis_content.get("phase")?.as_array()? {
         let Some(stages) = phase.get("stages") else {
             continue;
@@ -326,6 +337,15 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
 
 pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
+
+    if legis_content.get("phase").is_none() {
+        if let Some(stages) = legis_content.get("stages") {
+            most_fitting_votes = extract_most_fitting_votes(stages).await;
+        }
+
+        return most_fitting_votes
+    }
+
     for phase in legis_content
         .get("phase")
         .unwrap()
@@ -1778,5 +1798,17 @@ mod tests {
                 println!("YUHU")
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_xxvii_aa_387() {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXVII".to_string()];
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/AA/387")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
     }
 }

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Speech};
+use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Reference, Speech};
 use regex::Regex;
 use serde_json::{json, Value};
 
@@ -36,7 +36,7 @@ pub struct LegisUniqueInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct DebateInfo {
     pub about: String,
-    pub references: Vec<LegisUniqueInfo>
+    pub references: Vec<Reference>
 }
 
 
@@ -504,10 +504,10 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<PlenarSp
         })
         .filter(|(_, speeches, _)| !speeches.is_empty())
         .flat_map(|(text, speeches, refs)| {
-            let references = refs.iter().flat_map(|x| Some(LegisUniqueInfo {
-                legis_gp: x["gp_code"].as_str()?.to_string(),
-                legis_ityp: x["ityp"].as_str()?.to_string(),
-                legis_inr: x["inr"].as_i64()? as i32,
+            let references = refs.iter().flat_map(|x| Some(Reference {
+                gp: x["gp_code"].as_str()?.to_string(),
+                ityp: x["ityp"].as_str()?.to_string(),
+                inr: x["inr"].as_i64()? as u32,
             })).collect::<Vec<_>>();
             Some((
                 DebateInfo {

@@ -9,7 +9,7 @@ use crate::{
     caching::{disk_caching, get_disk_cache_json},
     documents,
     error::ScraperError,
-    extract_from_gegenstand_url, extract_text_from_html,
+    extract_from_gegenstand_url_text, extract_text_from_html,
     legis_init::extract_topics,
     person_url_to_id,
     proposals::ProposalsPayload,
@@ -210,7 +210,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         {
             let text = entry["text"].as_str().unwrap();
             if text.contains("Regierungsvorlage") {
-                let rv = extract_from_gegenstand_url(text).unwrap();
+                let rv = extract_from_gegenstand_url_text(text).unwrap();
                 legis_gp = Some(rv.0);
                 legis_init_ityp = Some(rv.1);
                 legis_init_inr = Some(rv.2.unwrap());

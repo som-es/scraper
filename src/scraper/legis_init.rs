@@ -1,23 +1,13 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Speech, Vote, VoteType, VotedByName,
+    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType, VotedByName
 };
 use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
-    documents,
-    error::ScraperError,
-    extract_from_gegenstand_url, extract_pro_contra_party_codes_from_string,
-    extract_text_from_html,
-    filter::filter_name_extraction,
-    find_optimal_votes_by_name, person_url_to_id,
-    proposals::ProposalScraper,
-    speeches::extract_speeches,
-    yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand,
-    GegenstandPaths, ProContra, Scraper, TextExtractor,
+    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_pro_contra_party_codes_from_string, extract_text_from_html, filter::filter_name_extraction, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -55,6 +45,7 @@ pub trait LegislativeInitiatives: Scraper {
         let raw = match get_disk_cache_json(proposal_path).await {
             Some(raw) => raw,
             None => {
+                log::info!("NO CACHE!!!!!!!!");
                 let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
                 if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
                     log::warn!("could cache raw {proposal_path}: {e:?}")
@@ -198,6 +189,8 @@ impl LegislativeInitiatives for AustriaScraper {
         let (plenary_session, hidden_votes) = extract_hidden_votes(legis_content).await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
 
+        let references = extract_references(legis_content);
+
         // sometimes, the info is missing
         if hidden_votes.voted_by_name && !eurovoc_topics.contains(&"namentliche Abstimmung".into())
         {
@@ -248,6 +241,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
+
         Some(LegislativeInitiative {
             title,
             description,
@@ -273,6 +267,7 @@ impl LegislativeInitiatives for AustriaScraper {
             proposal,
             hidden_votes_info: hidden_votes,
             plenary_session,
+            references,
         })
     }
 
@@ -280,6 +275,19 @@ impl LegislativeInitiatives for AustriaScraper {
         self.gegenstand_paths(initiatives, 12 + 2)
             .ok_or(ScraperError::LegisInitParseError)
     }
+}
+
+pub fn extract_references(legis_content: &Value) -> Option<Vec<Reference>> {
+    Some(legis_content["reference"].as_array()?.iter().flat_map(|v| {
+        let (gp, ityp, inr) = extract_from_gegenstand_url(&v["url"].as_str()?[2..])?;
+        Some(
+            Reference {
+                gp,
+                ityp,
+                inr: inr?,
+            }
+        )
+    }).collect::<Vec<_>>())
 }
 
 pub fn is_accepted_based_on_votes(
@@ -307,7 +315,7 @@ pub fn extract_invisibly_declined(
     };
 
     if status_description.contains("abgelehnt") {
-        return Some((true, extract_from_gegenstand_url(status_description)));
+        return Some((true, extract_from_gegenstand_url_text(status_description)));
     }
 
     Some((false, None))
@@ -720,18 +728,18 @@ mod tests {
         assert!(paths.len() >= 10);
         println!("length: {}", paths.len());
 
-        return;
+        // return;
 
         let mut error_count = 0;
         for path in &paths {
-            let x = scraper.get_legis_init(path).await;
-            if x.is_err() {
-                error_count += 1;
-                println!("erorring path: {path}");
-            }
-            // if path.contains("3431") {
-                // println!("path: {path:?}");
+            // let x = scraper.get_legis_init(path).await;
+            // if x.is_err() {
+            //     error_count += 1;
+            //     println!("erorring path: {path}");
             // }
+            if path.contains("I/1858") {
+                println!("path: {path:?}");
+            }
             // println!("path: {path:?}");
         }
         println!("paths: {}", paths.len());
@@ -1851,8 +1859,14 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
     }
+    #[tokio::test]
+    async fn test_xxvii_i_1858() {
+        let scraper = AustriaScraper::default();
 
-
-
-
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/1858")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+    }
 }

@@ -355,7 +355,8 @@ impl TextExtractor {
 
             let add_zeros = (0..(4 - count).max(0)).map(|_| '0').collect::<String>();
             let to_fetch = format!("{gp_url}{site_indicator}{add_zeros}{site}.html");
-            dbg!(&to_fetch);
+            log::info!("{to_fetch}");
+            // dbg!(&to_fetch);
             match self.extract_text_from_url(&to_fetch, None, only_text).await {
                 Some(text) => {
                     if skip_strategy_fn(&text, already_skipped) {

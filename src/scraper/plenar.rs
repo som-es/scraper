@@ -1173,4 +1173,17 @@ mod tests {
         assert_eq!(absences, vec!["Wilhelm Wolterer".to_string()]);
         println!("absences: {absences:?}");
     }
+
+
+    #[tokio::test]
+    async fn test_plenar_xxvii_189() {
+        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/189")
+            .await
+            .unwrap();
+        println!("plenar: {plenar:?}");
+    }
 }

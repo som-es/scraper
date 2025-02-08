@@ -111,15 +111,21 @@ pub fn unique_titles() -> HashSet<&'static str> {
 }
 
 pub type DeclineUrlGegenstand = (String, String, Option<u32>);
-fn extract_from_gegenstand_url(text: &str) -> Option<DeclineUrlGegenstand> {
-    let start = text.find('"')?;
-    let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"')?;
-    let mut gegenstand_url = text[start + 2..end].split('/');
+
+pub fn extract_from_gegenstand_url(url: &str) -> Option<DeclineUrlGegenstand> {
+    let mut gegenstand_url = url.split('/');
     gegenstand_url.next();
     let gp = gegenstand_url.next()?.to_string();
     let ityp = gegenstand_url.next()?.to_string();
     let inr = gegenstand_url.next()?.to_string();
     Some((gp, ityp, inr.parse::<u32>().ok()))
+}
+
+pub fn extract_from_gegenstand_url_text(text: &str) -> Option<DeclineUrlGegenstand> {
+    let start = text.find('"')?;
+    let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"')?;
+    let gegenstand_url = &text[start + 2..end];
+    extract_from_gegenstand_url(gegenstand_url)
 }
 
 pub fn extract_text_from_html(html: &str) -> String {

@@ -79,7 +79,7 @@ impl LegislativeInitiatives for AustriaScraper {
         json!({
             "GP": self.scrape_info.gp,
             "NRBR": self.scrape_info.council_type,
-            "DOKTYP": [
+            /*"DOKTYP": [
                 "VOLKBG",
                 "RV",
                 "RVS",
@@ -95,8 +95,9 @@ impl LegislativeInitiatives for AustriaScraper {
                 "ARH2",
                 "AVB",
                 "URH2",
-                "ME"
-            ],
+                "ME",
+                "AUB"
+            ],*/
             // "VHG": [
             //     "ANTR"
             // ],
@@ -717,6 +718,9 @@ mod tests {
         let initiatives = scraper.post_legis_payload().await.unwrap();
         let paths = scraper.legis_paths(initiatives).unwrap();
         assert!(paths.len() >= 10);
+        println!("length: {}", paths.len());
+
+        return;
 
         let mut error_count = 0;
         for path in &paths {
@@ -1822,4 +1826,33 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
     }
+
+
+    //      72 | XXIII  | I    |   527 | 117318417 |              
+    #[tokio::test]
+    async fn test_xxiii_i_527() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXIII/I/527")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+    }
+
+    // 110965 | XXVII  | I    |    50 | 117423840 |              
+    #[tokio::test]
+    async fn test_xxvii_i_50() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/50")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+    }
+
+
+
+
 }

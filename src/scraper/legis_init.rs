@@ -59,6 +59,8 @@ pub trait LegislativeInitiatives: Scraper {
     }
 }
 
+pub const IGNORE_ITYPS: [&str; 1] = ["J"];
+
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
@@ -116,6 +118,11 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let doktyp = legis_content["doktyp"].as_str()?.to_string();
+
+        if IGNORE_ITYPS.contains(&ityp.as_str()) {
+            return None;
+        }
+
         let inr = legis_content["inr"].as_u64()?;
         let gp = legis_content["gp_code"].as_str()?.to_string();
 

@@ -436,6 +436,8 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
             hidden_votes.vote_type = Some(VoteType::ReversingProposal)
         } else if text.contains("antrag") {
             hidden_votes.vote_type = Some(VoteType::Proposal)
+        } else if text.contains("Antrag auf Kenntnisnahme") {
+            hidden_votes.vote_type = Some(VoteType::Proposal)
         } else if text.contains("Sitzung des Nationalrates")
             && text.contains("Genehmigung")
             && text.to_lowercase().contains("namentliche")
@@ -1876,4 +1878,18 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
     }
+
+    #[tokio::test]
+    async fn test_xxvii_iii_835() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/III/835")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+    }
+
+
+
 }

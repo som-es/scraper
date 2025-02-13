@@ -436,6 +436,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
             hidden_votes.vote_type = Some(VoteType::ReversingProposal)
         } else if text.contains("antrag") {
             hidden_votes.vote_type = Some(VoteType::Proposal)
+        // https://www.parlament.gv.at/gegenstand/XXVII/III/835
         } else if text.contains("Antrag auf Kenntnisnahme") {
             hidden_votes.vote_type = Some(VoteType::Proposal)
         } else if text.contains("Sitzung des Nationalrates")

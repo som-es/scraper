@@ -41,7 +41,7 @@ impl Parties for AustriaScraper {
 
             added_vote_legis_inits += 1;
             
-            if added_vote_legis_inits >= 30 {
+            if added_vote_legis_inits >= 5 {
                 break;
             }
         }
@@ -58,7 +58,7 @@ impl Parties for AustriaScraper {
 
             added_vote_legis_inits += 1;
             
-            if added_vote_legis_inits >= 30 {
+            if added_vote_legis_inits >= 5 {
                 break;
             }
         }

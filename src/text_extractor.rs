@@ -142,7 +142,7 @@ impl TextExtractor {
                 let response = match self.client.get(url).send().await {
                     Ok(res) => res,
                     Err(e) => {
-                        println!("url: {url} Error: {e:?}");
+                        log::error!("url: {url} Error: {e:?}");
                         return None;
                     }
                 };

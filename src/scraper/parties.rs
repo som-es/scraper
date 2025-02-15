@@ -22,7 +22,8 @@ impl Parties for AustriaScraper {
         let raw = self.post_legis_payload().await?;
         let legis_paths = self.legis_paths(raw)?;
         let mut votes = HashSet::new();
-        for path in legis_paths.iter().rev() {
+        let mut added_vote_legis_inits = 0;
+        for (_idx, path) in legis_paths.iter().rev().enumerate() {
             // println!("path: {path}");
             let Ok(legis_init) = self.get_legis_init(path).await else {
                 continue;
@@ -30,11 +31,23 @@ impl Parties for AustriaScraper {
             if legis_init.votes.is_empty() {
                 continue;
             }
-            votes.extend(legis_init.votes.into_iter().map(|vote| vote.party));
-            break;
+            let parties = legis_init.votes.into_iter().map(|vote| vote.party);
+             
+            // if path.contains("XXIV") {
+            //     let parties = parties.clone().collect::<Vec<_>>();
+            //     log::error!("path: {path:?} parties: {parties:?}");
+            // }
+            votes.extend(parties);
+
+            added_vote_legis_inits += 1;
+            
+            if added_vote_legis_inits >= 30 {
+                break;
+            }
         }
 
-        for path in legis_paths.iter() {
+        added_vote_legis_inits = 0;
+        for (_idx, path) in legis_paths.iter().enumerate() {
             let Ok(legis_init) = self.get_legis_init(path).await else {
                 continue;
             };
@@ -42,7 +55,12 @@ impl Parties for AustriaScraper {
                 continue;
             }
             votes.extend(legis_init.votes.into_iter().map(|vote| vote.party));
-            break;
+
+            added_vote_legis_inits += 1;
+            
+            if added_vote_legis_inits >= 30 {
+                break;
+            }
         }
 
         Ok(votes.into_iter().collect())

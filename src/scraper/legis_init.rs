@@ -45,7 +45,7 @@ pub trait LegislativeInitiatives: Scraper {
         let raw = match get_disk_cache_json(proposal_path).await {
             Some(raw) => raw,
             None => {
-                log::info!("NO CACHE!!!!!!!!");
+                log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
                 let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
                 if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
                     log::warn!("could cache raw {proposal_path}: {e:?}")
@@ -452,8 +452,10 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
         }
 
         if text.to_lowercase().contains("namentlich") {
-            let (vote_sum, pro_count, contra_count, invalid_count) =
-                extract_vote_count(text).unwrap();
+            let Some((vote_sum, pro_count, contra_count, invalid_count)) = extract_vote_count(text) else {
+                log::error!("could not extract vote sum, pro count, etc from text: {text:?}");
+                continue;
+            };
             let mut delegate_votes = None;
             for protocol_link_obj in fsth.iter() {
                 let Some(url) = protocol_link_obj["url"].as_str() else {
@@ -507,7 +509,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
                     }
                 };
 
-                println!("variant: {html_text}");
+                // println!("variant: {html_text}");
                 if let Some(new_delegate_votes) = extract_votes_by_name(&html_text) {
                     delegate_votes = Some(new_delegate_votes);
                     break;
@@ -539,7 +541,7 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
 fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     let vote_counts_regex = yes_no_votes_regex();
 
-    let captures = vote_counts_regex.captures(text).unwrap();
+    let captures = vote_counts_regex.captures(text)?;
     Some((
         captures.get(1).unwrap().as_str().parse().unwrap(),
         captures.get(2).unwrap().as_str().parse().unwrap(),
@@ -572,12 +574,12 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let contra_match = contra_regex.find(from_html_text)?;
     let contra_votes_start_idx = contra_match.start();
 
-    dbg!(from_html_text[pro_match.start()..pro_match.end()]
-        .chars()
-        .collect::<String>());
-    dbg!(from_html_text[contra_match.start()..contra_match.end()]
-        .chars()
-        .collect::<String>());
+    // dbg!(from_html_text[pro_match.start()..pro_match.end()]
+    //     .chars()
+    //     .collect::<String>());
+    // dbg!(from_html_text[contra_match.start()..contra_match.end()]
+    //     .chars()
+    //     .collect::<String>());
 
     // let from_html_text = from_html_text.chars().collect::<Vec<char>>();
     // let pro_open_ended = &from_html_text[pro_votes_start_idx..];
@@ -594,7 +596,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // println!("------------ pro_delegates: {pro_delegates:?}");
     // println!("--------------- text: {from_html_text}");
 
-    dbg!(contra_votes_start_idx);
+    // dbg!(contra_votes_start_idx);
     // let contra_open_ended = &from_html_text[contra_votes_start_idx..];
     // let contra_open_ended = &contra_open_ended[contra_open_ended.iter().position(|x| *x == ':')? + 1..];
     let contra_open_ended = &from_html_text[contra_match.end() + 1..];

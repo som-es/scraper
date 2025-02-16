@@ -36,10 +36,8 @@ pub struct LegisUniqueInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct DebateInfo {
     pub about: String,
-    pub references: Vec<Reference>
+    pub references: Vec<Reference>,
 }
-
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct PlenarInfo {
@@ -233,11 +231,10 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     let text = text.replace('\u{ad}', "");
     let titles = unique_titles();
 
-    let text =text 
+    let text = text
         .split_inclusive(' ')
         .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
         .collect::<String>();
-
 
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
     let absence_match = absence_marker_regex.find(&text)?;
@@ -251,9 +248,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         start_idx -= 1;
     }
 
-    let open_ended_absence = &text[start_idx+1..];
+    let open_ended_absence = &text[start_idx + 1..];
     // println!("open_ended_absence: {}", &open_ended_absence[..500]);
-
 
     // let print = &text[start_idx..start_idx + 400];
     // println!("print: {print}");
@@ -272,7 +268,11 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
         .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))
         .min(open_ended_absence.find(", die ich").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(", Zuweisungen").unwrap_or(usize::MAX))
+        .min(
+            open_ended_absence
+                .find(", Zuweisungen")
+                .unwrap_or(usize::MAX),
+        )
         .min(open_ended_absence.find(".").unwrap_or(usize::MAX))
         .min(
             open_ended_absence
@@ -504,15 +504,20 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<PlenarSp
         })
         .filter(|(_, speeches, _)| !speeches.is_empty())
         .flat_map(|(text, speeches, refs)| {
-            let references = refs.iter().flat_map(|x| Some(Reference {
-                gp: x["gp_code"].as_str()?.to_string(),
-                ityp: x["ityp"].as_str()?.to_string(),
-                inr: x["inr"].as_i64()? as u32,
-            })).collect::<Vec<_>>();
+            let references = refs
+                .iter()
+                .flat_map(|x| {
+                    Some(Reference {
+                        gp: x["gp_code"].as_str()?.to_string(),
+                        ityp: x["ityp"].as_str()?.to_string(),
+                        inr: x["inr"].as_i64()? as u32,
+                    })
+                })
+                .collect::<Vec<_>>();
             Some((
                 DebateInfo {
                     about: text.to_string(),
-                    references
+                    references,
                 },
                 speeches
                     .iter()
@@ -740,7 +745,10 @@ mod tests {
                 .map(|x| x.as_str())
                 .collect::<Vec<_>>(),
             vec![
-                "Andreas Kollross", "Petra Vorderwinkler", "Christian Lausch", "Henrike Brandstötter"
+                "Andreas Kollross",
+                "Petra Vorderwinkler",
+                "Christian Lausch",
+                "Henrike Brandstötter"
             ]
         )
     }
@@ -1159,7 +1167,7 @@ mod tests {
         assert_eq!(&absences, &Vec::<String>::new());
     }
 
-    // 
+    //
     #[tokio::test]
     async fn test_absences_extraction_from_doc2() {
         let link = "/dokument/XXIV/NRSITZ/1/fnameorig_144815.html".to_string();
@@ -1173,7 +1181,6 @@ mod tests {
         assert_eq!(absences, vec!["Wilhelm Wolterer".to_string()]);
         println!("absences: {absences:?}");
     }
-
 
     #[tokio::test]
     async fn test_plenar_xxvii_189() {

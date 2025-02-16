@@ -1,13 +1,24 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType, VotedByName
+    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType,
+    VotedByName,
 };
 use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_pro_contra_party_codes_from_string, extract_text_from_html, filter::filter_name_extraction, find_optimal_votes_by_name, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, ProContra, Scraper, TextExtractor
+    caching::{disk_caching, get_disk_cache_json},
+    documents,
+    error::ScraperError,
+    extract_from_gegenstand_url, extract_from_gegenstand_url_text,
+    extract_pro_contra_party_codes_from_string, extract_text_from_html,
+    filter::filter_name_extraction,
+    find_optimal_votes_by_name, person_url_to_id,
+    proposals::ProposalScraper,
+    speeches::extract_speeches,
+    yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand,
+    GegenstandPaths, ProContra, Scraper, TextExtractor,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -42,6 +53,11 @@ pub trait LegislativeInitiatives: Scraper {
         &self,
         proposal_path: &str,
     ) -> Result<LegislativeInitiative, ScraperError> {
+        for ityp in IGNORE_ITYPS {
+            if proposal_path.contains(&format!("{ityp}/")) {
+                return Err(ScraperError::NoVoteFound);
+            }
+        }
         let raw = match get_disk_cache_json(proposal_path).await {
             Some(raw) => raw,
             None => {
@@ -59,13 +75,13 @@ pub trait LegislativeInitiatives: Scraper {
     }
 }
 
-pub const IGNORE_ITYPS: [&str; 1] = ["J"];
+pub const IGNORE_ITYPS: [&str; 3] = ["J", "EUBTG", "AB"];
 
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
-        // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
+    // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
     // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
 
     fn legis_payload(&self) -> Self::Payload {
@@ -248,7 +264,6 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
-
         Some(LegislativeInitiative {
             title,
             description,
@@ -285,16 +300,20 @@ impl LegislativeInitiatives for AustriaScraper {
 }
 
 pub fn extract_references(legis_content: &Value) -> Option<Vec<Reference>> {
-    Some(legis_content["reference"].as_array()?.iter().flat_map(|v| {
-        let (gp, ityp, inr) = extract_from_gegenstand_url(&v["url"].as_str()?[2..])?;
-        Some(
-            Reference {
-                gp,
-                ityp,
-                inr: inr?,
-            }
-        )
-    }).collect::<Vec<_>>())
+    Some(
+        legis_content["reference"]
+            .as_array()?
+            .iter()
+            .flat_map(|v| {
+                let (gp, ityp, inr) = extract_from_gegenstand_url(&v["url"].as_str()?[2..])?;
+                Some(Reference {
+                    gp,
+                    ityp,
+                    inr: inr?,
+                })
+            })
+            .collect::<Vec<_>>(),
+    )
 }
 
 pub fn is_accepted_based_on_votes(
@@ -318,7 +337,7 @@ pub fn extract_invisibly_declined(
     let status_description = legis_content["status"]["description"].as_str();
 
     let Some(status_description) = status_description else {
-        return Some((false, None))
+        return Some((false, None));
     };
 
     if status_description.contains("abgelehnt") {
@@ -334,7 +353,7 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
         if let Some(stages) = legis_content.get("stages") {
             most_fitting_date = extract_most_fitting_date(stages)
         }
-        return most_fitting_date
+        return most_fitting_date;
     }
     for phase in legis_content.get("phase")?.as_array()? {
         let Some(stages) = phase.get("stages") else {
@@ -359,7 +378,7 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option
             most_fitting_votes = extract_most_fitting_votes(stages).await;
         }
 
-        return most_fitting_votes
+        return most_fitting_votes;
     }
 
     for phase in legis_content
@@ -452,7 +471,8 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
         }
 
         if text.to_lowercase().contains("namentlich") {
-            let Some((vote_sum, pro_count, contra_count, invalid_count)) = extract_vote_count(text) else {
+            let Some((vote_sum, pro_count, contra_count, invalid_count)) = extract_vote_count(text)
+            else {
                 log::error!("could not extract vote sum, pro count, etc from text: {text:?}");
                 continue;
             };
@@ -1847,8 +1867,7 @@ mod tests {
         println!("res: {res:?}");
     }
 
-
-    //      72 | XXIII  | I    |   527 | 117318417 |              
+    //      72 | XXIII  | I    |   527 | 117318417 |
     #[tokio::test]
     async fn test_xxiii_i_527() {
         let scraper = AustriaScraper::default();
@@ -1860,7 +1879,7 @@ mod tests {
         println!("res: {res:?}");
     }
 
-    // 110965 | XXVII  | I    |    50 | 117423840 |              
+    // 110965 | XXVII  | I    |    50 | 117423840 |
     #[tokio::test]
     async fn test_xxvii_i_50() {
         let scraper = AustriaScraper::default();
@@ -1892,7 +1911,4 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
     }
-
-
-
 }

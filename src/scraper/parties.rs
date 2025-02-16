@@ -32,7 +32,7 @@ impl Parties for AustriaScraper {
                 continue;
             }
             let parties = legis_init.votes.into_iter().map(|vote| vote.party);
-             
+
             // if path.contains("XXIV") {
             //     let parties = parties.clone().collect::<Vec<_>>();
             //     log::error!("path: {path:?} parties: {parties:?}");
@@ -40,7 +40,7 @@ impl Parties for AustriaScraper {
             votes.extend(parties);
 
             added_vote_legis_inits += 1;
-            
+
             if added_vote_legis_inits >= 5 {
                 break;
             }
@@ -57,7 +57,7 @@ impl Parties for AustriaScraper {
             votes.extend(legis_init.votes.into_iter().map(|vote| vote.party));
 
             added_vote_legis_inits += 1;
-            
+
             if added_vote_legis_inits >= 5 {
                 break;
             }

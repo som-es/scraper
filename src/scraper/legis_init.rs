@@ -111,7 +111,7 @@ impl LegislativeInitiatives for AustriaScraper {
             //     "ANTR"
             // ],
             "DATUM_VON": [
-                Option::<String>::None, Option::<String>::None
+                self.scrape_info.date_start, self.scrape_info.date_end 
             ],
         })
 

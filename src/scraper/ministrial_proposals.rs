@@ -128,10 +128,12 @@ impl AustriaScraper {
 }
 
 impl MinistrialProposalScraper for AustriaScraper {
-    const FILTER_PATH: &'static str = "/Filter/api/filter/data/81?js=eval&showAll=true";
+    const FILTER_PATH: &'static str = "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
+    // const FILTER_PATH: &'static str = "/Filter/api/filter/data/81?js=eval&showAll=true";
     const TO_DELEGATES_IDX: &'static str = "rows";
 
     fn ministrial_payload(&self) -> Self::Payload {
+        println!("scrape info: {:?}", self.scrape_info.gp);
         json!({"GP_CODE": self.scrape_info.gp, "DOKTYP": "MEG"})
     }
 
@@ -248,7 +250,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_ministrial_prop_me_343() {
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
+
+        scraper.scrape_info.gp = vec!["XXVIII".to_string()];
 
         // scraper.get_ministrial_proposal("/gegenstand/XXVII/ME/248");
 
@@ -259,9 +263,9 @@ mod tests {
             .unwrap();
         for path in scraper.ministrial_prop_paths(proposals).unwrap() {
             // println!("path: {path:?}");
-            let ministrial = scraper.get_ministrial_proposal(path).await.unwrap();
+            let ministrial = scraper.get_ministrial_proposal(path.clone()).await.unwrap();
             println!(
-                "shortform: {}",
+                "path: {path:?} shortform: {}",
                 ministrial.gegenstand_info.ressort_shortform
             );
             // println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);

@@ -75,6 +75,8 @@ pub trait Scraper {
 pub struct GeneralScrapeInfo {
     pub gp: Vec<String>,
     pub council_type: Vec<String>,
+    pub date_start: Option<chrono::NaiveDateTime>,
+    pub date_end: Option<chrono::NaiveDateTime>,
 }
 
 impl Default for GeneralScrapeInfo {
@@ -82,6 +84,8 @@ impl Default for GeneralScrapeInfo {
         Self {
             gp: vec!["XXVIII".to_string()],
             council_type: vec!["NR".to_string()],
+            date_start: None,
+            date_end: None,
         }
     }
 }

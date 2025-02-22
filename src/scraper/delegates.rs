@@ -288,7 +288,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     let mut is_gov = false;
     let mut is_ministry = false;
     let mut is_chancellor = false;
-    if ref_function == Some("BM") {
+    if ref_function == Some("BM") || name.to_lowercase().contains("minister") {
         is_gov = true;
         is_ministry = true;
     }
@@ -296,6 +296,10 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     if ref_function == Some("BK") {
         is_gov = true;
         is_chancellor = true;
+    }
+    
+    if ref_function == Some("VK") {
+        is_gov = true;
     }
 
     if ref_function == Some("STS") {

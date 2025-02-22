@@ -304,7 +304,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     
     let mut is_nr = false;
     if ref_function == Some("NR") {
-        is_nr =  true;
+        is_nr = true;
     }
 
     Some(Mandate {

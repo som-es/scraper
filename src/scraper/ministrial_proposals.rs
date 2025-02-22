@@ -149,7 +149,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         let raw_ministrial_content = &raw_ministrial["content"];
         let ityp = raw_ministrial_content["ityp"].as_str().unwrap().to_string();
 
-        println!("{}", serde_json::to_string_pretty(&raw_ministrial).unwrap());
+        // println!("{}", serde_json::to_string_pretty(&raw_ministrial).unwrap());
 
         let description = raw_ministrial_content["description"].as_str()?.to_string();
         let raw_documents = raw_ministrial_content["documents"]

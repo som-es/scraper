@@ -43,7 +43,7 @@ pub async fn extract_gov_official(
     raw_official: &Value,
     delegate_scraper: &(impl DelegateScraper + Sync),
 ) -> Option<GovOfficial> {
-    println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
+    // println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
     let raw_official = raw_official.as_array()?;
     let function_and_dates = extract_function_and_dates(raw_official[3].as_str()?)?;
 
@@ -57,10 +57,10 @@ pub async fn extract_gov_official(
         .end_date
         .and_then(|end_date| chrono::NaiveDate::parse_from_str(end_date, "%d.%m.%Y").ok());
 
-    let delegate = delegate_scraper
-        .get_delegate(format!("/person/{id}").as_str().into())
-        .await
-        .ok()?;
+    // let delegate = delegate_scraper
+    //     .get_delegate(format!("/person/{id}").as_str().into())
+    //     .await
+    //     .ok()?;
     Some(GovOfficial {
         government: raw_official[1].as_str()?.to_string(),
         function: function_and_dates.function.to_string(),
@@ -68,7 +68,6 @@ pub async fn extract_gov_official(
         start_date,
         end_date,
         delegate_id: id,
-        delegate,
     })
 }
 
@@ -176,8 +175,8 @@ mod tests {
             chrono::NaiveDate::from_ymd_opt(2020, 1, 7).unwrap()
         );
         // assert_eq!(gov_official.end_date, None);
-        assert_eq!(gov_official.delegate.id, 65321);
-        assert_eq!(gov_official.delegate.name, "Kurz Sebastian");
+        assert_eq!(gov_official.delegate_id, 65321);
+        // assert_eq!(gov_official.delegate.name, "Kurz Sebastian");
         // assert!(gov_official.delegate.is_active);
     }
 

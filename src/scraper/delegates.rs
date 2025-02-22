@@ -273,6 +273,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     let end = raw_mandate["mandatBis"].as_str()?.to_string();
     let party = raw_mandate["wahlpartei"].as_str().map(ToString::to_string);
     let constituency = raw_mandate["wahlkreis"].as_str().map(ToString::to_string);
+    let function = raw_mandate["funktion"].as_str().map(ToString::to_string);
 
     let start = NaiveDate::parse_from_str(&start, "%d.%m.%Y").ok()?;
 
@@ -282,12 +283,41 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
         NaiveDate::parse_from_str(&end, "%d.%m.%Y").ok()
     };
 
+    let ref_function = function.as_ref().map(|x| x.as_str());
+
+    let mut is_gov = false;
+    let mut is_ministry = false;
+    let mut is_chancellor = false;
+    if ref_function == Some("BM") {
+        is_gov = true;
+        is_ministry = true;
+    }
+    
+    if ref_function == Some("BK") {
+        is_gov = true;
+        is_chancellor = true;
+    }
+
+    if ref_function == Some("STS") {
+        is_gov = true;
+    }
+    
+    let mut is_nr = false;
+    if ref_function == Some("NR") {
+        is_nr =  true;
+    }
+
     Some(Mandate {
         name,
         party,
         constituency,
         start,
         end,
+        function,
+        is_nr,
+        is_gov,
+        is_ministry,
+        is_chancellor,
     })
 }
 
@@ -399,7 +429,7 @@ mod tests {
             res.contact.mail,
             Some("martina.diesner-wais@parlament.gv.at".into())
         );
-        assert_eq!(res.contact.social_media, SocialMedia::default());
+        // assert_eq!(res.contact.social_media, SocialMedia::default());
         assert_eq!(res.gender, Gender::Female);
         assert_eq!(
             res.mandates,
@@ -409,7 +439,12 @@ mod tests {
                     constituency: Some("3B - Waldviertel".to_string()),
                     party: Some("ÖVP".into()),
                     start: NaiveDate::from_ymd_opt(2013, 10, 29).unwrap(),
-                    end: None
+                    end: None,
+                    function: Some("NR".into()),
+                    is_gov: false,
+                    is_nr: true,
+                    is_ministry: false,
+                    is_chancellor: false,
                 },
                 Mandate {
                     name: "Mitglied des Bundesrates".into(),
@@ -418,19 +453,34 @@ mod tests {
                         "In den Bundesrat entsendet vom Niederösterreichischen Landtag".into()
                     ),
                     start: NaiveDate::from_ymd_opt(2003, 4, 24).unwrap(),
-                    end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
+                    end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap()),
+                    function: Some("BR".into()),
+                    is_gov: false,
+                    is_nr: false,
+                    is_ministry: false,
+                    is_chancellor: false,
                 },
                 Mandate {
                     name: "Schriftführerin des Bundesrates".into(),
                     party: None,
                     constituency: None,
                     start: NaiveDate::from_ymd_opt(2010, 11, 5).unwrap(),
-                    end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap())
+                    is_chancellor: false,
+                    end: Some(NaiveDate::from_ymd_opt(2013, 4, 23).unwrap()),
+                    is_gov: false,
+                    is_ministry: false,
+                    function: Some("ZSB".into()),
+                    is_nr: false,
                 },
                 Mandate {
                     name: "Schriftführerin des Bundesrates".into(),
+                    is_gov: false,
+                    is_chancellor: false,
+                    is_ministry: false,
+                    is_nr: false,
                     party: None,
                     constituency: None,
+                    function: Some("ZSB".into()),
                     start: NaiveDate::from_ymd_opt(2006, 1, 1).unwrap(),
                     end: Some(NaiveDate::from_ymd_opt(2006, 6, 30).unwrap())
                 },

@@ -128,8 +128,7 @@ impl AustriaScraper {
 }
 
 impl MinistrialProposalScraper for AustriaScraper {
-    const FILTER_PATH: &'static str = "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
-    // const FILTER_PATH: &'static str = "/Filter/api/filter/data/81?js=eval&showAll=true";
+    const FILTER_PATH: &'static str = "/Filter/api/filter/data/81?js=eval&showAll=true";
     const TO_DELEGATES_IDX: &'static str = "rows";
 
     fn ministrial_payload(&self) -> Self::Payload {
@@ -150,7 +149,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         let raw_ministrial_content = &raw_ministrial["content"];
         let ityp = raw_ministrial_content["ityp"].as_str().unwrap().to_string();
 
-        // println!("{}", serde_json::to_string_pretty(&raw_ministrial).unwrap());
+        println!("{}", serde_json::to_string_pretty(&raw_ministrial).unwrap());
 
         let description = raw_ministrial_content["description"].as_str()?.to_string();
         let raw_documents = raw_ministrial_content["documents"]
@@ -249,14 +248,38 @@ mod tests {
     use super::MinistrialProposalScraper;
 
     #[tokio::test]
+    async fn test_ministrial_props_xxvi() {
+        let scraper = AustriaScraper::default();
+        let mut proposal_payload = ProposalsPayload::default();
+        proposal_payload.scrape_info.gp = vec!["XXVI".to_string()];
+    
+        let proposals = scraper
+            .post_ministrial_proposals_payload(proposal_payload)
+            .await
+            .unwrap();
+        for path in scraper.ministrial_prop_paths(proposals).unwrap() {
+            // println!("path: {path:?}");
+            let ministrial = scraper.get_ministrial_proposal(path.clone()).await.unwrap();
+            println!("");
+            println!(
+                "path: {path:?} shortform: {}",
+                ministrial.gegenstand_info.ressort_shortform
+            );
+            println!("ministrial issuers: {:?}", ministrial.delegate_ids);
+            // println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);
+        }
+
+    }
+
+    #[tokio::test]
     async fn test_ministrial_prop_me_343() {
         let mut scraper = AustriaScraper::default();
 
-        scraper.scrape_info.gp = vec!["XXVIII".to_string()];
 
         // scraper.get_ministrial_proposal("/gegenstand/XXVII/ME/248");
 
-        let proposal_payload = ProposalsPayload::default();
+        let mut proposal_payload = ProposalsPayload::default();
+        proposal_payload.scrape_info.gp = vec!["XXVII".to_string()];
         let proposals = scraper
             .post_ministrial_proposals_payload(proposal_payload)
             .await

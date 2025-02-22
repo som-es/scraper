@@ -17,7 +17,7 @@ use super::{AustriaScraper, GegenstandPaths, Scraper};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct ProposalsPayload {
     pub date_payload: DatePayload,
-    scrape_info: GeneralScrapeInfo,
+    pub scrape_info: GeneralScrapeInfo,
 }
 
 impl ProposalsPayload {

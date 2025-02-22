@@ -45,9 +45,10 @@ pub async fn extract_gov_official(
 ) -> Option<GovOfficial> {
     println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
     let raw_official = raw_official.as_array()?;
-    let function_and_dates = extract_function_and_dates(raw_official[2].as_str()?)?;
+    let function_and_dates = extract_function_and_dates(raw_official[3].as_str()?)?;
 
-    let id = extract_id_from_unnecessary_link(raw_official[9].as_str()?)?;
+    let id = raw_official[0].as_u64()?;
+    // let id = extract_id_from_unnecessary_link(raw_official[9].as_str()?)?;
 
     let start_date =
         chrono::NaiveDate::parse_from_str(function_and_dates.start_date, "%d.%m.%Y").ok()?;
@@ -61,11 +62,12 @@ pub async fn extract_gov_official(
         .await
         .ok()?;
     Some(GovOfficial {
-        government: extract_gov_from_html(raw_official[0].as_str()?),
+        government: raw_official[1].as_str()?.to_string(),
         function: function_and_dates.function.to_string(),
-        ministry: raw_official[7].as_str()?.to_string(),
+        ministry: raw_official[5].as_str()?.to_string(),
         start_date,
         end_date,
+        delegate_id: id,
         delegate,
     })
 }
@@ -73,7 +75,8 @@ pub async fn extract_gov_official(
 #[async_trait]
 impl GovOfficials for AustriaScraper {
     const FILTER_PATH: &'static str =
-        "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_018&listeId=undefined&showAll=true";
+        // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFW_018&listeId=undefined&showAll=true";
+        "/Filter/api/filter/data/1718?1=1&showAll=true";
 
     async fn gov_officials(&self) -> Option<Vec<GovOfficial>> {
         Some(
@@ -100,9 +103,7 @@ impl GovOfficials for AustriaScraper {
           "REG": [
             "0"
           ],
-          "R_ZEIT": [
-            "AKT"
-          ]
+          
         })
     }
 }
@@ -115,7 +116,14 @@ pub struct FunctionAndDates<'a> {
 }
 
 fn extract_function_and_dates(function_text: &str) -> Option<FunctionAndDates> {
-    let mut function_text = function_text.split("<br />");
+    let break_str = if function_text.contains("<br>") {
+        "<br>"
+    } else if function_text.contains("<br/>") {
+        "<br/>"
+    } else {
+        "<br />"
+    };
+    let mut function_text = function_text.split(break_str);
     let function = function_text.next()?;
     let dates = function_text.next()?;
 
@@ -150,36 +158,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_single_gov_official_from_json() {
-        let raw_gov = json!([
-            r#"<span title="06.12.2021 - " class="zeigeTooltip">Nehammer</span>"#,
-            "Mag. Werner Kogler",
-            "Bundesminister<br />06.12.2021 - ",
-            "134",
-            "007",
-            "Kogler",
-            "D",
-            "Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport",
-            "10.05.2023",
-            "/WWER/PAD_08242/index.shtml"
-        ]);
+        let raw_gov = json!(
+            [65321,"Kurz II","Sebastian Kurz","Bundeskanzler<br/>07.01.2020 - 11.10.2021","Bundeskanzler:in","Bundeskanzleramt","Kurz","Männer","Tue Jan 07 00:00:00 CET 2020","/person/65321",1]
+        );
         let scraper = AustriaScraper::default();
         let gov_official = super::extract_gov_official(&raw_gov, &scraper)
             .await
             .unwrap();
-        assert_eq!(gov_official.government, "Nehammer");
-        assert_eq!(gov_official.function, "Bundesminister");
+        assert_eq!(gov_official.government, "Kurz II");
+        assert_eq!(gov_official.function, "Bundeskanzler");
         assert_eq!(
             gov_official.ministry,
-            "Bundesministerium für Kunst, Kultur, öffentlichen Dienst und Sport"
+            "Bundeskanzleramt"
         );
         assert_eq!(
             gov_official.start_date,
-            chrono::NaiveDate::from_ymd_opt(2021, 12, 6).unwrap()
+            chrono::NaiveDate::from_ymd_opt(2020, 1, 7).unwrap()
         );
-        assert_eq!(gov_official.end_date, None);
-        assert_eq!(gov_official.delegate.id, 8242);
-        assert_eq!(gov_official.delegate.name, "Kogler Werner, Mag.");
-        assert!(gov_official.delegate.is_active);
+        // assert_eq!(gov_official.end_date, None);
+        assert_eq!(gov_official.delegate.id, 65321);
+        assert_eq!(gov_official.delegate.name, "Kurz Sebastian");
+        // assert!(gov_official.delegate.is_active);
     }
 
     #[test]

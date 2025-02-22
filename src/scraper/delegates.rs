@@ -292,12 +292,12 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
         is_gov = true;
         is_ministry = true;
     }
-    
+
     if ref_function == Some("BK") {
         is_gov = true;
         is_chancellor = true;
     }
-    
+
     if ref_function == Some("VK") {
         is_gov = true;
     }
@@ -305,7 +305,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
     if ref_function == Some("STS") {
         is_gov = true;
     }
-    
+
     let mut is_nr = false;
     if ref_function == Some("NR") {
         is_nr = true;

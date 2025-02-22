@@ -136,7 +136,7 @@ impl TextExtractor {
         attribute_extraction_fn: Option<fn(&Html, &str) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
-        let mut html = match get_disk_cache(cache_key).await {
+        let mut html = match get_disk_cache(cache_key, 60 * 60 * 24 * 30).await {
             Some(html) => html,
             None => {
                 let response = match self.client.get(url).send().await {

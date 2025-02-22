@@ -252,7 +252,7 @@ mod tests {
         let scraper = AustriaScraper::default();
         let mut proposal_payload = ProposalsPayload::default();
         proposal_payload.scrape_info.gp = vec!["XXVI".to_string()];
-    
+
         let proposals = scraper
             .post_ministrial_proposals_payload(proposal_payload)
             .await
@@ -268,13 +268,11 @@ mod tests {
             println!("ministrial issuers: {:?}", ministrial.delegate_ids);
             // println!("{:?} {:?} {:?}", ministrial.legis_gp, ministrial.legis_init_inr, ministrial.legis_init_ityp);
         }
-
     }
 
     #[tokio::test]
     async fn test_ministrial_prop_me_343() {
         let mut scraper = AustriaScraper::default();
-
 
         // scraper.get_ministrial_proposal("/gegenstand/XXVII/ME/248");
 

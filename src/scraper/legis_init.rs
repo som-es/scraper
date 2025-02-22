@@ -8,7 +8,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
+    caching::{disk_caching, get_disk_cache_json, get_disk_cache_json_with_secs},
     documents,
     error::ScraperError,
     extract_from_gegenstand_url, extract_from_gegenstand_url_text,
@@ -58,7 +58,7 @@ pub trait LegislativeInitiatives: Scraper {
                 return Err(ScraperError::NoVoteFound);
             }
         }
-        let raw = match get_disk_cache_json(proposal_path).await {
+        let raw = match get_disk_cache_json_with_secs(proposal_path, 60 * 60 * 24 * 2).await {
             Some(raw) => raw,
             None => {
                 log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
@@ -111,7 +111,7 @@ impl LegislativeInitiatives for AustriaScraper {
             //     "ANTR"
             // ],
             "DATUM_VON": [
-                self.scrape_info.date_start, self.scrape_info.date_end 
+                self.scrape_info.date_start, self.scrape_info.date_end
             ],
         })
 

@@ -12,7 +12,7 @@ fn ignore_cache_xxvii() -> bool {
     std::env::var("SCRAPER_IGNORE_CACHE_XXVII").unwrap_or("true".into()) == "true"
 }
 
-pub async fn get_disk_cache(entry: &str) -> Option<String> {
+pub async fn get_disk_cache(entry: &str, redo_secs: u64) -> Option<String> {
     if entry.contains("XXVIII/") && ignore_cache_xxvii() {
         //     // ignores cache
         return None;
@@ -27,7 +27,7 @@ pub async fn get_disk_cache(entry: &str) -> Option<String> {
         .modified()
         .ok()?;
     let last_modified_duration = SystemTime::now().duration_since(last_modified).ok()?;
-    if last_modified_duration.as_secs() > 60 * 60 * 24 * 190 {
+    if last_modified_duration.as_secs() > redo_secs {
         return None;
     }
 
@@ -43,7 +43,13 @@ pub async fn disk_caching(entry: &str, data: impl AsRef<[u8]>) -> std::io::Resul
 }
 
 pub async fn get_disk_cache_json(entry: &str) -> Option<Value> {
-    get_disk_cache(entry)
+    get_disk_cache(entry, 60 * 60 * 24 * 190)
+        .await
+        .map(|x| serde_json::from_str(&x).ok())?
+}
+
+pub async fn get_disk_cache_json_with_secs(entry: &str, redo_secs: u64) -> Option<Value> {
+    get_disk_cache(entry, redo_secs)
         .await
         .map(|x| serde_json::from_str(&x).ok())?
 }

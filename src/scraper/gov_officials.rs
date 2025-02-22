@@ -3,8 +3,7 @@ use common_scrapes::GovOfficial;
 use serde_json::{json, Value};
 
 use crate::{
-    delegates::DelegateScraper, error::ScraperError, extract_text_from_html, AustriaScraper,
-    Scraper,
+    caching::{disk_caching, get_disk_cache_json}, delegates::DelegateScraper, error::ScraperError, extract_text_from_html, AustriaScraper, Scraper
 };
 
 #[async_trait]
@@ -78,11 +77,24 @@ impl GovOfficials for AustriaScraper {
         "/Filter/api/filter/data/1718?1=1&showAll=true";
 
     async fn gov_officials(&self) -> Option<Vec<GovOfficial>> {
+        let path = "officials.json";
+        let gov_officials_raw = match get_disk_cache_json(path).await {
+            Some(raw) => raw,
+            None => {
+                let raw_proposal = self.post_gov_officials_payload()
+                    .await
+                    .ok()?;
+
+                if let Err(e) = disk_caching(path, raw_proposal.to_string()).await {
+                    log::warn!("could cache raw {path}: {e:?}")
+                }
+                raw_proposal
+            },
+        };
+        
         Some(
             futures::future::join_all(
-                self.post_gov_officials_payload()
-                    .await
-                    .ok()?
+                    gov_officials_raw 
                     .get("rows")?
                     .as_array()?
                     .iter()

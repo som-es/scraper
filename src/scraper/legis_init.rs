@@ -58,7 +58,7 @@ pub trait LegislativeInitiatives: Scraper {
                 return Err(ScraperError::NoVoteFound);
             }
         }
-        let raw = match get_disk_cache_json_with_secs(proposal_path, 60 * 60 * 24 * 2).await {
+        let raw = match get_disk_cache_json(proposal_path).await {
             Some(raw) => raw,
             None => {
                 log::info!("NO CACHE!!!!!!!! {proposal_path:?}");

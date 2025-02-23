@@ -372,6 +372,9 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "Kolleginnen",
         "einige",
         "nämlich",
+        "Dipl",
+        "heute",
+        
     ]
     .into_iter()
     .collect::<HashSet<_>>();
@@ -1189,6 +1192,19 @@ mod tests {
         let scraper = AustriaScraper::default();
         let plenar = scraper
             .get_plenar("/gegenstand/XXVII/NRSITZ/189")
+            .await
+            .unwrap();
+        println!("plenar: {plenar:?}");
+    }
+
+
+    #[tokio::test]
+    async fn test_plenar_xxvii_243() {
+        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/243")
             .await
             .unwrap();
         println!("plenar: {plenar:?}");

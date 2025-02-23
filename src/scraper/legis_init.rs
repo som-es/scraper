@@ -1911,4 +1911,16 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
     }
+    
+    #[tokio::test]
+    async fn test_xxvii_a_3342() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3342")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        // plenary_session_id:2747091
+    }
 }

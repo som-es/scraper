@@ -1939,4 +1939,19 @@ mod tests {
         // plenary_session_id:2747091
         // /gegenstand/XXV/UEA/855
     }
+
+    // /gegenstand/XXV/UEA/835?
+    
+    #[tokio::test]
+    async fn test_xxv_uea_835() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXV/UEA/835")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        // plenary_session_id:2747091
+        // /gegenstand/XXV/UEA/855
+    }
 }

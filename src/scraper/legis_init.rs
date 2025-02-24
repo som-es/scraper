@@ -582,17 +582,14 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let from_html_text = &from_html_text[start_of_yes_no_idx..];
     let from_html_text = &from_html_text.replace("Graf Herbert L.", "Graf Herbert L");
 
-    let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
+    let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:").unwrap();
     let contra_regex =
-        Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*:").unwrap();
+        Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:").unwrap();
 
-    // println!("next: {from_html_text}");
-
+    // println!("form {from_html_text}");
     let pro_match = pro_regex.find(from_html_text)?;
-    let pro_votes_start_idx = pro_match.start();
+    let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;
 
-    let contra_match = contra_regex.find(from_html_text)?;
-    let contra_votes_start_idx = contra_match.start();
 
     // dbg!(from_html_text[pro_match.start()..pro_match.end()]
     //     .chars()
@@ -818,23 +815,29 @@ mod tests {
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
             for path in scraper.legis_paths(initiatives).unwrap() {
-                println!();
-                println!("path: {path:?}");
+                // println!();
+                // println!("path: {path:?}");
                 let Ok(init) = scraper.get_legis_init(&path).await else {
                     println!("error {}{path}", AustriaScraper::BASE_URL);
                     continue;
                 };
-                println!("init: {init:?}");
+                // println!("init: {init:?}");
                 if init.hidden_votes_info.voted_by_name {
                     println!("init: title: {}, accepted: {:?}, votes: {:?}, id: {:?}, hidden_votes: {:?}, ", init.title, init.accepted, init.votes, init.id, init.hidden_votes_info);
                     println!(" {}{path}", AustriaScraper::BASE_URL,);
-                    count += 1;
+                    if let Some(c) = init.hidden_votes_info.voted_by_name_data {
+                        if let Some(d) = c.delegates_pro_contra {
+                            count += 1;
+                        }
+                    }
                 }
             }
             println!("elapsed: {:?}", start.elapsed());
             println!("count: {count:?}");
-            break;
+            // break;
         }
+
+        println!("count: {count:?}");
     }
 
     #[tokio::test]
@@ -1922,5 +1925,18 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
         // plenary_session_id:2747091
+    }
+
+    #[tokio::test]
+    async fn test_xxv_uea_855() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXV/UEA/855")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        // plenary_session_id:2747091
+        // /gegenstand/XXV/UEA/855
     }
 }

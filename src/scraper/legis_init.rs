@@ -495,7 +495,7 @@ pub async fn extract_most_fitting_votes(
 
         if !(text.contains("Abstimmung")
             || text.contains("abgelehnt")
-            || text.contains("angenommen")) || (text.contains("Ausschuss") && !text.contains("Nationalrat"))
+            || text.contains("angenommen")) || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
         {
             continue;
         }
@@ -2070,4 +2070,66 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {contra: vec!["V".to_string(),"S".to_string(),"G".to_string(), "N".into()], pro: vec!["F".into()] });
     }
+
+    #[tokio::test]
+    async fn test_xxvii_a_571() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/A/571")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::Proposal, stage: Stage::None });
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {pro: vec!["S".to_string(),"N".to_string(),"J".to_string()], contra: vec!["V".into(), "F".into()] });
+    }
+    
+    #[tokio::test]
+    async fn test_xxvii_uea_144() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/UEA/144")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+        assert_eq!(res.plenary_session, Some(60));
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert_eq!(named_vote.contra_count, 109);
+        let pro_contra = named_vote.delegates_pro_contra.unwrap();
+        assert!(pro_contra.contra.contains(&"Zanger Wolfgang".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_xxvi_i_282() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/I/282")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, None);
+    }
+
+    #[tokio::test]
+    async fn test_xxvi_i_178() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/I/178")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, None);
+    }
+
+
 }

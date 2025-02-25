@@ -654,6 +654,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // println!("form {from_html_text}");
     let pro_match = pro_regex.find(from_html_text)?;
     let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;
+    println!("from html text: {from_html_text}");
 
     // dbg!(from_html_text[pro_match.start()..pro_match.end()]
     //     .chars()
@@ -667,8 +668,15 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // let pro_open_ended = &pro_open_ended[pro_open_ended.iter().position(|x| *x == ':')? + 1..];
     let pro_open_ended = &from_html_text[pro_match.end()..];
     // let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
-    let end_pro_idx = pro_open_ended.find('.')?;
-    let pro_delegates = &pro_open_ended[..end_pro_idx];
+    let end_pro_idx = pro_open_ended.find('.');
+    let pro_delegates = match end_pro_idx {
+        Some(end_pro_idx) => {
+            &pro_open_ended[..end_pro_idx]
+        },
+        None => {
+           &from_html_text[pro_match.end()..contra_match.start()-1]
+        },
+    };
 
     // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
 
@@ -682,8 +690,16 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // let contra_open_ended = &contra_open_ended[contra_open_ended.iter().position(|x| *x == ':')? + 1..];
     let contra_open_ended = &from_html_text[contra_match.end() + 1..];
     // let end_contra_idx = contra_open_ended.iter().position(|x| *x == '.')?;
-    let end_contra_idx = contra_open_ended.find('.')?;
-    let contra_delegates = &contra_open_ended[..end_contra_idx];
+    let end_contra_idx = contra_open_ended.find('.');
+    let contra_delegates = match end_contra_idx {
+        Some(end_contra_idx) => {
+            &contra_open_ended[..end_contra_idx]
+        },
+        None => {
+            let end_contra_idx = contra_open_ended.find('*')?;
+            &contra_open_ended[..end_contra_idx-1]
+        },
+    };
 
     // let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());
     let contra_delegates = group_names_from_vote_section(contra_delegates);
@@ -783,7 +799,17 @@ mod tests {
         AustriaScraper, Scraper,
     };
 
-    use super::is_accepted_based_on_votes;
+    use super::{extract_vote_count, is_accepted_based_on_votes};
+
+    #[test]
+    fn test_vote_count_extraction() {
+        let text = r#"<a href=\"/gegenstand/XXV/NRSITZ/75\">75. Sitzung des Nationalrates</a>: Unselbständiger Entschließungsantrag abgelehnt<br>Namentliche Abstimmung (abgegebene Stimme: 141, davon Ja-Stimmen: 34, Nein-Stimmen: 107)"#;
+        let x = extract_vote_count(text).unwrap();
+        assert_eq!(x.0, 141);
+        assert_eq!(x.1, 34);
+        assert_eq!(x.2, 107);
+
+    }
 
     #[test]
     fn test_accepted_on_vote_count_stuff() {
@@ -2131,5 +2157,22 @@ mod tests {
         assert_eq!(res.accepted, None);
     }
 
+    #[tokio::test]
+    async fn test_xxv_uea_443() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXV/UEA/443")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted.unwrap(), AcceptedState::Declined);
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert!(named_vote.delegates_pro_contra.unwrap().contra.contains(&"Yilmaz".to_string()));
+        assert_eq!(named_vote.contra_count, 83);
+        assert_eq!(named_vote.pro_count, 52);
+        assert_eq!(named_vote.vote_sum, 135);
+    }
 
 }

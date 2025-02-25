@@ -60,7 +60,7 @@ pub fn remove_plenar_info(haystack: &str) -> String {
 }
 
 pub fn yes_no_votes_regex() -> Regex {
-    Regex::new(r"(?i)abg.*ne\s*St.*men[:\s]*\s*(\d+)[^\d]*.*Ja.*-Sti.men[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.en[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
+    Regex::new(r"(?i)abg.*ne\s*St.*me.[:\s]*\s*(\d+)[^\d]*.*Ja.*-Sti.me.[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.e.[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
         .unwrap()
 }
 

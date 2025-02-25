@@ -10,5 +10,6 @@ pub fn filter_name_extraction<'a>(
         .map(|name| name.replace('\r', " "))
         .map(|name| name.replace('\u{a0}', " "))
         .map(|name| remove_multiple_of(&name, ' '))
+        .filter(|name| name.len() > 0)
     // .map(|name| remove_multiple_of(&name, '\n'))
 }

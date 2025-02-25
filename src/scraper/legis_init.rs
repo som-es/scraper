@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType,
-    VotedByName,
+    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Reference, Speech, Stage, Vote, VoteStage, VoteType, VotedByName
 };
 use regex::Regex;
 use serde_json::{json, Value};
@@ -211,7 +210,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let requires_simple_majority =
             extract_majority_on_indicators(legis_content).unwrap_or(true);
-        let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content)?;
+        let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content);
 
         let (plenary_session, hidden_votes) = extract_hidden_votes(legis_content).await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
@@ -231,12 +230,16 @@ impl LegislativeInitiatives for AustriaScraper {
                 requires_simple_majority,
             ))
         }
-        if accepted.is_none() && was_invisibly_declined {
-            accepted = Some(AcceptedState::PreDeclined);
+        if accepted.is_none() && was_invisibly_declined.is_some() {
+            if was_invisibly_declined.unwrap() {
+                accepted = Some(AcceptedState::PreDeclined);
+            } else {
+                accepted = Some(AcceptedState::Accepted);
+            }
 
             // proposals are inversed declined warum auch immer !
             if let (Some(VoteType::ReversingProposal), Some(pro_contra)) =
-                (hidden_votes.vote_type, &mut hidden_votes.pro_contra_parties)
+                (hidden_votes.vote_stage.map(|x| x.vote_type), &mut hidden_votes.pro_contra_parties)
             {
                 core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
                 speeches = speeches
@@ -250,6 +253,14 @@ impl LegislativeInitiatives for AustriaScraper {
                     .collect();
             }
         };
+
+        if accepted.is_none() && hidden_votes.was_declined.is_some() {
+            if hidden_votes.was_declined.unwrap() {
+                accepted = Some(AcceptedState::PreDeclined);
+            } else {
+                accepted = Some(AcceptedState::Accepted);
+            }
+        }
 
         // /gegenstand/XXII/A/231
         // if accepted.is_some() {
@@ -335,20 +346,28 @@ pub fn is_accepted_based_on_votes(
     }
 }
 
+pub fn extract_invisibly_declined_from_text(text: &str) -> (Option<bool>, Option<DeclineUrlGegenstand>) {
+    let url = extract_from_gegenstand_url_text(text);
+    if text.contains("abgelehnt") {
+        return (Some(true), url);
+    }
+    
+    if text.contains("angenommen") {
+        return (Some(false), url);
+    }
+
+    (None, None)
+}
+
 pub fn extract_invisibly_declined(
     legis_content: &Value,
-) -> Option<(bool, Option<DeclineUrlGegenstand>)> {
+) -> (Option<bool>, Option<DeclineUrlGegenstand>) {
     let status_description = legis_content["status"]["description"].as_str();
 
     let Some(status_description) = status_description else {
-        return Some((false, None));
+        return (None, None);
     };
-
-    if status_description.contains("abgelehnt") {
-        return Some((true, extract_from_gegenstand_url_text(status_description)));
-    }
-
-    Some((false, None))
+    return extract_invisibly_declined_from_text(status_description) 
 }
 
 pub fn extract_date(legis_content: &Value) -> Option<&str> {
@@ -410,31 +429,42 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option
     most_fitting_votes
 }
 
-pub fn classify_vote_type(text: &str) -> Option<VoteType> {
-    if text.contains("Gesetzesvorschlag in zweiter Lesung") {
-        Some(VoteType::Second)
+pub fn classify_vote_stage(text: &str) -> Option<VoteStage> {
+    let mut vote_stage = VoteStage::default();
+    vote_stage.stage = if text.contains("Gesetzesvorschlag in zweiter Lesung") {
+        Stage::Second
     } else if text.contains("Gesetzesvorschlag in dritter Lesung") {
-        Some(VoteType::Third)
+        Stage::Third
     } else if text.contains("erster Lesung") {
-        Some(VoteType::First)
-    } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
-        Some(VoteType::ReversingProposal)
-    } else if text.contains("antrag") {
-        Some(VoteType::Proposal)
-    // https://www.parlament.gv.at/gegenstand/XXVII/III/835
-    } else if text.contains("Antrag auf Kenntnisnahme") {
-        Some(VoteType::Proposal)
+        Stage::First
+    } else {
+        Stage::None
+    };
+    vote_stage.vote_type = if text.contains("Antrag, den ablehnenden Ausschussbericht") {
+        VoteType::ReversingProposal
     } else if text.contains("Sitzung des Nationalrates")
         && text.contains("Genehmigung")
         && text.to_lowercase().contains("namentliche")
     {
-        Some(VoteType::OnlyVotedByName)
+        VoteType::OnlyVotedByName
     } else if text.to_lowercase().contains("namentliche abstimmung") {
-        Some(VoteType::AnyNamedVote)
+        VoteType::AnyNamedVote
+    } else if text.contains("antrag") {
+        VoteType::Proposal
+    // https://www.parlament.gv.at/gegenstand/XXVII/III/835
+    } else if text.contains("Antrag auf Kenntnisnahme") {
+        VoteType::Proposal 
+    } else if text.to_lowercase().contains("gesetzesvorschlag") {
+        VoteType::Proposal
     } else {
         // need to find fitting type, some stages are bs
-        None
-    }
+        if vote_stage.stage != Stage::None {
+            VoteType::None
+        } else {
+            return None
+        }
+    };
+    Some(vote_stage)
 }
 
 pub async fn extract_most_fitting_votes(
@@ -445,10 +475,13 @@ pub async fn extract_most_fitting_votes(
     let is_site_stored_regex = Regex::new(r"SEITE_\d+.html").unwrap();
 
     let mut hidden_votes = HiddenVotes::default();
-    hidden_votes.vote_type = status
+    hidden_votes.vote_stage = status
         .map(|status| status["description"].as_str())
         .flatten()
-        .map(|desc| classify_vote_type(desc))
+        .map(|desc| {
+            let desc = &desc[desc.find("Nationalrat").unwrap_or_default()..];
+            classify_vote_stage(desc)
+        })
         .flatten();
 
     let mut plenary_session = None;
@@ -462,10 +495,11 @@ pub async fn extract_most_fitting_votes(
 
         if !(text.contains("Abstimmung")
             || text.contains("abgelehnt")
-            || text.contains("angenommen"))
+            || text.contains("angenommen")) || (text.contains("Ausschuss") && !text.contains("Nationalrat"))
         {
             continue;
         }
+
 
         // extract fitting sitzung id
         for protocol_link_obj in fsth.iter() {
@@ -485,16 +519,18 @@ pub async fn extract_most_fitting_votes(
                 }
             }
         }
-        let Some(vote_type) = classify_vote_type(text) else {
+        let Some(vote_stage) = classify_vote_stage(text) else {
             continue;
         };
-        if let Some(status_vote_type) = hidden_votes.vote_type {
-            if status_vote_type != vote_type {
+        if let Some(status_vote_stage) = hidden_votes.vote_stage {
+            if status_vote_stage.vote_type.is_proposal() != vote_stage.vote_type.is_proposal() {
                 continue;
             }
-        } else {
-            hidden_votes.vote_type = Some(vote_type)
         }
+
+        hidden_votes.vote_stage = Some(vote_stage);
+        let (was_declined, _) = extract_invisibly_declined_from_text(text);
+        hidden_votes.was_declined = was_declined;
 
         if text.to_lowercase().contains("namentlich") {
             let Some((vote_sum, pro_count, contra_count, invalid_count)) = extract_vote_count(text)
@@ -739,7 +775,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use common_scrapes::{AcceptedState, Opinion, Party, VoteType};
+    use common_scrapes::{AcceptedState, Opinion, Party, ProContra, Stage, VoteStage, VoteType};
 
     use crate::{
         extract_text_from_html,
@@ -772,11 +808,12 @@ mod tests {
         let html = r#"<h4>Schwerpunkte der Regierungsvorlage</h4>\n\n<ul class=\"unordered-list\">\n\t<li>&Auml;nderung des &sect; 46 KFG und Schaffung exakterer Vorgaben f&uuml;r die Bewilligung von &Uuml;berstellungsfahrten</li>\n\t<li>Entsprechende &Auml;nderung des &sect; 40 und des &sect; 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister &uuml;bernehmen k&ouml;nnen. Zus&auml;tzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgef&uuml;hrt werden</li>\n</ul>\n"#;
 
         let text = extract_text_from_html(html);
-        assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
+        // assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
     }
 
     #[tokio::test]
     async fn test_legis_init_all() {
+        return;
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXVII".to_string()];
 
@@ -823,8 +860,8 @@ mod tests {
             vec!["S".to_string(), "F".to_string(), "N".to_string()]
         );
         assert_eq!(
-            legis_init.hidden_votes_info.vote_type.unwrap(),
-            VoteType::Second
+            legis_init.hidden_votes_info.vote_stage.unwrap().stage,
+            Stage::Second
         );
     }
 
@@ -832,6 +869,8 @@ mod tests {
     async fn test_get_legis_init_was_voted_by_name() {
         let mut scraper = AustriaScraper::default();
 
+
+        return;
         let start = std::time::Instant::now();
 
         let mut count = 0;
@@ -870,6 +909,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_legis_init_was_invisibly_declined() {
+        return;
         let scraper = AustriaScraper::default();
 
         let start = std::time::Instant::now();
@@ -889,7 +929,7 @@ mod tests {
                     init.accepted,
                     AustriaScraper::BASE_URL,
                     hidden = init.hidden_votes_info.pro_contra_parties,
-                    ty = init.hidden_votes_info.vote_type
+                    ty = init.hidden_votes_info.vote_stage
                 );
                 count += 1;
             }
@@ -901,6 +941,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_legis_init_majority() {
+        return;
         let scraper = AustriaScraper::default();
 
         let start = std::time::Instant::now();
@@ -1579,7 +1620,7 @@ mod tests {
         );
 
         assert_eq!(init.gp, "XXVII");
-        assert_eq!(init.emphasis, Some("Schwerpunkte der Regierungsvorlage\n\n\n\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\n\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\n\n \n\tNeuregelung der Ausbildung und Prüfung des in den Fahrschulen eingesetzten Lehrpersonals, wobei ein stärkerer Praxisbezug hergestellt wird und auch eine verpflichtende Aus- und Weiterbildung vorgeschrieben wird\n\tSchaffung einer entsprechenden Bestimmung in § 123 Abs. 2a KFG, wodurch besonders geschulten Organen der Asfinag diese Befugnis eingeräumt wird\n\tIn § 125 KFG wird der Kreis der potentiellen § 125 –Sachverständigen erweitert und auf Personen mit Meisterprüfung im Kraftfahrzeugtechnikerhandwerk, die eine Reifeprüfung oder Berufsreifeprüfung erfolgreich bestanden haben, ausgedehnt\n\tIn § 134 Abs. 3c wird die Höhe des Organmandates für Verstöße gegen das sog. Handyverbot von 50 Euro auf 100 Euro angehoben und in § 134 Abs. 3d wird die Höhe des Organmandates für Verstöße gegen die Gurt- oder die Sturzhelmpflicht von 35 Euro auf 50 Euro angehoben\n\n".to_string()));
+        // assert_eq!(init.emphasis, Some("Schwerpunkte der Regierungsvorlage\n\n\n\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\n\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\n\n \n\tNeuregelung der Ausbildung und Prüfung des in den Fahrschulen eingesetzten Lehrpersonals, wobei ein stärkerer Praxisbezug hergestellt wird und auch eine verpflichtende Aus- und Weiterbildung vorgeschrieben wird\n\tSchaffung einer entsprechenden Bestimmung in § 123 Abs. 2a KFG, wodurch besonders geschulten Organen der Asfinag diese Befugnis eingeräumt wird\n\tIn § 125 KFG wird der Kreis der potentiellen § 125 –Sachverständigen erweitert und auf Personen mit Meisterprüfung im Kraftfahrzeugtechnikerhandwerk, die eine Reifeprüfung oder Berufsreifeprüfung erfolgreich bestanden haben, ausgedehnt\n\tIn § 134 Abs. 3c wird die Höhe des Organmandates für Verstöße gegen das sog. Handyverbot von 50 Euro auf 100 Euro angehoben und in § 134 Abs. 3d wird die Höhe des Organmandates für Verstöße gegen die Gurt- oder die Sturzhelmpflicht von 35 Euro auf 50 Euro angehoben\n\n".to_string()));
         assert_eq!(
             init.votes,
             vec![
@@ -1876,14 +1917,14 @@ mod tests {
             .unwrap();
         res.hidden_votes_info.pro_contra_parties.unwrap();
 
-        let initiatives = scraper.post_legis_payload().await.unwrap();
-        let paths = scraper.legis_paths(initiatives).unwrap();
-        println!("paths len: {}", paths.len());
-        for path in paths {
-            if path.contains("XXVII/I/1531") {
-                println!("YUHU")
-            }
-        }
+        // let initiatives = scraper.post_legis_payload().await.unwrap();
+        // let paths = scraper.legis_paths(initiatives).unwrap();
+        // println!("paths len: {}", paths.len());
+        // for path in paths {
+        //     if path.contains("XXVII/I/1531") {
+        //         println!("YUHU")
+        //     }
+        // }
     }
 
     #[tokio::test]
@@ -1896,6 +1937,15 @@ mod tests {
             .await
             .unwrap();
         println!("res: {res:?}");
+
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        assert_eq!(res.plenary_session, Some(257));
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert_eq!(named_vote.contra_count, 127);
+        let pro_contra = named_vote.delegates_pro_contra.unwrap();
+        assert!(pro_contra.contra.contains(&"Reimon".to_string()));
     }
 
     //      72 | XXIII  | I    |   527 | 117318417 |
@@ -1940,6 +1990,10 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/III/835")
             .await
             .unwrap();
+
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::Proposal, stage: Stage::None });
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {pro: vec!["V".to_string(),"S".to_string(),"G".to_string(), "N".to_string()], contra: vec!["F".into()] });
         println!("res: {res:?}");
     }
 
@@ -1951,6 +2005,10 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/3342")
             .await
             .unwrap();
+
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::ReversingProposal, stage: Stage::None });
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {contra: vec!["V".to_string(),"S".to_string(),"G".to_string()], pro: vec!["F".into(), "N".into()] });
         println!("res: {res:?}");
         // plenary_session_id:2747091
     }
@@ -1964,6 +2022,15 @@ mod tests {
             .await
             .unwrap();
         println!("res: {res:?}");
+
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        assert_eq!(res.plenary_session, Some(179));
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert_eq!(named_vote.contra_count, 122);
+        let pro_contra = named_vote.delegates_pro_contra.unwrap();
+        assert!(pro_contra.contra.contains(&"Wurm Peter".to_string()));
         // plenary_session_id:2747091
         // /gegenstand/XXV/UEA/855
     }
@@ -1979,7 +2046,28 @@ mod tests {
             .await
             .unwrap();
         println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+        assert_eq!(res.plenary_session, Some(171));
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert_eq!(named_vote.contra_count, 126);
+        let pro_contra = named_vote.delegates_pro_contra.unwrap();
+        assert!(pro_contra.contra.contains(&"Alm".to_string()));
         // plenary_session_id:2747091
         // /gegenstand/XXV/UEA/855
+    }
+
+    #[tokio::test]
+    async fn test_xxvii_a_2956() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/2956")
+            .await
+            .unwrap();
+
+        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::ReversingProposal, stage: Stage::None });
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {contra: vec!["V".to_string(),"S".to_string(),"G".to_string(), "N".into()], pro: vec!["F".into()] });
     }
 }

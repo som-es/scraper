@@ -3,7 +3,10 @@ use common_scrapes::GovOfficial;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json, get_disk_cache_json_with_secs}, delegates::DelegateScraper, error::ScraperError, extract_text_from_html, AustriaScraper, Scraper
+    caching::{disk_caching, get_disk_cache_json, get_disk_cache_json_with_secs},
+    delegates::DelegateScraper,
+    error::ScraperError,
+    extract_text_from_html, AustriaScraper, Scraper,
 };
 
 #[async_trait]
@@ -81,20 +84,18 @@ impl GovOfficials for AustriaScraper {
         let gov_officials_raw = match get_disk_cache_json_with_secs(path, 60 * 60 * 24 * 2).await {
             Some(raw) => raw,
             None => {
-                let raw_proposal = self.post_gov_officials_payload()
-                    .await
-                    .ok()?;
+                let raw_proposal = self.post_gov_officials_payload().await.ok()?;
 
                 if let Err(e) = disk_caching(path, raw_proposal.to_string()).await {
                     log::warn!("could cache raw {path}: {e:?}")
                 }
                 raw_proposal
-            },
+            }
         };
-        
+
         Some(
             futures::future::join_all(
-                    gov_officials_raw 
+                gov_officials_raw
                     .get("rows")?
                     .as_array()?
                     .iter()
@@ -114,7 +115,7 @@ impl GovOfficials for AustriaScraper {
           "REG": [
             "0"
           ],
-          
+
         })
     }
 }
@@ -169,19 +170,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_single_gov_official_from_json() {
-        let raw_gov = json!(
-            [65321,"Kurz II","Sebastian Kurz","Bundeskanzler<br/>07.01.2020 - 11.10.2021","Bundeskanzler:in","Bundeskanzleramt","Kurz","Männer","Tue Jan 07 00:00:00 CET 2020","/person/65321",1]
-        );
+        let raw_gov = json!([
+            65321,
+            "Kurz II",
+            "Sebastian Kurz",
+            "Bundeskanzler<br/>07.01.2020 - 11.10.2021",
+            "Bundeskanzler:in",
+            "Bundeskanzleramt",
+            "Kurz",
+            "Männer",
+            "Tue Jan 07 00:00:00 CET 2020",
+            "/person/65321",
+            1
+        ]);
         let scraper = AustriaScraper::default();
         let gov_official = super::extract_gov_official(&raw_gov, &scraper)
             .await
             .unwrap();
         assert_eq!(gov_official.government, "Kurz II");
         assert_eq!(gov_official.function, "Bundeskanzler");
-        assert_eq!(
-            gov_official.ministry,
-            "Bundeskanzleramt"
-        );
+        assert_eq!(gov_official.ministry, "Bundeskanzleramt");
         assert_eq!(
             gov_official.start_date,
             chrono::NaiveDate::from_ymd_opt(2020, 1, 7).unwrap()

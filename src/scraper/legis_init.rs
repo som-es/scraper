@@ -132,6 +132,10 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let legis_content = &raw_legis["content"];
 
+        // let Some(status) = legis_content.get("status") else {
+        //     return None;
+        // };
+
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let doktyp = legis_content["doktyp"].as_str()?.to_string();
 
@@ -372,10 +376,11 @@ pub fn extract_date(legis_content: &Value) -> Option<&str> {
 
 pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
+    let status = legis_content.get("status");
 
     if legis_content.get("phase").is_none() {
         if let Some(stages) = legis_content.get("stages") {
-            most_fitting_votes = extract_most_fitting_votes(stages).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
         }
 
         return most_fitting_votes;
@@ -398,18 +403,54 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option
             .unwrap()
             .contains("Plenarberatungen NR")
         {
-            most_fitting_votes = extract_most_fitting_votes(stages).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
             break;
         }
     }
     most_fitting_votes
 }
 
-pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<HiddenVotes>) {
+pub fn classify_vote_type(text: &str) -> Option<VoteType> {
+    if text.contains("Gesetzesvorschlag in zweiter Lesung") {
+        Some(VoteType::Second)
+    } else if text.contains("Gesetzesvorschlag in dritter Lesung") {
+        Some(VoteType::Third)
+    } else if text.contains("erster Lesung") {
+        Some(VoteType::First)
+    } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
+        Some(VoteType::ReversingProposal)
+    } else if text.contains("antrag") {
+        Some(VoteType::Proposal)
+    // https://www.parlament.gv.at/gegenstand/XXVII/III/835
+    } else if text.contains("Antrag auf Kenntnisnahme") {
+        Some(VoteType::Proposal)
+    } else if text.contains("Sitzung des Nationalrates")
+        && text.contains("Genehmigung")
+        && text.to_lowercase().contains("namentliche")
+    {
+        Some(VoteType::OnlyVotedByName)
+    } else if text.to_lowercase().contains("namentliche abstimmung") {
+        Some(VoteType::AnyNamedVote)
+    } else {
+        // need to find fitting type, some stages are bs
+        None
+    }
+}
+
+pub async fn extract_most_fitting_votes(
+    stages: &Value,
+    status: Option<&Value>,
+) -> (Option<u64>, Option<HiddenVotes>) {
     let sitzung_id_regex = Regex::new(r"(\d+). Sitzung").unwrap();
     let is_site_stored_regex = Regex::new(r"SEITE_\d+.html").unwrap();
 
     let mut hidden_votes = HiddenVotes::default();
+    hidden_votes.vote_type = status
+        .map(|status| status["description"].as_str())
+        .flatten()
+        .map(|desc| classify_vote_type(desc))
+        .flatten();
+
     let mut plenary_session = None;
 
     for stage in stages.as_array().unwrap().iter().rev() {
@@ -444,30 +485,15 @@ pub async fn extract_most_fitting_votes(stages: &Value) -> (Option<u64>, Option<
                 }
             }
         }
-
-        if text.contains("Gesetzesvorschlag in zweiter Lesung") {
-            hidden_votes.vote_type = Some(VoteType::Second)
-        } else if text.contains("Gesetzesvorschlag in dritter Lesung") {
-            hidden_votes.vote_type = Some(VoteType::Third)
-        } else if text.contains("erster Lesung") {
-            hidden_votes.vote_type = Some(VoteType::First)
-        } else if text.contains("Antrag, den ablehnenden Ausschussbericht") {
-            hidden_votes.vote_type = Some(VoteType::ReversingProposal)
-        } else if text.contains("antrag") {
-            hidden_votes.vote_type = Some(VoteType::Proposal)
-        // https://www.parlament.gv.at/gegenstand/XXVII/III/835
-        } else if text.contains("Antrag auf Kenntnisnahme") {
-            hidden_votes.vote_type = Some(VoteType::Proposal)
-        } else if text.contains("Sitzung des Nationalrates")
-            && text.contains("Genehmigung")
-            && text.to_lowercase().contains("namentliche")
-        {
-            hidden_votes.vote_type = Some(VoteType::OnlyVotedByName)
-        } else if text.to_lowercase().contains("namentliche abstimmung") {
-            hidden_votes.vote_type = Some(VoteType::AnyNamedVote)
-        } else {
-            // need to find fitting type, some stages are bs
+        let Some(vote_type) = classify_vote_type(text) else {
             continue;
+        };
+        if let Some(status_vote_type) = hidden_votes.vote_type {
+            if status_vote_type != vote_type {
+                continue;
+            }
+        } else {
+            hidden_votes.vote_type = Some(vote_type)
         }
 
         if text.to_lowercase().contains("namentlich") {
@@ -582,14 +608,16 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let from_html_text = &from_html_text[start_of_yes_no_idx..];
     let from_html_text = &from_html_text.replace("Graf Herbert L.", "Graf Herbert L");
 
-    let pro_regex = Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:").unwrap();
+    let pro_regex =
+        Regex::new(r"(?m)Mit\s*.*Ja.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:")
+            .unwrap();
     let contra_regex =
-        Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:").unwrap();
+        Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:")
+            .unwrap();
 
     // println!("form {from_html_text}");
     let pro_match = pro_regex.find(from_html_text)?;
     let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;
-
 
     // dbg!(from_html_text[pro_match.start()..pro_match.end()]
     //     .chars()
@@ -1914,7 +1942,7 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
     }
-    
+
     #[tokio::test]
     async fn test_xxvii_a_3342() {
         let scraper = AustriaScraper::default();
@@ -1941,7 +1969,7 @@ mod tests {
     }
 
     // /gegenstand/XXV/UEA/835?
-    
+
     #[tokio::test]
     async fn test_xxv_uea_835() {
         let scraper = AustriaScraper::default();

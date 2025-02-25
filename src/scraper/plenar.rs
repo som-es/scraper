@@ -374,7 +374,6 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "nämlich",
         "Dipl",
         "heute",
-        
     ]
     .into_iter()
     .collect::<HashSet<_>>();
@@ -1196,7 +1195,6 @@ mod tests {
             .unwrap();
         println!("plenar: {plenar:?}");
     }
-
 
     #[tokio::test]
     async fn test_plenar_xxvii_243() {

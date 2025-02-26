@@ -671,6 +671,8 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let end_pro_idx = pro_open_ended.find('.');
     let pro_delegates = match end_pro_idx {
         Some(end_pro_idx) => {
+            let contra_idx = contra_match.start() - pro_match.end();
+            let end_pro_idx = contra_idx.min(end_pro_idx);
             &pro_open_ended[..end_pro_idx]
         },
         None => {
@@ -693,11 +695,17 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let end_contra_idx = contra_open_ended.find('.');
     let contra_delegates = match end_contra_idx {
         Some(end_contra_idx) => {
+            let star_idx = contra_open_ended.find('*').unwrap_or(end_contra_idx);
+            let end_contra_idx = end_contra_idx.min(star_idx);
+
             &contra_open_ended[..end_contra_idx]
         },
         None => {
             let end_contra_idx = contra_open_ended.find('*')?;
-            &contra_open_ended[..end_contra_idx-1]
+
+            let x = &contra_open_ended[..end_contra_idx-1];
+            dbg!(x);
+            x
         },
     };
 
@@ -1073,6 +1081,13 @@ mod tests {
             assert_eq!(r, buf);
         }
 
+        let named_vote = init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap();
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+
         #[rustfmt::skip]
         let rhs = vec![
             "Bauer", "Bayr", "Becher", "Binder", "Brosz", "Broukal", "Bures", "Cap", "Csörgits", "Eder", "Einem", "Faul", "Fleckl", "Gaál Anton", "Gartlehner", "Gaßner", "Glawischnig", "Gradwohl", "Grossmann", "Grünewald", "Gusenbauer", "Haidlmayr", "Heinisch-Hosek", "Heinzl", "Hoscher", "Jarolim", "Kaipel", "Keck", "Kogler", "Königsberger-Ludwig", "Krainer", "Kräuter", "Krist", "Kummerer", "Kuntzl", "Lackner", "Lapp", "Lichtenberger Evelin", "Lunacek", "Maier Johann", "Mandak", "Marizzi", "Matznetter", "Moser Hans", "Muttonen", "Niederwieser", "Nürnberger", "Öllinger", "Parnigoni", "Pendl", "Pfeffer", "Pirklhuber", "Posch", "Prähauser", "Prammer", "Puswald", "Rada Robert", "Reheis", "Rest-Hinterseer", "Riepl", "Sburny", "Scharer", "Schasching", "Schieder", "Schönpass", "Schopf",
@@ -1216,6 +1231,13 @@ mod tests {
             ]
         );
 
+        let named_vote = init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap();
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+
         assert_eq!(
             init.hidden_votes_info
                 .clone()
@@ -1301,6 +1323,14 @@ mod tests {
 
         assert!(init.hidden_votes_info.voted_by_name);
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+
+        let named_vote = init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap();
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+
 
         assert_eq!(
             init.hidden_votes_info
@@ -1489,6 +1519,14 @@ mod tests {
             .unwrap();
         assert!(init.hidden_votes_info.voted_by_name);
         assert_eq!(init.accepted, Some(AcceptedState::Declined));
+        let named_vote = init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap();
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+
+
         assert_eq!(
             init.hidden_votes_info
                 .clone()
@@ -1560,6 +1598,16 @@ mod tests {
                 "Bösch"
             ]
         );
+
+        let named_vote = init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap();
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+
+
+
         assert_eq!(
             init.hidden_votes_info
                 .clone()
@@ -1603,6 +1651,12 @@ mod tests {
                 "Bernhard"
             ]
         );
+        let named_vote = init.hidden_votes_info
+                .clone()
+                .voted_by_name_data
+                .unwrap();
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
 
         assert_eq!(
             init.hidden_votes_info
@@ -1969,6 +2023,9 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
         assert_eq!(res.plenary_session, Some(257));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
         assert_eq!(named_vote.contra_count, 127);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Reimon".to_string()));
@@ -2039,6 +2096,8 @@ mod tests {
         // plenary_session_id:2747091
     }
 
+
+    // THIS HAS WRONG PRO AND CONTRA COUNT 
     #[tokio::test]
     async fn test_xxv_uea_855() {
         let scraper = AustriaScraper::default();
@@ -2054,6 +2113,9 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
         assert_eq!(res.plenary_session, Some(179));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+
+        // assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        // assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
         assert_eq!(named_vote.contra_count, 122);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Wurm Peter".to_string()));
@@ -2076,6 +2138,9 @@ mod tests {
         assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
         assert_eq!(res.plenary_session, Some(171));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
         assert_eq!(named_vote.contra_count, 126);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Alm".to_string()));
@@ -2126,6 +2191,9 @@ mod tests {
         assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
         assert_eq!(res.plenary_session, Some(60));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
         assert_eq!(named_vote.contra_count, 109);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Zanger Wolfgang".to_string()));
@@ -2169,10 +2237,49 @@ mod tests {
         println!("res: {res:?}");
         assert_eq!(res.accepted.unwrap(), AcceptedState::Declined);
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        assert!(named_vote.delegates_pro_contra.unwrap().contra.contains(&"Yilmaz".to_string()));
+        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Yilmaz".to_string()));
+
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.unwrap().pro.len());
         assert_eq!(named_vote.contra_count, 83);
         assert_eq!(named_vote.pro_count, 52);
         assert_eq!(named_vote.vote_sum, 135);
+    }
+    
+    #[tokio::test]
+    async fn test_xxiv_uea_1019() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXIV/UEA/1019")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted.unwrap(), AcceptedState::Declined);
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Wurm".to_string()));
+
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.unwrap().pro.len());
+        assert_eq!(named_vote.contra_count, 98);
+        assert_eq!(named_vote.pro_count, 63);
+        assert_eq!(named_vote.vote_sum, 161);
+    }
+
+    // gegenstand/XXVII/I/2704
+    #[tokio::test]
+    async fn test_xxvii_i_2704() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/2704")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, None);
+
     }
 
 }

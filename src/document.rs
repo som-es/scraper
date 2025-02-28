@@ -71,3 +71,23 @@ pub fn documents(raw_documents: &[Value]) -> Option<Vec<Document>> {
 
     Some(documents)
 }
+
+pub fn extract_plenar_documents(legis_content: &Value) -> Option<Vec<Document>> {
+    Some(
+        legis_content
+            .get("phase")?
+            .as_array()?
+            .iter()
+            .find(|phase| {
+                phase["name"]
+                    .as_str()
+                    .unwrap()
+                    .contains("Plenarberatungen NR")
+            })
+            .into_iter()
+            .flat_map(|nr_phase| Some(documents(&nr_phase["documents"].as_array()?)))
+            .flatten()
+            .flatten()
+            .collect(),
+    )
+}

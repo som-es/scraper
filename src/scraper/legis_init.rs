@@ -3,20 +3,13 @@ mod votes;
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType
+    AcceptedState, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType,
 };
 use serde_json::{json, Value};
 use votes::extract_hidden_votes;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
-    documents,
-    error::ScraperError,
-    extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_text_from_html,
-    filter::filter_name_extraction, person_url_to_id,
-    proposals::ProposalScraper,
-    speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand,
-    GegenstandPaths, Scraper,
+    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_plenar_documents, extract_text_from_html, filter::filter_name_extraction, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -151,7 +144,8 @@ impl LegislativeInitiatives for AustriaScraper {
         } else {
             legis_content["documents"].as_array()?
         };
-        let documents = documents(raw_documents)?;
+        let mut documents = documents(raw_documents)?;
+        documents.extend(extract_plenar_documents(legis_content).unwrap_or_default());
 
         let names = legis_content["names"]
             .as_array()
@@ -238,9 +232,10 @@ impl LegislativeInitiatives for AustriaScraper {
             }
 
             // proposals are inversed declined warum auch immer !
-            if let (Some(VoteType::ReversingProposal), Some(pro_contra)) =
-                (hidden_votes.vote_stage.map(|x| x.vote_type), &mut hidden_votes.pro_contra_parties)
-            {
+            if let (Some(VoteType::ReversingProposal), Some(pro_contra)) = (
+                hidden_votes.vote_stage.map(|x| x.vote_type),
+                &mut hidden_votes.pro_contra_parties,
+            ) {
                 core::mem::swap(&mut pro_contra.contra, &mut pro_contra.pro);
                 speeches = speeches
                     .into_iter()
@@ -279,6 +274,18 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
+        const LAW_DETERMINATORS: [&str; 3] = ["RV", "A", "I"];
+        let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
+
+        if status == Some(5) && accepted == Some(AcceptedState::Accepted) && is_law {
+            // search text for "in Kraft getreten" oder so
+            let law_file = documents.iter().find(|x| x.title.contains("Gesetz"));
+            if let Some(law_file) = law_file {
+                println!("{id}: law_file: yes!: {law_file:?}");
+            } else {
+                panic!("bad! {id}, docs: {documents:?}");
+            }
+        }
 
         Some(LegislativeInitiative {
             title,
@@ -348,12 +355,14 @@ pub fn is_accepted_based_on_votes(
     }
 }
 
-pub fn extract_invisibly_declined_from_text(text: &str) -> (Option<bool>, Option<DeclineUrlGegenstand>) {
+pub fn extract_invisibly_declined_from_text(
+    text: &str,
+) -> (Option<bool>, Option<DeclineUrlGegenstand>) {
     let url = extract_from_gegenstand_url_text(text);
     if text.contains("abgelehnt") {
         return (Some(true), url);
     }
-    
+
     if text.contains("angenommen") {
         return (Some(false), url);
     }
@@ -369,7 +378,7 @@ pub fn extract_invisibly_declined(
     let Some(status_description) = status_description else {
         return (None, None);
     };
-    return extract_invisibly_declined_from_text(status_description) 
+    return extract_invisibly_declined_from_text(status_description);
 }
 
 pub fn extract_date(legis_content: &Value) -> Option<&str> {
@@ -483,7 +492,7 @@ mod tests {
         AustriaScraper, Scraper,
     };
 
-    use super::{is_accepted_based_on_votes};
+    use super::is_accepted_based_on_votes;
 
     #[test]
     fn test_vote_count_extraction() {
@@ -492,7 +501,6 @@ mod tests {
         assert_eq!(x.0, 141);
         assert_eq!(x.1, 34);
         assert_eq!(x.2, 107);
-
     }
 
     #[test]
@@ -576,9 +584,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_legis_init_was_voted_by_name() {
+    async fn test_get_legis_init_with_accepted_and_status_5() {
         let mut scraper = AustriaScraper::default();
 
+        let start = std::time::Instant::now();
+
+        let mut count = 0;
+        // for gp in ["XXIV", "XXIII", "XXII"] {
+        for gp in [
+            "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+        ] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
+
+            if gp != "XXVII" {
+                continue;
+            }
+
+            let initiatives = scraper.post_legis_payload().await.unwrap();
+            for path in scraper.legis_paths(initiatives).unwrap() {
+                // println!();
+                // println!("path: {path:?}");
+                let Ok(init) = scraper.get_legis_init(&path).await else {
+                    // println!("error {}{path}", AustriaScraper::BASE_URL);
+                    continue;
+                };
+            }
+            println!("elapsed: {:?}", start.elapsed());
+            println!("count: {count:?}");
+            // break;
+        }
+
+        println!("count: {count:?}");
+    }
+
+    #[tokio::test]
+    async fn test_get_legis_init_was_voted_by_name() {
+        let mut scraper = AustriaScraper::default();
 
         return;
         let start = std::time::Instant::now();
@@ -757,12 +798,20 @@ mod tests {
             assert_eq!(r, buf);
         }
 
-        let named_vote = init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap();
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        let named_vote = init.hidden_votes_info.clone().voted_by_name_data.unwrap();
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
 
         #[rustfmt::skip]
         let rhs = vec![
@@ -907,12 +956,20 @@ mod tests {
             ]
         );
 
-        let named_vote = init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap();
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        let named_vote = init.hidden_votes_info.clone().voted_by_name_data.unwrap();
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
 
         assert_eq!(
             init.hidden_votes_info
@@ -1000,13 +1057,20 @@ mod tests {
         assert!(init.hidden_votes_info.voted_by_name);
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
 
-        let named_vote = init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap();
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
-
+        let named_vote = init.hidden_votes_info.clone().voted_by_name_data.unwrap();
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
 
         assert_eq!(
             init.hidden_votes_info
@@ -1195,13 +1259,20 @@ mod tests {
             .unwrap();
         assert!(init.hidden_votes_info.voted_by_name);
         assert_eq!(init.accepted, Some(AcceptedState::Declined));
-        let named_vote = init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap();
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
-
+        let named_vote = init.hidden_votes_info.clone().voted_by_name_data.unwrap();
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
 
         assert_eq!(
             init.hidden_votes_info
@@ -1275,14 +1346,20 @@ mod tests {
             ]
         );
 
-        let named_vote = init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap();
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
-
-
+        let named_vote = init.hidden_votes_info.clone().voted_by_name_data.unwrap();
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
 
         assert_eq!(
             init.hidden_votes_info
@@ -1327,12 +1404,20 @@ mod tests {
                 "Bernhard"
             ]
         );
-        let named_vote = init.hidden_votes_info
-                .clone()
-                .voted_by_name_data
-                .unwrap();
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        let named_vote = init.hidden_votes_info.clone().voted_by_name_data.unwrap();
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
 
         assert_eq!(
             init.hidden_votes_info
@@ -1694,14 +1779,31 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
 
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
 
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
         assert_eq!(res.plenary_session, Some(257));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
 
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 127);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Reimon".to_string()));
@@ -1751,8 +1853,25 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::Proposal, stage: Stage::None });
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {pro: vec!["V".to_string(),"S".to_string(),"G".to_string(), "N".to_string()], contra: vec!["F".into()] });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::Proposal,
+                stage: Stage::None
+            }
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
+            &ProContra {
+                pro: vec![
+                    "V".to_string(),
+                    "S".to_string(),
+                    "G".to_string(),
+                    "N".to_string()
+                ],
+                contra: vec!["F".into()]
+            }
+        );
         println!("res: {res:?}");
     }
 
@@ -1765,15 +1884,26 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::ReversingProposal, stage: Stage::None });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::ReversingProposal,
+                stage: Stage::None
+            }
+        );
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {contra: vec!["V".to_string(),"S".to_string(),"G".to_string()], pro: vec!["F".into(), "N".into()] });
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
+            &ProContra {
+                contra: vec!["V".to_string(), "S".to_string(), "G".to_string()],
+                pro: vec!["F".into(), "N".into()]
+            }
+        );
         println!("res: {res:?}");
         // plenary_session_id:2747091
     }
 
-
-    // THIS HAS WRONG PRO AND CONTRA COUNT 
+    // THIS HAS WRONG PRO AND CONTRA COUNT
     #[tokio::test]
     async fn test_xxv_uea_855() {
         let scraper = AustriaScraper::default();
@@ -1784,7 +1914,13 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
 
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
 
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
         assert_eq!(res.plenary_session, Some(179));
@@ -1811,12 +1947,29 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
         assert_eq!(res.plenary_session, Some(171));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
 
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 126);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Alm".to_string()));
@@ -1833,9 +1986,26 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::ReversingProposal, stage: Stage::None });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::ReversingProposal,
+                stage: Stage::None
+            }
+        );
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {contra: vec!["V".to_string(),"S".to_string(),"G".to_string(), "N".into()], pro: vec!["F".into()] });
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
+            &ProContra {
+                contra: vec![
+                    "V".to_string(),
+                    "S".to_string(),
+                    "G".to_string(),
+                    "N".into()
+                ],
+                pro: vec!["F".into()]
+            }
+        );
     }
 
     #[tokio::test]
@@ -1849,10 +2019,22 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::Proposal, stage: Stage::None });
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(), &ProContra {pro: vec!["S".to_string(),"N".to_string(),"J".to_string()], contra: vec!["V".into(), "F".into()] });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::Proposal,
+                stage: Stage::None
+            }
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
+            &ProContra {
+                pro: vec!["S".to_string(), "N".to_string(), "J".to_string()],
+                contra: vec!["V".into(), "F".into()]
+            }
+        );
     }
-    
+
     #[tokio::test]
     async fn test_xxvii_uea_144() {
         let scraper = AustriaScraper::default();
@@ -1864,12 +2046,29 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
-        assert_eq!(res.hidden_votes_info.vote_stage.unwrap(), VoteStage { vote_type: VoteType::AnyNamedVote, stage: Stage::None });
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
         assert_eq!(res.plenary_session, Some(60));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
 
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 109);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Zanger Wolfgang".to_string()));
@@ -1913,15 +2112,31 @@ mod tests {
         println!("res: {res:?}");
         assert_eq!(res.accepted.unwrap(), AcceptedState::Declined);
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Yilmaz".to_string()));
+        assert!(named_vote
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .contra
+            .contains(&"Yilmaz".to_string()));
 
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.unwrap().pro.len());
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 83);
         assert_eq!(named_vote.pro_count, 52);
         assert_eq!(named_vote.vote_sum, 135);
     }
-    
+
     #[tokio::test]
     async fn test_xxiv_uea_1019() {
         let scraper = AustriaScraper::default();
@@ -1934,10 +2149,26 @@ mod tests {
         println!("res: {res:?}");
         assert_eq!(res.accepted.unwrap(), AcceptedState::Declined);
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Wurm".to_string()));
+        assert!(named_vote
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .contra
+            .contains(&"Wurm".to_string()));
 
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.unwrap().pro.len());
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 98);
         assert_eq!(named_vote.pro_count, 63);
         assert_eq!(named_vote.vote_sum, 161);
@@ -1955,10 +2186,9 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, None);
-
     }
 
-    // 
+    //
     #[tokio::test]
     async fn test_xii_uea_373() {
         let scraper = AustriaScraper::default();
@@ -1973,10 +2203,31 @@ mod tests {
 
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
 
-        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Krainer".to_string()));
-        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Zinggl".to_string()));
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.unwrap().pro.len());
+        assert!(named_vote
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .contra
+            .contains(&"Krainer".to_string()));
+        assert!(named_vote
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .contra
+            .contains(&"Zinggl".to_string()));
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 82);
         assert_eq!(named_vote.pro_count, 91);
         assert_eq!(named_vote.vote_sum, 173);
@@ -1996,8 +2247,8 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
         println!("res: {res:?}");
     }
-    
-    // gegenstand/XXII/E/97 
+
+    // gegenstand/XXII/E/97
     #[tokio::test]
     async fn test_xxii_e_97() {
         let scraper = AustriaScraper::default();

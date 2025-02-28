@@ -2,10 +2,13 @@ use common_scrapes::{HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedBy
 use regex::Regex;
 use serde_json::Value;
 
-use crate::{extract_pro_contra_party_codes_from_string, find_optimal_votes_by_name, legis_init::group_names_from_vote_section, yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, Scraper, TextExtractor};
+use crate::{
+    extract_pro_contra_party_codes_from_string, find_optimal_votes_by_name,
+    legis_init::group_names_from_vote_section, yes_no_votes_inside_regex, yes_no_votes_regex,
+    AustriaScraper, Scraper, TextExtractor,
+};
 
 use super::extract_invisibly_declined_from_text;
-
 
 pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
@@ -67,7 +70,7 @@ pub fn classify_vote_stage(text: &str) -> Option<VoteStage> {
         VoteType::Proposal
     // https://www.parlament.gv.at/gegenstand/XXVII/III/835
     } else if text.contains("Antrag auf Kenntnisnahme") {
-        VoteType::Proposal 
+        VoteType::Proposal
     } else if text.to_lowercase().contains("gesetzesvorschlag") {
         VoteType::Proposal
     } else {
@@ -75,7 +78,7 @@ pub fn classify_vote_stage(text: &str) -> Option<VoteStage> {
         if vote_stage.stage != Stage::None {
             VoteType::None
         } else {
-            return None
+            return None;
         }
     };
     Some(vote_stage)
@@ -109,11 +112,11 @@ pub async fn extract_most_fitting_votes(
 
         if !(text.contains("Abstimmung")
             || text.contains("abgelehnt")
-            || text.contains("angenommen")) || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
+            || text.contains("angenommen"))
+            || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
         {
             continue;
         }
-
 
         // extract fitting sitzung id
         for protocol_link_obj in fsth.iter() {
@@ -170,7 +173,7 @@ pub async fn extract_most_fitting_votes(
                 //     _ => panic!("should not be possible hopefully"),
                 // }
                 let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
-                dbg!(protocol_link_obj);
+                // dbg!(protocol_link_obj);
 
                 let html_text = if is_site_stored_regex.is_match(url) {
                     let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/').unwrap();
@@ -178,8 +181,10 @@ pub async fn extract_most_fitting_votes(
                     let Some(site_start) = protocol_link_obj["fund_von"].as_u64() else {
                         continue;
                     };
-                    
-                    let site_end = protocol_link_obj["fund_bis"].as_u64().unwrap_or(site_start+1);
+
+                    let site_end = protocol_link_obj["fund_bis"]
+                        .as_u64()
+                        .unwrap_or(site_start + 1);
                     // let Some(site_end) = protocol_link_obj["fund_bis"].as_u64() else {
                     //     continue;
                     // };
@@ -270,7 +275,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     // println!("form {from_html_text}");
     let pro_match = pro_regex.find(from_html_text)?;
     let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;
-    println!("from html text: {from_html_text}");
+    // println!("from html text: {from_html_text}");
 
     // dbg!(from_html_text[pro_match.start()..pro_match.end()]
     //     .chars()
@@ -290,10 +295,8 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
             let contra_idx = contra_match.start() - pro_match.end();
             let end_pro_idx = contra_idx.min(end_pro_idx);
             &pro_open_ended[..end_pro_idx]
-        },
-        None => {
-           &from_html_text[pro_match.end()..contra_match.start()-1]
-        },
+        }
+        None => &from_html_text[pro_match.end()..contra_match.start() - 1],
     };
 
     // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
@@ -315,14 +318,14 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
             let end_contra_idx = end_contra_idx.min(star_idx);
 
             &contra_open_ended[..end_contra_idx]
-        },
+        }
         None => {
             let end_contra_idx = contra_open_ended.find('*')?;
 
-            let x = &contra_open_ended[..end_contra_idx-1];
+            let x = &contra_open_ended[..end_contra_idx - 1];
             dbg!(x);
             x
-        },
+        }
     };
 
     // let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());

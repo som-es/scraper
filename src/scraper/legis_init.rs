@@ -129,6 +129,7 @@ impl LegislativeInitiatives for AustriaScraper {
         // println!("{json}");
 
         let legis_content = &raw_legis["content"];
+        let status = legis_content["status"]["number"].as_u64().map(|x| x as u8);
 
         // let Some(status) = legis_content.get("status") else {
         //     return None;
@@ -278,6 +279,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
+
         Some(LegislativeInitiative {
             title,
             description,
@@ -304,6 +306,7 @@ impl LegislativeInitiatives for AustriaScraper {
             hidden_votes_info: hidden_votes,
             plenary_session,
             references,
+            status,
         })
     }
 
@@ -1977,7 +1980,34 @@ mod tests {
         assert_eq!(named_vote.contra_count, 82);
         assert_eq!(named_vote.pro_count, 91);
         assert_eq!(named_vote.vote_sum, 173);
-
     }
 
+    // /gegenstand/XVIII/UEA/8
+
+    #[tokio::test]
+    async fn test_xvviii_uea_8() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/UEA/8")
+            .await
+            .unwrap();
+
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        println!("res: {res:?}");
+    }
+    
+    // gegenstand/XXII/E/97 
+    #[tokio::test]
+    async fn test_xxii_e_97() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXII/E/97")
+            .await
+            .unwrap();
+
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        println!("res: {res:?}");
+    }
 }

@@ -3,24 +3,20 @@ mod votes;
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, HiddenVotes, LegislativeInitiative, Party, Reference, Speech, Stage, Vote, VoteStage, VoteType, VotedByName
+    AcceptedState, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType
 };
-use regex::Regex;
 use serde_json::{json, Value};
 use votes::extract_hidden_votes;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json, get_disk_cache_json_with_secs},
+    caching::{disk_caching, get_disk_cache_json},
     documents,
     error::ScraperError,
-    extract_from_gegenstand_url, extract_from_gegenstand_url_text,
-    extract_pro_contra_party_codes_from_string, extract_text_from_html,
-    filter::filter_name_extraction,
-    find_optimal_votes_by_name, person_url_to_id,
+    extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_text_from_html,
+    filter::filter_name_extraction, person_url_to_id,
     proposals::ProposalScraper,
-    speeches::extract_speeches,
-    yes_no_votes_inside_regex, yes_no_votes_regex, AustriaScraper, DeclineUrlGegenstand,
-    GegenstandPaths, ProContra, Scraper, TextExtractor,
+    speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand,
+    GegenstandPaths, Scraper,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -1970,8 +1966,18 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-
         println!("res: {res:?}");
+
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+
+        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Krainer".to_string()));
+        assert!(named_vote.delegates_pro_contra.as_ref().unwrap().contra.contains(&"Zinggl".to_string()));
+        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
+        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.unwrap().pro.len());
+        assert_eq!(named_vote.contra_count, 82);
+        assert_eq!(named_vote.pro_count, 91);
+        assert_eq!(named_vote.vote_sum, 173);
+
     }
 
 }

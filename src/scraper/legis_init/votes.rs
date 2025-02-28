@@ -178,9 +178,11 @@ pub async fn extract_most_fitting_votes(
                     let Some(site_start) = protocol_link_obj["fund_von"].as_u64() else {
                         continue;
                     };
-                    let Some(site_end) = protocol_link_obj["fund_bis"].as_u64() else {
-                        continue;
-                    };
+                    
+                    let site_end = protocol_link_obj["fund_bis"].as_u64().unwrap_or(site_start+1);
+                    // let Some(site_end) = protocol_link_obj["fund_bis"].as_u64() else {
+                    //     continue;
+                    // };
 
                     match extractor
                         .text_accumulation(

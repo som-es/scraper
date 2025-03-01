@@ -3,7 +3,7 @@ mod votes;
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType,
+    AcceptedState, FileType, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType
 };
 use serde_json::{json, Value};
 use votes::extract_hidden_votes;
@@ -169,10 +169,12 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
+        let vote_infavor = legis_content["vote"]["infavor"].as_bool();
+
         let mut accepted = if votes.is_empty() {
             None
         } else {
-            legis_content["vote"]["infavor"].as_bool()
+            vote_infavor
         }
         .map(|x| {
             if x {
@@ -274,16 +276,15 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
-        const LAW_DETERMINATORS: [&str; 3] = ["RV", "A", "I"];
+        const LAW_DETERMINATORS: [&str; 5] = ["RV", "A", "BRA", "BUA", "EBR"];
         let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
 
-        if status == Some(5) && accepted == Some(AcceptedState::Accepted) && is_law {
+        if vote_infavor == Some(true) {
             // search text for "in Kraft getreten" oder so
-            let law_file = documents.iter().find(|x| x.title.contains("Gesetz"));
+            let law_file = documents.iter().find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
             if let Some(law_file) = law_file {
-                println!("{id}: law_file: yes!: {law_file:?}");
-            } else {
-                panic!("bad! {id}, docs: {documents:?}");
+                let url = format!("{}{}", AustriaScraper::BASE_URL, law_file.link);
+                println!("{id}: doktyp: {doktyp} law_file: yes!: {url:?}");
             }
         }
 
@@ -314,6 +315,8 @@ impl LegislativeInitiatives for AustriaScraper {
             plenary_session,
             references,
             status,
+            is_law,
+            law_accepted: vote_infavor,
         })
     }
 
@@ -608,6 +611,9 @@ mod tests {
                     // println!("error {}{path}", AustriaScraper::BASE_URL);
                     continue;
                 };
+                if init.is_law /*&& init.law_accepted == Some(true)*/ {
+                    count += 1;
+                }
             }
             println!("elapsed: {:?}", start.elapsed());
             println!("count: {count:?}");

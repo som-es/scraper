@@ -1,15 +1,25 @@
+mod come_into_effect;
 mod votes;
 
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, FileType, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType
+    AcceptedState, FileType, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType,
 };
 use serde_json::{json, Value};
 use votes::extract_hidden_votes;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json}, documents, error::ScraperError, extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_plenar_documents, extract_text_from_html, filter::filter_name_extraction, person_url_to_id, proposals::ProposalScraper, speeches::extract_speeches, AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper
+    caching::{disk_caching, get_disk_cache_json},
+    documents,
+    error::ScraperError,
+    extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_plenar_documents,
+    extract_text_from_html,
+    filter::filter_name_extraction,
+    person_url_to_id,
+    proposals::ProposalScraper,
+    speeches::extract_speeches,
+    AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper, TextExtractor,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -36,7 +46,7 @@ pub trait LegislativeInitiatives: Scraper {
         .await
     }
 
-    async fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative>;
+    async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative>;
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError>;
 
@@ -60,7 +70,7 @@ pub trait LegislativeInitiatives: Scraper {
                 raw_proposal
             }
         };
-        Self::raw_legis_into_legis(raw)
+        self.raw_legis_into_legis(raw)
             .await
             .ok_or(ScraperError::LegisInitParseError)
     }
@@ -114,7 +124,7 @@ impl LegislativeInitiatives for AustriaScraper {
         // })
     }
 
-    async fn raw_legis_into_legis(raw_legis: Value) -> Option<LegislativeInitiative> {
+    async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative> {
         let description = raw_legis["meta"]["description"].as_str()?.to_string();
         let title = raw_legis["meta"]["title"].as_str()?.to_string();
 
@@ -171,12 +181,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let vote_infavor = legis_content["vote"]["infavor"].as_bool();
 
-        let mut accepted = if votes.is_empty() {
-            None
-        } else {
-            vote_infavor
-        }
-        .map(|x| {
+        let mut accepted = if votes.is_empty() { None } else { vote_infavor }.map(|x| {
             if x {
                 AcceptedState::Accepted
             } else {
@@ -276,15 +281,26 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
-        const LAW_DETERMINATORS: [&str; 5] = ["RV", "A", "BRA", "BUA", "EBR"];
+        const LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
         let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
 
         if vote_infavor == Some(true) {
             // search text for "in Kraft getreten" oder so
-            let law_file = documents.iter().find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
+            let law_file = documents
+                .iter()
+                .find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
             if let Some(law_file) = law_file {
-                let url = format!("{}{}", AustriaScraper::BASE_URL, law_file.link);
-                println!("{id}: doktyp: {doktyp} law_file: yes!: {url:?}");
+                let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+                let text = text_extractor
+                    .extract_text_from_url(law_file, None, true)
+                    .await;
+                if let Some(text) = text {
+                    let come_into_effect_info = come_into_effect::extract_come_into_effect(&text);
+                    println!("come into effect: {come_into_effect_info:?}");
+                }
+
+                // let url = format!("{}{}", AustriaScraper::BASE_URL, law_file.link);
+                // println!("{id}: doktyp: {doktyp} law_file: yes!: {url:?}");
             }
         }
 
@@ -486,8 +502,12 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use chrono::NaiveDate;
-    use common_scrapes::{AcceptedState, Opinion, Party, ProContra, Stage, VoteStage, VoteType};
+    use common_scrapes::{
+        AcceptedState, FileType, Opinion, Party, ProContra, Stage, VoteStage, VoteType,
+    };
 
     use crate::{
         extract_text_from_html,
@@ -496,6 +516,16 @@ mod tests {
     };
 
     use super::is_accepted_based_on_votes;
+
+    #[tokio::test]
+    pub async fn test_xxvii_a_4098() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/4098")
+            .await
+            .unwrap();
+    }
 
     #[test]
     fn test_vote_count_extraction() {
@@ -604,6 +634,7 @@ mod tests {
             }
 
             let initiatives = scraper.post_legis_payload().await.unwrap();
+            let mut doktypes_with_law = HashSet::new();
             for path in scraper.legis_paths(initiatives).unwrap() {
                 // println!();
                 // println!("path: {path:?}");
@@ -611,12 +642,28 @@ mod tests {
                     // println!("error {}{path}", AustriaScraper::BASE_URL);
                     continue;
                 };
-                if init.is_law /*&& init.law_accepted == Some(true)*/ {
+
+                let law_file = init
+                    .documents
+                    .iter()
+                    .find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
+                if let Some(_law_file) = law_file {
+                    if init.doktyp == "AUB" {
+                        // let url = format!("{}/gegenstand/{}/{}/{}", AustriaScraper::BASE_URL, init.gp, init.ityp, init.inr);
+                        // println!("url: {url:?}")
+                    }
+                    doktypes_with_law.insert(init.doktyp);
+                }
+
+                if init.is_law
+                /*&& init.law_accepted == Some(true)*/
+                {
                     count += 1;
                 }
             }
             println!("elapsed: {:?}", start.elapsed());
             println!("count: {count:?}");
+            println!("{doktypes_with_law:?}");
             // break;
         }
 

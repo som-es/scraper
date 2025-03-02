@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
-use common_scrapes::{PlenarSpeech, Speech, SpeechTextInfo};
+use common_scrapes::{Document, PlenarSpeech, Speech, SpeechTextInfo};
 use regex::Regex;
 use scraper::Html;
 
@@ -61,6 +61,12 @@ impl HasHTMLUrl for PlenarSpeech {
             .first()
             .expect("PlenarSpeech has no HTML URL")
             .document_url
+    }
+}
+
+impl HasHTMLUrl for Document {
+    fn html_url(&self) -> &str {
+        &self.link
     }
 }
 

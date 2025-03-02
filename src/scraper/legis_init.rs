@@ -298,7 +298,6 @@ impl LegislativeInitiatives for AustriaScraper {
                     .await;
                 if let Some(text) = text {
                     come_into_effect_info = come_into_effect::extract_come_into_effect(&text);
-                    println!("come into effect: {come_into_effect_info:?}");
                 }
 
                 // let url = format!("{}{}", AustriaScraper::BASE_URL, law_file.link);
@@ -528,7 +527,51 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/4098")
             .await
             .unwrap();
+
+        let cie = init.come_into_effect_info.unwrap();
+        assert_eq!(cie.by_publication, false);
+        assert_eq!(
+            cie.law_come_into_effect_date,
+            Some(NaiveDate::from_ymd_opt(2024, 7, 1).unwrap())
+        );
+        assert_eq!(cie.law_expires_on_date, None);
     }
+
+    #[tokio::test]
+    pub async fn test_xxvii_a_3762() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3762")
+            .await
+            .unwrap();
+
+        assert!(init.is_law);
+        let cie = init.come_into_effect_info.unwrap();
+        assert_eq!(cie.by_publication, true);
+        assert_eq!(cie.law_come_into_effect_date, None);
+        assert_eq!(
+            cie.law_expires_on_date,
+            Some(NaiveDate::from_ymd_opt(2027, 12, 31).unwrap())
+        );
+    }
+
+    // /gegenstand/XXVIII/I/22
+    #[tokio::test]
+    pub async fn test_xxviii_i_22() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVIII/I/22")
+            .await
+            .unwrap();
+
+        assert!(init.is_law);
+        let cie = init.come_into_effect_info.unwrap();
+        assert_eq!(cie.by_publication, true);
+    }
+
+
 
     #[test]
     fn test_vote_count_extraction() {

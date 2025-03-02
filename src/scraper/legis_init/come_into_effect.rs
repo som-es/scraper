@@ -41,21 +41,23 @@ fn convert_month_to_number(month: &str) -> Option<usize> {
 pub fn extract_german_date_from_str(text: &str) -> Option<NaiveDate> {
     let date_pattern = r"(\d{1,2})\.\s([A-Za-zä]+)\s(\d{4})";
     let date_regex = Regex::new(&date_pattern).unwrap();
-    let date_captures = date_regex.captures(text).unwrap();
-    let day = date_captures.get(1).unwrap().as_str().trim();
-    let month = date_captures.get(2).unwrap().as_str().trim();
-    let year = date_captures.get(3).unwrap().as_str().trim();
+    let date_captures = date_regex.captures(text)?;
+    let day = date_captures.get(1)?.as_str().trim();
+    let month = date_captures.get(2)?.as_str().trim();
+    let year = date_captures.get(3)?.as_str().trim();
 
-    let month = convert_month_to_number(month).unwrap();
+    let month = convert_month_to_number(month)?;
     NaiveDate::from_ymd_opt(year.parse().ok()?, month as u32, day.parse().ok()?)
 }
 
 pub fn extract_come_into_effect(text: &str) -> Option<ComeIntoEffectInfo> {
-    let Some(come_into_effect_idx) = text.find("in Kraft") else {
+    let into_effect_regex = r"in\s+Kraft";
+    let into_effect_regex = Regex::new(&into_effect_regex).unwrap();
+    let Some(come_into_effect_idx) = into_effect_regex.find(text) else {
         return None;
     };
 
-    let come_into_effect = &text[..come_into_effect_idx];
+    let come_into_effect = &text[..come_into_effect_idx.start()];
 
     let date_idx = get_reversed_date_idx(come_into_effect);
 
@@ -69,14 +71,16 @@ pub fn extract_come_into_effect(text: &str) -> Option<ComeIntoEffectInfo> {
         come_into_effect_info.by_publication = true;
     }
 
-    let Some(expire_idx) = text.find("außer Kraft") else {
+    let expire_regex = r"außer\s+Kraft";
+    let expire_regex = Regex::new(&expire_regex).unwrap();
+    let Some(expire_idx) = expire_regex.find(text) else {
         return Some(come_into_effect_info);
     };
-    let expire_str = &text[..expire_idx];
+    let expire_str = &text[..expire_idx.start()];
 
     let date_idx = get_reversed_date_idx(expire_str);
 
-    let most_useful_info = &come_into_effect[date_idx..];
+    let most_useful_info = &expire_str[date_idx..];
     let date = extract_german_date_from_str(most_useful_info);
     come_into_effect_info.law_expires_on_date = date;
 
@@ -88,6 +92,14 @@ fn get_reversed_date_idx(come_into_effect: &str) -> usize {
     for (idx, char) in come_into_effect.char_indices().rev() {
         if char == '.' {
             date_idx = idx - 1;
+            if come_into_effect
+                .as_bytes()
+                .get(date_idx - 1)
+                .map(|x| (*x as char).is_digit(10))
+                .unwrap_or_default()
+            {
+                date_idx -= 1
+            }
             break;
         }
     }

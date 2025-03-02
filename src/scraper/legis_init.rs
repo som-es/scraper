@@ -1,4 +1,5 @@
 mod come_into_effect;
+pub use come_into_effect::*;
 mod votes;
 
 use async_trait::async_trait;
@@ -284,6 +285,7 @@ impl LegislativeInitiatives for AustriaScraper {
         const LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
         let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
 
+        let mut come_into_effect_info = None;
         if vote_infavor == Some(true) {
             // search text for "in Kraft getreten" oder so
             let law_file = documents
@@ -295,7 +297,7 @@ impl LegislativeInitiatives for AustriaScraper {
                     .extract_text_from_url(law_file, None, true)
                     .await;
                 if let Some(text) = text {
-                    let come_into_effect_info = come_into_effect::extract_come_into_effect(&text);
+                    come_into_effect_info = come_into_effect::extract_come_into_effect(&text);
                     println!("come into effect: {come_into_effect_info:?}");
                 }
 
@@ -333,6 +335,7 @@ impl LegislativeInitiatives for AustriaScraper {
             status,
             is_law,
             law_accepted: vote_infavor,
+            come_into_effect_info,
         })
     }
 

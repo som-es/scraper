@@ -1,14 +1,9 @@
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
+use common_scrapes::ComeIntoEffectInfo;
 use regex::Regex;
 
-#[derive(Debug, Clone, Default)]
-pub struct ComeIntoEffectInfo {
-    law_come_into_effect_date: Option<NaiveDate>,
-    law_expires_on_date: Option<NaiveDate>,
-    by_publication: bool,
-}
 fn convert_month_to_number(month: &str) -> Option<usize> {
     let months: HashMap<_, _> = vec![
         ("Jänner", 1),
@@ -75,8 +70,15 @@ pub fn extract_come_into_effect(text: &str) -> Option<ComeIntoEffectInfo> {
     }
 
     let Some(expire_idx) = text.find("außer Kraft") else {
-        return Some();
+        return Some(come_into_effect_info);
     };
+    let expire_str = &text[..expire_idx];
+
+    let date_idx = get_reversed_date_idx(expire_str);
+
+    let most_useful_info = &come_into_effect[date_idx..];
+    let date = extract_german_date_from_str(most_useful_info);
+    come_into_effect_info.law_expires_on_date = date;
 
     Some(come_into_effect_info)
 }

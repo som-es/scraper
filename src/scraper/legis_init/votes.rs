@@ -89,7 +89,7 @@ pub async fn extract_most_fitting_votes(
     status: Option<&Value>,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let sitzung_id_regex = Regex::new(r"(\d+). Sitzung").unwrap();
-    let is_site_stored_regex = Regex::new(r"SEITE_\d+.html").unwrap();
+    let is_site_stored_regex = Regex::new(r"SEITE_\d+").unwrap();
 
     let mut hidden_votes = HiddenVotes::default();
     hidden_votes.vote_stage = status
@@ -175,7 +175,7 @@ pub async fn extract_most_fitting_votes(
                 let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
                 // dbg!(protocol_link_obj);
 
-                let html_text = if is_site_stored_regex.is_match(url) {
+                let html_text = if is_site_stored_regex.is_match(&url.to_ascii_uppercase()) {
                     let (last_idx, _) = url.char_indices().rev().find(|(_, c)| *c == '/').unwrap();
 
                     let Some(site_start) = protocol_link_obj["fund_von"].as_u64() else {

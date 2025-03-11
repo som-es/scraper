@@ -1,0 +1,16 @@
+"status": {
+    "number": 5,
+    "description": "Beschlossen im Bundesrat <a href=\"/gegenstand/XXIV/BNR/661\">661/BNR</a><br>mehrstimmig<br>Beschlossen im Nationalrat <a href=\"/gegenstand/XXIV/BNR/661\">661/BNR</a>, Namentliche Abstimmung (abgegebene Stimmen: 159, davon Ja-Stimmen: 100, Nein-Stimmen: 59)",
+    "bgbllinks": [
+        {
+            "title": "Bundesgesetzblatt I Nr. 120/2012",
+            "link": "http://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BgblAuth&Dokumentnummer=BGBLA_2012_I_120",
+            "type": "DEFAULT"
+        },
+        {
+            "title": "Kunsttext",
+            "link": "http://www.ris.bka.gv.at/Ergebnis.wxe?Abfrage=Bundesnormen&Kundmachungsorgan=BGBl.+I+Nr.&Kundmachungsnummer=120%2f2012&Suchworte=&ReturnUrl=%2fSuchen.wxe%3fQueryID%3dBundesnormen",
+            "type": "DEFAULT"
+        }
+    ]
+},

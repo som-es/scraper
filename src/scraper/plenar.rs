@@ -167,7 +167,7 @@ impl Plenar for AustriaScraper {
         }
 
         let absences = extract_absences(&documents).await;
-        println!("!!!!!!! absences: {absences:?}");
+        log::info!("!!!!!!! absences: {absences:?}");
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
@@ -217,7 +217,7 @@ async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
-    println!("processing noew: absence doc: {doc:?}");
+    // println!("processing noew: absence doc: {doc:?}");
     extract_absences_from_text(&text)
 }
 
@@ -285,7 +285,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                 .unwrap_or(open_ended_absence.len()),
         )];
 
-    println!(
+    log::info!(
         "-------------
     info: {info:?}"
     );
@@ -384,7 +384,6 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         .flat_map(|x| x.split("sowie"))
         .map(|x| {
             x.split_inclusive(char::is_whitespace)
-                // .inspect(|x| println!("pre x: {x:?}, {}", x.chars().filter(|x| x.is_alphabetic()).count()))
                 .filter(|split| {
                     !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
                         || split.contains('.')
@@ -396,10 +395,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
                             ret
                         })
                 })
-            // .inspect(|x| println!("after x: {x:?}"))
         })
         .map(|x| x.collect::<String>())
-        // .inspect(|x| println!("x: {x:?}"))
         .collect::<Vec<_>>();
 
     Some(
@@ -481,6 +478,9 @@ fn combine_speech_info(
             .get(&debates_key)
             .map(|speeches| speeches.as_slice())
             .unwrap_or_default();
+        if document_link_speeches.is_empty() {
+            log::warn!("Keine document links! Aber {} speeches", debate_speeches.len());
+        }
         for (debate_speech, document_link_speech) in
             debate_speeches.iter_mut().zip(document_link_speeches)
         {
@@ -567,6 +567,27 @@ mod tests {
             .plenar_paths(plenar_infos)
             .expect("Failed to get paths");
         println!("paths: {paths:?}");
+    }
+
+    #[tokio::test]
+    async fn test_combine_warning() {
+        let mut scraper = AustriaScraper::default();
+        simple_logger::init_with_level(log::Level::Warn).unwrap();
+
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
+
+            let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+
+            let paths = scraper
+                .plenar_paths(plenar_infos)
+                .expect("Failed to get paths");
+            for path in paths {
+                println!("path: {}{path}", AustriaScraper::BASE_URL);
+                let _plenar_info = scraper.get_plenar(&path).await.unwrap();
+                // plenar_info
+            }
+        }
     }
 
     #[tokio::test]
@@ -819,6 +840,7 @@ mod tests {
             .await
             .unwrap();
 
+        dbg!(&plenar);
         assert_eq!(
             plenar.absences,
             Some(vec![

@@ -17,7 +17,7 @@ mod request;
 mod scraper;
 mod speeches;
 mod text_extractor;
-mod text_utils;
+pub mod text_utils;
 mod url;
 
 pub use text_extractor::*;
@@ -131,13 +131,6 @@ pub fn extract_from_gegenstand_url_text(text: &str) -> Option<DeclineUrlGegensta
 pub fn extract_text_from_html(html: &str) -> String {
     let (_, text) = remove_paran_contents(html, '<', '>');
     html_escape::decode_html_entities(&text).to_string()
-    // let fragment = Html::parse_fragment(html);
-
-    // fragment
-    //     .tree
-    //     .nodes()
-    //     .flat_map(|node| node.value().as_text().map(|text| text.deref()))
-    //     .collect::<String>()
 }
 
 /// used if the id does not directly point to the text, but to an element that is completely outside the text

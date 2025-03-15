@@ -133,7 +133,11 @@ impl MinistrialProposalScraper for AustriaScraper {
 
     fn ministrial_payload(&self) -> Self::Payload {
         println!("scrape info: {:?}", self.scrape_info.gp);
-        json!({"GP_CODE": self.scrape_info.gp, "DOKTYP": "MEG"})
+        json!({
+            "GP_CODE": self.scrape_info.gp, 
+            "DOKTYP": "MEG", 
+            "DATUM_VON": [ self.scrape_info.date_start, self.scrape_info.date_end
+        ]})
     }
 
     fn ministrial_prop_paths(&self, proposals: Value) -> Result<Vec<GegenstandInfo>, ScraperError> {

@@ -549,6 +549,25 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    pub async fn test_xxvii_a_2173() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVII/A/2173")
+            .await
+            .unwrap();
+
+        assert!(init.is_law);
+        // let cie = init.come_into_effect_info.unwrap();
+        // assert_eq!(cie.by_publication, true);
+        // assert_eq!(cie.law_come_into_effect_date, None);
+        // assert_eq!(
+        //     cie.law_expires_on_date,
+        //     Some(NaiveDate::from_ymd_opt(2027, 12, 31).unwrap())
+        // );
+    }
+
     // /gegenstand/XXVIII/I/22
     #[tokio::test]
     pub async fn test_xxviii_i_22() {
@@ -563,8 +582,6 @@ mod tests {
         let cie = init.come_into_effect_info.unwrap();
         assert_eq!(cie.by_publication, true);
     }
-
-
 
     #[test]
     fn test_vote_count_extraction() {

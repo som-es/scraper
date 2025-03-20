@@ -618,11 +618,23 @@ mod tests {
         // assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
     }
 
+    // /gegenstand/XXVIII/A/104
+    #[tokio::test]
+    async fn test_unfinished_xxviii_a_104() {
+        let scraper = AustriaScraper::default();
+
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/104")
+            .await
+            .unwrap();
+        println!("init: {init:?}");
+    }
+
     #[tokio::test]
     async fn test_legis_init_all() {
-        return;
+        // return;
         let mut scraper = AustriaScraper::default();
-        scraper.scrape_info.gp = vec!["XXVII".to_string()];
+        scraper.scrape_info.gp = vec!["XXVIII".to_string()];
 
         let initiatives = scraper.post_legis_payload().await.unwrap();
         let paths = scraper.legis_paths(initiatives).unwrap();
@@ -638,7 +650,10 @@ mod tests {
             //     error_count += 1;
             //     println!("erorring path: {path}");
             // }
-            if path.contains("I/1858") {
+            // if path.contains("I/1858") {
+            //     println!("path: {path:?}");
+            // }
+            if path.contains("A/104") {
                 println!("path: {path:?}");
             }
             // println!("path: {path:?}");

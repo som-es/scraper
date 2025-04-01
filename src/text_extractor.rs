@@ -100,6 +100,8 @@ pub struct TextExtractor {
 unsafe impl Sync for TextExtractor {}
 unsafe impl Send for TextExtractor {}
 
+pub const UNREALISTIC_SPEECH_LENGTH: usize = 36000;
+
 impl TextExtractor {
     pub fn new(base_url: &str) -> Self {
         let president_regex = Regex::new(r"\nPräsident(?:[^P!,])*?:.*[Nn]ächste.*").unwrap();
@@ -219,7 +221,7 @@ impl TextExtractor {
 
         // dbg!(start_at_delegate_speech_idx);
 
-        match start_at_delegate_speech_idx {
+        let speech_text = match start_at_delegate_speech_idx {
             Some(start_at_delegate_speech_idx) => {
                 let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
@@ -258,7 +260,14 @@ impl TextExtractor {
                 Some(fitted_speech)
             }
             None => Some(unfitted_speech),
+        };
+
+        if let Some(speech_text) = &speech_text {
+            if speech_text.len() >= UNREALISTIC_SPEECH_LENGTH {
+                return None
+            }
         }
+        speech_text
     }
 
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {

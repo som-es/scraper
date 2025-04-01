@@ -1229,4 +1229,24 @@ mod tests {
             .unwrap();
         println!("plenar: {plenar:?}");
     }
+    
+    #[tokio::test]
+    async fn test_plenar_xxiv_55() {
+        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXIV/NRSITZ/55")
+            .await
+            .unwrap();
+
+        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        for debate in &plenar.debates {
+            for speech in &debate.speeches {
+                let speech_text = text_extractor.speech_extraction_with_fit(&speech.speech.spoken_text_html_urls[0], &speech.speech.delegate_display_name).await.unwrap();
+                println!("speech_text: {speech_text:?}");
+            }
+        }
+        println!("plenar: {plenar:?}");
+    }
 }

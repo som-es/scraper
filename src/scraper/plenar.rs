@@ -383,18 +383,17 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         .flat_map(|x| x.split("und"))
         .flat_map(|x| x.split("sowie"))
         .map(|x| {
-            x.split_inclusive(char::is_whitespace)
-                .filter(|split| {
-                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
-                        || split.contains('.')
-                        || {
-                            let mut ret = false;
-                            if skip_words.contains(split.trim_matches(char::is_whitespace)) {
-                                ret = true;
-                            }
-                            ret
-                        })
-                })
+            x.split_inclusive(char::is_whitespace).filter(|split| {
+                !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
+                    || split.contains('.')
+                    || {
+                        let mut ret = false;
+                        if skip_words.contains(split.trim_matches(char::is_whitespace)) {
+                            ret = true;
+                        }
+                        ret
+                    })
+            })
         })
         .map(|x| x.collect::<String>())
         .collect::<Vec<_>>();
@@ -479,7 +478,10 @@ fn combine_speech_info(
             .map(|speeches| speeches.as_slice())
             .unwrap_or_default();
         if document_link_speeches.is_empty() {
-            log::warn!("Keine document links! Aber {} speeches", debate_speeches.len());
+            log::warn!(
+                "Keine document links! Aber {} speeches",
+                debate_speeches.len()
+            );
         }
         for (debate_speech, document_link_speech) in
             debate_speeches.iter_mut().zip(document_link_speeches)

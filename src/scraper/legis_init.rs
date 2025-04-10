@@ -376,7 +376,7 @@ pub fn extract_invisibly_declined_from_text(
         return (Some(true), url);
     }
 
-    if text.contains("angenommen") {
+    if text.contains("angenommen") || text.contains("Nationalrates: Genehmigung") {
         return (Some(false), url);
     }
 
@@ -537,7 +537,6 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/3762")
             .await
             .unwrap();
-
 
         assert!(init.is_law);
         let cie = init.come_into_effect_info.unwrap();
@@ -2051,8 +2050,19 @@ mod tests {
         assert_eq!(res.plenary_session, Some(179));
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
 
-        assert_eq!(named_vote.contra_count, named_vote.delegates_pro_contra.as_ref().unwrap().contra.len());
-        assert_eq!(named_vote.pro_count, named_vote.delegates_pro_contra.as_ref().unwrap().pro.len());
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
         assert_eq!(named_vote.contra_count, 122);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.pro.contains(&"Wurm Peter".to_string()));
@@ -2385,5 +2395,33 @@ mod tests {
 
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
         println!("res: {res:?}");
+    }
+
+    #[tokio::test]
+    async fn test_xxviii_i_26() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/I/26")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().contra, Vec::<String>::new());
+    }
+    
+    #[tokio::test]
+    async fn test_xxvii_uea_1266() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/UEA/1266")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["S".to_string()]);
     }
 }

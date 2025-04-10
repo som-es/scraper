@@ -73,6 +73,8 @@ pub fn classify_vote_stage(text: &str) -> Option<VoteStage> {
         VoteType::Proposal
     } else if text.to_lowercase().contains("gesetzesvorschlag") {
         VoteType::Proposal
+    } else if text.contains("Nationalrates: Genehmigung") {
+        VoteType::Proposal
     } else {
         // need to find fitting type, some stages are bs
         if vote_stage.stage != Stage::None {
@@ -112,7 +114,8 @@ pub async fn extract_most_fitting_votes(
 
         if !(text.contains("Abstimmung")
             || text.contains("abgelehnt")
-            || text.contains("angenommen"))
+            || text.contains("angenommen")
+            || (text.contains("Nationalrates: Genehmigung")))
             || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
         {
             continue;

@@ -341,7 +341,10 @@ pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Optio
 
     let pro = &pro_contra_str[pro_start + 7..contra_start - 2];
     let pro = convert_party_code_list_to_vec(pro);
+    let pro = pro.into_iter().filter(|x| !x.is_empty()).collect();
+
     let contra = convert_party_code_list_to_vec_open_ended(&pro_contra_str[contra_start + 8..]);
+    let contra = contra.into_iter().filter(|x| !x.is_empty()).collect();
 
     Some(ProContra { pro, contra })
 }

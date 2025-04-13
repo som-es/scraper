@@ -61,7 +61,30 @@ pub fn extract_come_into_effect(text: &str) -> Option<ComeIntoEffectInfo> {
 
     let date_idx = get_reversed_date_idx(come_into_effect);
 
-    let most_useful_info = &come_into_effect[date_idx..];
+    let most_useful_info = &come_into_effect.get(date_idx..)?; /*
+    thread 'tokio-runtime-worker' panicked at /home/rusty/Desktop/rust/scraper/src/scraper/legis_init/come_into_effect.rs:64:45:
+byte index 12426 is not a char boundary; it is inside '…' (bytes 12424..12427) of `
+
+
+
+
+Entwurf eines Bundesgesetzes über die Anerkennung des
+Österreichischen Roten Kreuzes und den Schutz des Zeichens des Roten
+Kreuzes (Rotkreuzgesetz - RKG)
+
+
+
+
+
+
+
+
+Entwurf
+
+Bundesgesetz über die Anerkennung des
+Österreichischen Ro`[...]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace */
+
     let date = extract_german_date_from_str(most_useful_info);
 
     let mut come_into_effect_info = ComeIntoEffectInfo::default();

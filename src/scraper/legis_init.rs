@@ -2424,4 +2424,21 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["S".to_string()]);
     }
+
+    // gegenstand/XXVIII/AA/6
+    #[tokio::test]
+    async fn test_xxviii_aa_6() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/AA/6")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["V".into(), "S".to_string(), "N".into()]);
+    }
+
+
 }

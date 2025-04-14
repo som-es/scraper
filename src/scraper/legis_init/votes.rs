@@ -66,7 +66,7 @@ pub fn classify_vote_stage(text: &str) -> Option<VoteStage> {
         VoteType::OnlyVotedByName
     } else if text.to_lowercase().contains("namentliche abstimmung") {
         VoteType::AnyNamedVote
-    } else if text.contains("antrag") {
+    } else if text.to_lowercase().contains("antrag") {
         VoteType::Proposal
     // https://www.parlament.gv.at/gegenstand/XXVII/III/835
     } else if text.contains("Antrag auf Kenntnisnahme") {

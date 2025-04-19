@@ -1231,7 +1231,7 @@ mod tests {
             .unwrap();
         println!("plenar: {plenar:?}");
     }
-    
+
     #[tokio::test]
     async fn test_plenar_xxiv_55() {
         // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
@@ -1245,7 +1245,13 @@ mod tests {
         let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         for debate in &plenar.debates {
             for speech in &debate.speeches {
-                let speech_text = text_extractor.speech_extraction_with_fit(&speech.speech.spoken_text_html_urls[0], &speech.speech.delegate_display_name).await.unwrap();
+                let speech_text = text_extractor
+                    .speech_extraction_with_fit(
+                        &speech.speech.spoken_text_html_urls[0],
+                        &speech.speech.delegate_display_name,
+                    )
+                    .await
+                    .unwrap();
                 println!("speech_text: {speech_text:?}");
             }
         }

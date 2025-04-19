@@ -264,7 +264,7 @@ impl TextExtractor {
 
         if let Some(speech_text) = &speech_text {
             if speech_text.len() >= UNREALISTIC_SPEECH_LENGTH {
-                return None
+                return None;
             }
         }
         speech_text

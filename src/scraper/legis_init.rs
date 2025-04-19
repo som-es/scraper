@@ -5,7 +5,8 @@ mod votes;
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
-    AcceptedState, FileType, LegislativeInitiative, Party, Reference, Speech, Vote, VoteType,
+    AcceptedState, FileType, LegislativeInitiative, Party, Reference, RelatedDelegate, Speech,
+    Vote, VoteType,
 };
 use serde_json::{json, Value};
 use votes::extract_hidden_votes;
@@ -162,11 +163,14 @@ impl LegislativeInitiatives for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let delegate_ids = names
+        let related_delegates = names
             .iter()
-            .flat_map(|name| name["url"].as_str().map(person_url_to_id))
-            .flatten()
-            .collect::<Vec<u64>>();
+            .flat_map(|name| {
+                let delegate_id = name["url"].as_str().map(person_url_to_id)??;
+                let text = name["funktext"].as_str().map(ToString::to_string);
+                Some(RelatedDelegate { text, delegate_id })
+            })
+            .collect::<Vec<RelatedDelegate>>();
 
         let votes = extract_votes(legis_content).unwrap_or_default();
         let topics = extract_topics(legis_content, "topics").unwrap_or_default();
@@ -284,8 +288,11 @@ impl LegislativeInitiatives for AustriaScraper {
         let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
 
         let mut is_voteable_on = is_law;
-        
-        const IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = ["US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2", "RVVB", "USVL", "BUA", "UEAM"];
+
+        const IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
+            "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB",
+            "URH2", "RVVB", "USVL", "BUA", "UEAM",
+        ];
         if IS_VOTEABLE_ON_DOKTYPES.contains(&&doktyp.as_str()) {
             is_voteable_on = true;
         }
@@ -322,7 +329,7 @@ impl LegislativeInitiatives for AustriaScraper {
             id,
             votes,
             documents,
-            delegate_ids,
+            related_delegates,
             accepted,
             date,
             speeches,
@@ -340,7 +347,7 @@ impl LegislativeInitiatives for AustriaScraper {
             is_law,
             law_accepted: vote_infavor,
             come_into_effect_info,
-            is_voteable_on, 
+            is_voteable_on,
         })
     }
 
@@ -684,7 +691,7 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/4129")
             .await
             .unwrap();
-        assert_eq!(legis_init.delegate_ids, vec![5439, 87001]);
+        assert_eq!(legis_init.related_delegates.iter().map(|x| x.delegate_id).collect::<Vec<_>>(), vec![5439, 87001]);
         assert!(!legis_init.requires_simple_majority);
         assert_eq!(legis_init.accepted.unwrap(), AcceptedState::PreDeclined);
         assert!(!legis_init.speeches.is_empty());
@@ -2434,9 +2441,12 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().contra, Vec::<String>::new());
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            Vec::<String>::new()
+        );
     }
-    
+
     #[tokio::test]
     async fn test_xxvii_uea_1266() {
         let scraper = AustriaScraper::default();
@@ -2448,7 +2458,10 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["S".to_string()]);
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().pro,
+            vec!["S".to_string()]
+        );
     }
 
     // gegenstand/XXVIII/AA/6
@@ -2463,8 +2476,9 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["V".into(), "S".to_string(), "N".into()]);
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().pro,
+            vec!["V".into(), "S".to_string(), "N".into()]
+        );
     }
-
-
 }

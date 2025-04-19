@@ -77,7 +77,8 @@ pub trait LegislativeInitiatives: Scraper {
     }
 }
 
-pub const IGNORE_ITYPS: [&str; 3] = ["J", "EUBTG", "AB"];
+// pub const IGNORE_ITYPS: [&str; 3] = ["J", "EUBTG", "AB"];
+pub const IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
 
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
@@ -109,9 +110,14 @@ impl LegislativeInitiatives for AustriaScraper {
                 "ME",
                 "AUB"
             ],*/
-            // "VHG": [
-            //     "ANTR"
-            // ],
+            /*"VHG": [ // voteable ons
+                "ANTR",
+                "RV",
+                "RVVB",
+                "GABR",
+                "GABR13",
+                "US",
+            ],*/
             "DATUM_VON": [
                 self.scrape_info.date_start, self.scrape_info.date_end
             ],
@@ -277,6 +283,13 @@ impl LegislativeInitiatives for AustriaScraper {
         const LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
         let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
 
+        let mut is_voteable_on = is_law;
+        
+        const IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = ["US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2", "RVVB", "USVL", "BUA", "UEAM"];
+        if IS_VOTEABLE_ON_DOKTYPES.contains(&&doktyp.as_str()) {
+            is_voteable_on = true;
+        }
+
         let mut come_into_effect_info = None;
         if vote_infavor == Some(true) {
             // search text for "in Kraft getreten" oder so
@@ -327,6 +340,7 @@ impl LegislativeInitiatives for AustriaScraper {
             is_law,
             law_accepted: vote_infavor,
             come_into_effect_info,
+            is_voteable_on, 
         })
     }
 
@@ -631,7 +645,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_legis_init_all() {
-        // return;
+        return;
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXVIII".to_string()];
 
@@ -748,6 +762,8 @@ mod tests {
         return;
         let start = std::time::Instant::now();
 
+        let mut doktypes = HashSet::new();
+        let mut itypes = HashSet::new();
         let mut count = 0;
         // for gp in ["XXIV", "XXIII", "XXII"] {
         for gp in [
@@ -763,6 +779,9 @@ mod tests {
                     println!("error {}{path}", AustriaScraper::BASE_URL);
                     continue;
                 };
+                doktypes.insert(init.doktyp.clone());
+                itypes.insert(init.ityp.clone());
+
                 // println!("init: {init:?}");
                 if init.hidden_votes_info.voted_by_name {
                     println!("init: title: {}, accepted: {:?}, votes: {:?}, id: {:?}, hidden_votes: {:?}, ", init.title, init.accepted, init.votes, init.id, init.hidden_votes_info);
@@ -776,8 +795,15 @@ mod tests {
             }
             println!("elapsed: {:?}", start.elapsed());
             println!("count: {count:?}");
+
             // break;
+            if gp == "XXIV" {
+                break;
+            }
         }
+
+        println!("doktypes: {doktypes:?}");
+        println!("itypes: {itypes:?}");
 
         println!("count: {count:?}");
     }

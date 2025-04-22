@@ -26,7 +26,7 @@ pub trait RisScraper: Scraper {
     const DECREE_QUERY_PARAMS: &'static str = "?Applikation=BgblAuth&Typ.SucheInVerordnungen=true";
 
     async fn fetch_decrees(&self, page: u32) -> Result<Value, ScraperError> {
-        let url = format!("{}{}", Self::STATE_LAW_URL, Self::DECREE_QUERY_PARAMS);
+        let url = format!("{}{}&Seitennummer={}", Self::STATE_LAW_URL, Self::DECREE_QUERY_PARAMS, page);
         request::request(Method::GET, self.client(), (), &url).await
     }
 

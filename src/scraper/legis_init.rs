@@ -648,6 +648,7 @@ mod tests {
             .await
             .unwrap();
         println!("init: {init:?}");
+        assert!(init.is_voteable_on);
     }
 
     #[tokio::test]
@@ -691,7 +692,14 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/4129")
             .await
             .unwrap();
-        assert_eq!(legis_init.related_delegates.iter().map(|x| x.delegate_id).collect::<Vec<_>>(), vec![5439, 87001]);
+        assert_eq!(
+            legis_init
+                .related_delegates
+                .iter()
+                .map(|x| x.delegate_id)
+                .collect::<Vec<_>>(),
+            vec![5439, 87001]
+        );
         assert!(!legis_init.requires_simple_majority);
         assert_eq!(legis_init.accepted.unwrap(), AcceptedState::PreDeclined);
         assert!(!legis_init.speeches.is_empty());
@@ -766,7 +774,7 @@ mod tests {
     async fn test_get_legis_init_was_voted_by_name() {
         let mut scraper = AustriaScraper::default();
 
-        return;
+        // return;
         let start = std::time::Instant::now();
 
         let mut doktypes = HashSet::new();
@@ -774,7 +782,8 @@ mod tests {
         let mut count = 0;
         // for gp in ["XXIV", "XXIII", "XXII"] {
         for gp in [
-            "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+            // "XXVIII", "XXVII", "XXVI", "XXV", "XXIV",
+            "XXIII", "XXII", "XXI", "XX",
         ] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
@@ -811,6 +820,10 @@ mod tests {
 
         println!("doktypes: {doktypes:?}");
         println!("itypes: {itypes:?}");
+        /*
+               doktypes: {"US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2", "RVVB", "USVL", "BUA", "UEAM"}
+        itypes: {"AA", "URH2", "UEA", "I", "US", "A"}
+                 */
 
         println!("count: {count:?}");
     }
@@ -2479,6 +2492,30 @@ mod tests {
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
             vec!["V".into(), "S".to_string(), "N".into()]
+        );
+    }
+
+    // gegenstand/XXVIII/III/79
+    #[tokio::test]
+    async fn test_xxviii_iii_79() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/III/79")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().pro,
+            vec![
+                "F".into(),
+                "V".into(),
+                "S".to_string(),
+                "N".into(),
+                "G".into()
+            ]
         );
     }
 }

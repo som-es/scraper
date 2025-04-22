@@ -1,25 +1,13 @@
 use std::str::FromStr;
 
 use chrono::NaiveDate;
-use common_scrapes::{Document, FileType};
+use common_scrapes::{Document, FileType, Thing};
 use reqwest::Method;
 use serde_json::Value;
 
 use crate::{error::ScraperError, request};
 
 use super::{AustriaScraper, Scraper};
-
-pub struct Thing {
-    pub id: String,
-    pub issuer: String,
-    pub organization: String,
-    pub title: String,
-    pub short_title: String,
-    pub date: NaiveDate,
-    pub thing_type: String,
-    pub part: String,
-    pub documents: Vec<Document>,
-}
 
 pub trait RisScraper: Scraper {
     const STATE_LAW_URL: &'static str = "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht";

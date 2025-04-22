@@ -1,10 +1,13 @@
+use std::str::FromStr;
+
+use chrono::NaiveDate;
 use common_scrapes::{Document, FileType};
 use reqwest::Method;
 use serde_json::Value;
 
 use crate::{error::ScraperError, request};
 
-use super::Scraper;
+use super::{AustriaScraper, Scraper};
 
 pub struct Thing {
     pub id: String,
@@ -12,7 +15,7 @@ pub struct Thing {
     pub organization: String,
     pub title: String,
     pub short_title: String,
-    pub date: String,
+    pub date: NaiveDate,
     pub thing_type: String,
     pub part: String,
     pub documents: Vec<Document>,
@@ -27,13 +30,14 @@ pub trait RisScraper: Scraper {
         request::request(Method::GET, self.client(), (), &url).await
     }
 
-    async fn fetch_and_parse_decrees(&self, page: u32) -> Result<Vec<Thing>, ScraperError> {
+    async fn fetch_and_parse_ministrial_decrees(&self, page: u32) -> Result<Vec<Thing>, ScraperError> {
         let decree = self.fetch_decrees(page).await?;
-        let decrees = decree["Data"]["Metadaten"]
+        let decrees = decree["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"]
             .as_array()
             .ok_or(ScraperError::ParseError)?
             .iter()
-            .filter_map(|decree| self.general_parse_thing(decree))
+            .filter_map(|decree| {
+                self.parse_ministrial_decree(&decree)})
             .collect::<Vec<Thing>>();
 
         Ok(decrees)
@@ -41,29 +45,31 @@ pub trait RisScraper: Scraper {
 
     fn parse_ministrial_decree(&self, decree_raw: &Value) -> Option<Thing> {
         let mut thing = self.general_parse_thing(decree_raw)?;
-        if !thing.issuer.contains("minister") {
+        if !thing.issuer.to_lowercase().contains("minister") {
             return None;
         }
-        thing.issuer = thing.issuer[thing.issuer.find('(')?..thing.issuer.find(')')?].to_string();
-        todo!()
+        thing.issuer = thing.issuer[thing.issuer.find('(')?+1..thing.issuer.find(')')?].to_string();
+        Some(thing)
     }
 
     fn general_parse_thing(&self, thing_raw: &Value) -> Option<Thing> {
         let data = &thing_raw["Data"]["Metadaten"];
         let technical_data = &data["Technisch"];
-        let id = technical_data["ID"].as_str()?;
-        let issuer = technical_data["Einbringer"].as_str()?;
-        let organization = technical_data["Organ"].as_str()?;
+        let id = technical_data["ID"].as_str().unwrap();
+        let issuer = technical_data["Einbringer"].as_str().unwrap();
+        let organization = technical_data["Organ"].as_str().unwrap();
 
         let general_info = &data["Bundesrecht"];
-        let title = general_info["Titel"].as_str()?;
-        let short_title = general_info["Kurztitel"].as_str()?;
+        let title = general_info["Titel"].as_str().unwrap();
+        let short_title = general_info["Kurztitel"].as_str().unwrap();
 
-        let part = general_info["Teil"].as_str()?;
-        let date = general_info["Ausgabedatum"].as_str()?;
-        let thing_type = general_info["Typ"].as_str()?;
+        let general_bgbl_info = &general_info["BgblAuth"];
 
-        let documents = general_info["Dokumentliste"]["ContentReference"]["Urls"]["ContentUrl"]
+        let part = general_bgbl_info["Teil"].as_str().unwrap();
+        let date = general_bgbl_info["Ausgabedatum"].as_str().unwrap();
+        let thing_type = general_bgbl_info["Typ"].as_str().unwrap();
+
+        let documents = thing_raw["Data"]["Dokumentliste"]["ContentReference"]["Urls"]["ContentUrl"]
             .as_array()?
             .iter()
             .filter_map(|doc| {
@@ -88,10 +94,32 @@ pub trait RisScraper: Scraper {
             issuer: issuer.to_string(),
             title: title.to_string(),
             short_title: short_title.to_string(),
-            date: date.to_string(),
+            date: NaiveDate::from_str(date).unwrap(),
             thing_type: thing_type.to_string(),
             part: part.to_string(),
             documents,
         })
+    }
+}
+
+impl RisScraper for AustriaScraper {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scraper::AustriaScraper;
+
+    #[tokio::test]
+    async fn test_fetch_decrees() {
+        let scraper = AustriaScraper::default();
+        let result = scraper.fetch_decrees(1).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_and_parse_ministrial_decrees() {
+        let scraper = AustriaScraper::default();
+        let decrees = scraper.fetch_and_parse_ministrial_decrees(1).await.unwrap();
+        assert!(!decrees.is_empty());
     }
 }

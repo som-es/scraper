@@ -33,10 +33,10 @@ use crate::{
 pub trait LegislativeInitiatives: Scraper {
     const FILTER_PATH: &'static str;
 
-    fn legis_payload(&self) -> Self::Payload;
+    fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload;
 
-    async fn post_legis_payload(&self) -> Result<Value, ScraperError> {
-        let payload = self.legis_payload();
+    async fn post_legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Result<Value, ScraperError> {
+        let payload = self.legis_payload(searched_doktyps);
         self.post_payload(
             payload,
             format!(
@@ -56,7 +56,7 @@ pub trait LegislativeInitiatives: Scraper {
         &self,
         proposal_path: &str,
     ) -> Result<LegislativeInitiative, ScraperError> {
-        for ityp in IGNORE_ITYPS {
+        for ityp in LEGIS_IGNORE_ITYPS {
             if proposal_path.contains(&format!("{ityp}/")) {
                 return Err(ScraperError::NoVoteFound);
             }
@@ -79,7 +79,13 @@ pub trait LegislativeInitiatives: Scraper {
 }
 
 // pub const IGNORE_ITYPS: [&str; 3] = ["J", "EUBTG", "AB"];
-pub const IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
+pub const LEGIS_IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
+pub const LEGIS_LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
+
+pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
+    "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2",
+    "RVVB", "USVL", "BUA", "UEAM",
+];
 
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
@@ -88,10 +94,11 @@ impl LegislativeInitiatives for AustriaScraper {
     // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
     // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
 
-    fn legis_payload(&self) -> Self::Payload {
+    fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload {
         json!({
             "GP": self.scrape_info.gp,
             "NRBR": self.scrape_info.council_type,
+            "DOKTYP": searched_doktyps,
             /*"DOKTYP": [
                 "VOLKBG",
                 "RV",
@@ -142,7 +149,7 @@ impl LegislativeInitiatives for AustriaScraper {
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let doktyp = legis_content["doktyp"].as_str()?.to_string();
 
-        if IGNORE_ITYPS.contains(&ityp.as_str()) {
+        if LEGIS_IGNORE_ITYPS.contains(&ityp.as_str()) {
             return None;
         }
 
@@ -284,16 +291,11 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
-        const LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
-        let is_law = LAW_DETERMINATORS.contains(&doktyp.as_str());
+        let is_law = LEGIS_LAW_DETERMINATORS.contains(&doktyp.as_str());
 
         let mut is_voteable_on = is_law;
 
-        const IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
-            "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB",
-            "URH2", "RVVB", "USVL", "BUA", "UEAM",
-        ];
-        if IS_VOTEABLE_ON_DOKTYPES.contains(&&doktyp.as_str()) {
+        if LEGIS_IS_VOTEABLE_ON_DOKTYPES.contains(&&doktyp.as_str()) {
             is_voteable_on = true;
         }
 
@@ -519,7 +521,7 @@ fn extract_votes(legis_content: &Value) -> Option<Vec<Vote>> {
 mod tests {
     use std::collections::HashSet;
 
-    use chrono::NaiveDate;
+    use chrono::{Days, NaiveDate};
     use common_scrapes::{
         AcceptedState, FileType, Opinion, Party, ProContra, Stage, VoteStage, VoteType,
     };
@@ -653,12 +655,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_legis_init_all() {
-        return;
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXVIII".to_string()];
 
-        let initiatives = scraper.post_legis_payload().await.unwrap();
+        scraper.scrape_info.date_start = chrono::Local::now()
+            .naive_local()
+            .checked_sub_days(Days::new(90));
+
+        let initiatives = scraper.post_legis_payload(None).await.unwrap();
         let paths = scraper.legis_paths(initiatives).unwrap();
+
         assert!(paths.len() >= 10);
         println!("length: {}", paths.len());
 
@@ -674,7 +680,7 @@ mod tests {
             // if path.contains("I/1858") {
             //     println!("path: {path:?}");
             // }
-            if path.contains("A/104") {
+            if path.contains("A/77") {
                 println!("path: {path:?}");
             }
             // println!("path: {path:?}");
@@ -733,7 +739,7 @@ mod tests {
                 continue;
             }
 
-            let initiatives = scraper.post_legis_payload().await.unwrap();
+            let initiatives = scraper.post_legis_payload(None).await.unwrap();
             let mut doktypes_with_law = HashSet::new();
             for path in scraper.legis_paths(initiatives).unwrap() {
                 // println!();
@@ -787,7 +793,7 @@ mod tests {
         ] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
-            let initiatives = scraper.post_legis_payload().await.unwrap();
+            let initiatives = scraper.post_legis_payload(None).await.unwrap();
             for path in scraper.legis_paths(initiatives).unwrap() {
                 // println!();
                 // println!("path: {path:?}");
@@ -835,7 +841,7 @@ mod tests {
 
         let start = std::time::Instant::now();
 
-        let initiatives = scraper.post_legis_payload().await.unwrap();
+        let initiatives = scraper.post_legis_payload(None).await.unwrap();
         let mut count = 0;
         for path in scraper.legis_paths(initiatives).unwrap() {
             println!("path: {path:?}");
@@ -867,7 +873,7 @@ mod tests {
 
         let start = std::time::Instant::now();
 
-        let initiatives = scraper.post_legis_payload().await.unwrap();
+        let initiatives = scraper.post_legis_payload(None).await.unwrap();
         for path in scraper.legis_paths(initiatives).unwrap() {
             //println!("path: {path:?}");
             let Ok(init) = scraper.get_legis_init(&path).await else {
@@ -2516,6 +2522,23 @@ mod tests {
                 "N".into(),
                 "G".into()
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_xxviii_a_77() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/77")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().pro,
+            vec!["F".into(), "V".into(), "S".to_string(), "N".into(),]
         );
     }
 }

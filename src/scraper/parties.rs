@@ -19,7 +19,7 @@ impl Parties for AustriaScraper {
             .ok_or(ScraperError::NoEnactmentError)?;
         let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;*/
 
-        let raw = self.post_legis_payload().await?;
+        let raw = self.post_legis_payload(None).await?;
         let legis_paths = self.legis_paths(raw)?;
         let mut votes = HashSet::new();
         let mut added_vote_legis_inits = 0;

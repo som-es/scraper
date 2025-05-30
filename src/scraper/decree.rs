@@ -14,18 +14,25 @@ pub trait RisScraper: Scraper {
     const DECREE_QUERY_PARAMS: &'static str = "?Applikation=BgblAuth&Typ.SucheInVerordnungen=true";
 
     async fn fetch_decrees(&self, page: u32) -> Result<Value, ScraperError> {
-        let url = format!("{}{}&Seitennummer={}", Self::STATE_LAW_URL, Self::DECREE_QUERY_PARAMS, page);
+        let url = format!(
+            "{}{}&Seitennummer={}&DokumenteProSeite=OneHundred",
+            Self::STATE_LAW_URL,
+            Self::DECREE_QUERY_PARAMS,
+            page
+        );
         request::request(Method::GET, self.client(), (), &url).await
     }
 
-    async fn fetch_and_parse_ministrial_decrees(&self, page: u32) -> Result<Vec<Thing>, ScraperError> {
+    async fn fetch_and_parse_ministrial_decrees(
+        &self,
+        page: u32,
+    ) -> Result<Vec<Thing>, ScraperError> {
         let decree = self.fetch_decrees(page).await?;
         let decrees = decree["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"]
             .as_array()
             .ok_or(ScraperError::ParseError)?
             .iter()
-            .filter_map(|decree| {
-                self.parse_ministrial_decree(&decree)})
+            .filter_map(|decree| self.parse_ministrial_decree(&decree))
             .collect::<Vec<Thing>>();
 
         Ok(decrees)
@@ -36,7 +43,8 @@ pub trait RisScraper: Scraper {
         if !thing.issuer.to_lowercase().contains("minister") {
             return None;
         }
-        thing.issuer = thing.issuer[thing.issuer.find('(')?+1..thing.issuer.find(')')?].to_string();
+        thing.issuer =
+            thing.issuer[thing.issuer.find('(')? + 1..thing.issuer.find(')')?].to_string();
         Some(thing)
     }
 
@@ -57,7 +65,8 @@ pub trait RisScraper: Scraper {
         let date = general_bgbl_info["Ausgabedatum"].as_str().unwrap();
         let thing_type = general_bgbl_info["Typ"].as_str().unwrap();
 
-        let documents = thing_raw["Data"]["Dokumentliste"]["ContentReference"]["Urls"]["ContentUrl"]
+        let documents = thing_raw["Data"]["Dokumentliste"]["ContentReference"]["Urls"]
+            ["ContentUrl"]
             .as_array()?
             .iter()
             .filter_map(|doc| {
@@ -109,5 +118,7 @@ mod tests {
         let scraper = AustriaScraper::default();
         let decrees = scraper.fetch_and_parse_ministrial_decrees(1).await.unwrap();
         assert!(!decrees.is_empty());
+        println!("decrees count: {}", decrees.len());
+        dbg!(&decrees[..10]);
     }
 }

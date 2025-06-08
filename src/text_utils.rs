@@ -49,8 +49,8 @@ pub fn remove_paran_contents(
         out_text.push_str(&text[outer_start..start]);
         outer_start = end + 1;
     }
-    if outer_start < text.len() {
-        out_text.push_str(&text[outer_start + 1..]);
+    if outer_start-1 < text.len() {
+        out_text.push_str(&text[outer_start..]);
     }
 
     (paran_contents_string_components, out_text)
@@ -67,6 +67,7 @@ mod tests {
             '(',
             ')',
         );
+        assert_eq!(text, "Tim mit kleinen  Geräten ");
         println!("text: {text}");
     }
 
@@ -77,6 +78,18 @@ mod tests {
             '(',
             ')',
         );
+        assert_eq!(text, "Tim mit kleinen  Geräten SUPER duper wahr!!");
+        println!("text: {text}");
+    }
+    
+    #[test]
+    fn test_remove_paran_contents2() {
+        let (_, text) = remove_paran_contents(
+            "Tim mit kleinen (sehr kleinen) Geräten(sehr, (sehr) sehr wahr)SUPER duper wahr!!",
+            '(',
+            ')',
+        );
+        assert_eq!(text, "Tim mit kleinen  GerätenSUPER duper wahr!!");
         println!("text: {text}");
     }
 

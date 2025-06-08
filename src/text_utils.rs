@@ -49,7 +49,7 @@ pub fn remove_paran_contents(
         out_text.push_str(&text[outer_start..start]);
         outer_start = end + 1;
     }
-    if outer_start-1 < text.len() {
+    if outer_start - 1 < text.len() {
         out_text.push_str(&text[outer_start..]);
     }
 
@@ -81,7 +81,7 @@ mod tests {
         assert_eq!(text, "Tim mit kleinen  Geräten SUPER duper wahr!!");
         println!("text: {text}");
     }
-    
+
     #[test]
     fn test_remove_paran_contents2() {
         let (_, text) = remove_paran_contents(

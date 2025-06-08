@@ -13,6 +13,7 @@ use crate::{
     legis_init::extract_topics,
     person_url_to_id,
     proposals::ProposalsPayload,
+    LastUpdated,
 };
 
 use super::{AustriaScraper, Scraper};
@@ -37,6 +38,13 @@ pub struct MinistrialProposal {
     pub legis_gp: Option<String>,
     pub legis_init_inr: Option<u32>,
     pub legis_init_ityp: Option<String>,
+}
+
+impl LastUpdated for MinistrialProposal {
+    fn last_updated(&self) -> chrono::NaiveDateTime {
+        self.updated_at
+            .unwrap_or(chrono::Local::now().naive_local())
+    }
 }
 
 #[async_trait]

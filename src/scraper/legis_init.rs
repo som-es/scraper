@@ -21,7 +21,7 @@ use crate::{
     person_url_to_id,
     proposals::ProposalScraper,
     speeches::extract_speeches,
-    AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, Scraper, TextExtractor,
+    AustriaScraper, DeclineUrlGegenstand, GegenstandPaths, LastUpdated, Scraper, TextExtractor,
 };
 
 // const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
@@ -29,13 +29,23 @@ use crate::{
 //     pollster::block_on(scraper.get_parties()).unwrap()
 // });
 
+impl LastUpdated for LegislativeInitiative {
+    fn last_updated(&self) -> chrono::NaiveDateTime {
+        self.updated_at
+            .unwrap_or(chrono::Local::now().naive_local())
+    }
+}
+
 #[async_trait]
 pub trait LegislativeInitiatives: Scraper {
     const FILTER_PATH: &'static str;
 
     fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload;
 
-    async fn post_legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Result<Value, ScraperError> {
+    async fn post_legis_payload(
+        &self,
+        searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
         let payload = self.legis_payload(searched_doktyps);
         self.post_payload(
             payload,

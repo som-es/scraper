@@ -17,7 +17,7 @@ use crate::{
     filter::filter_name_extraction,
     person_url_to_id,
     speeches::extract_speeches_from_stages,
-    unique_titles, AustriaScraper, GegenstandPaths, Scraper, TextExtractor,
+    unique_titles, AustriaScraper, GegenstandPaths, LastUpdated, Scraper, TextExtractor,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -47,9 +47,17 @@ pub struct PlenarInfo {
     pub inr: u64,
     pub debates: Vec<Debate>,
     pub date: NaiveDateTime,
+    pub updated_at: Option<NaiveDateTime>,
     pub call_to_orders: Vec<CallToOrderInfo>,
     pub gp: String,
     pub absences: Option<Vec<String>>,
+}
+
+impl LastUpdated for PlenarInfo {
+    fn last_updated(&self) -> chrono::NaiveDateTime {
+        self.updated_at
+            .unwrap_or(chrono::Local::now().naive_local())
+    }
 }
 
 #[async_trait]
@@ -129,6 +137,11 @@ impl Plenar for AustriaScraper {
         )
         .unwrap();
 
+        let updated_at = plenar_content_0["update"].as_str();
+        let updated_at = updated_at.map(|updated_at| {
+            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
+        });
+
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];
         if let Some(stages) = plenar_content_0.get("stages") {
@@ -182,6 +195,7 @@ impl Plenar for AustriaScraper {
             debates,
             call_to_orders,
             date,
+            updated_at,
             gp: gp_code,
             absences,
         })

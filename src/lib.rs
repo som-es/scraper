@@ -9,6 +9,8 @@ use ::scraper::{ElementRef, Html, Selector};
 use regex::Regex;
 
 mod caching;
+mod last_updated;
+pub use last_updated::*;
 mod config;
 mod document;
 pub mod error;

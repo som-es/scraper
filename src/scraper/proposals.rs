@@ -9,7 +9,7 @@ use crate::{
     documents,
     error::ScraperError,
     legis_init::extract_topics,
-    person_url_to_id, DatePayload, GeneralScrapeInfo,
+    person_url_to_id, DatePayload, GeneralScrapeInfo, LastUpdated,
 };
 
 use super::{AustriaScraper, GegenstandPaths, Scraper};
@@ -31,6 +31,13 @@ impl ProposalsPayload {
 
     pub fn as_json(&self) -> Value {
         json!({"NRBR": self.scrape_info.council_type, "GP_CODE": self.scrape_info.gp, "DATUM_VON": self.date_payload.to_at_format()})
+    }
+}
+
+impl LastUpdated for Proposal {
+    fn last_updated(&self) -> chrono::NaiveDateTime {
+        self.updated_at
+            .unwrap_or(chrono::Local::now().naive_local())
     }
 }
 

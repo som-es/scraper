@@ -618,6 +618,13 @@ mod tests {
         let delegate = scraper.get_delegate("/person/6407".into()).await.unwrap();
         println!("delegate: {delegate:?}");
     }
+    
+    #[tokio::test]
+    async fn test_br_council_none() {
+        let scraper = AustriaScraper::default();
+        let delegate = scraper.get_delegate("/person/2953".into()).await.unwrap();
+        println!("delegate: {delegate:?}");
+    }
 
     #[tokio::test]
     pub async fn test_seat_lost() {

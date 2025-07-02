@@ -194,7 +194,9 @@ impl LegislativeInitiatives for AustriaScraper {
         let mut eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
         let other_keyword_topics = extract_topics(legis_content, "headwords").unwrap_or_default();
 
-        let mut speeches = extract_speeches(legis_content, true).unwrap_or_default();
+        let is_urgent = other_keyword_topics.iter().any(|x| x.contains("Dringliche"));
+
+        let mut speeches: Vec<Speech> = extract_speeches(legis_content, true).unwrap_or_default();
         let date = extract_date(legis_content)?;
 
         let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
@@ -360,6 +362,7 @@ impl LegislativeInitiatives for AustriaScraper {
             law_accepted: vote_infavor,
             come_into_effect_info,
             is_voteable_on,
+            is_urgent,
         })
     }
 
@@ -2598,8 +2601,35 @@ mod tests {
             .unwrap();
         println!("res: {res:?}");
         assert_eq!(res.accepted, None);
-        
+        assert!(res.is_urgent);
+    }
+   // https://www.parlament.gv.at/gegenstand/XXVII/A/110?selectedStage=100 
+    #[tokio::test]
+    async fn test_xxvii_a_110() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/110")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert!(res.is_urgent);
     }
 
-
+    //XXVII/A/769
+    #[tokio::test]
+    async fn test_xxvii_a_769() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/769")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert!(res.is_urgent);
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap().pro,
+            vec!["S".to_string()]
+        );
+    } 
 }

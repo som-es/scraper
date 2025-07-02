@@ -49,7 +49,7 @@ pub fn remove_paran_contents(
         out_text.push_str(&text[outer_start..start]);
         outer_start = end + 1;
     }
-    if outer_start - 1 < text.len() {
+    if outer_start - (!paran_infos.is_empty() as usize) < text.len() {
         out_text.push_str(&text[outer_start..]);
     }
 
@@ -64,6 +64,17 @@ mod tests {
     fn test_remove_paran_contents() {
         let (_, text) = remove_paran_contents(
             "Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)",
+            '(',
+            ')',
+        );
+        assert_eq!(text, "Tim mit kleinen  Geräten ");
+        println!("text: {text}");
+    }
+    
+    #[test]
+    fn test_remove_paran_contents_at_beginning() {
+        let (_, text) = remove_paran_contents(
+            "(yesyes)Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)",
             '(',
             ')',
         );
@@ -94,6 +105,18 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_paran_contents2_but_none_there() {
+        let (_, text) = remove_paran_contents(
+            "hallo",
+            '(',
+            ')',
+        );
+        assert_eq!(text, "hallo");
+        // println!("text: {text}");
+    }
+
+
+    #[test]
     fn test_remove_multiple_spaces_in_name() {
         let name = "Lukas   Liebt  Rötzer";
         let res = remove_multiple_of(name, ' ');
@@ -116,4 +139,5 @@ mod tests {
 
         assert_eq!(res, "Lukas Rötzer")
     }
+ 
 }

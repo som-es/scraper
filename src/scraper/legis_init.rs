@@ -233,7 +233,7 @@ impl LegislativeInitiatives for AustriaScraper {
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content);
 
-        let (plenary_session, hidden_votes) = extract_hidden_votes(legis_content).await;
+        let (plenary_session, hidden_votes) = extract_hidden_votes(legis_content, &ityp).await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
 
         let references = extract_references(legis_content);
@@ -790,7 +790,7 @@ mod tests {
     async fn test_get_legis_init_was_voted_by_name() {
         let mut scraper = AustriaScraper::default();
 
-        // return;
+        return;
         let start = std::time::Instant::now();
 
         let mut doktypes = HashSet::new();
@@ -2387,7 +2387,7 @@ mod tests {
 
     //
     #[tokio::test]
-    async fn test_xii_uea_373() {
+    async fn test_xxii_uea_373() {
         let scraper = AustriaScraper::default();
 
         let res = scraper
@@ -2444,7 +2444,6 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
         println!("res: {res:?}");
     }
-
     // gegenstand/XXII/E/97
     #[tokio::test]
     async fn test_xxii_e_97() {
@@ -2551,4 +2550,56 @@ mod tests {
             vec!["F".into(), "V".into(), "S".to_string(), "N".into(),]
         );
     }
+   // XXVII/A/769  
+    #[tokio::test]
+    async fn test_wrong_refs_xxvii_a_769() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/769")
+            .await
+            .unwrap();
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().pro,
+            vec!["S".to_string()]
+        );
+    }
+
+    // XXVII/A/2238
+    #[tokio::test]
+    async fn test_xxvii_a_2238() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/2238")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap().pro,
+            vec!["S".to_string()]
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            vec!["V".to_string(), "F".to_string(), "G".to_string(), "N".to_string()]
+        );
+    }
+
+    // XXVIII/J/439
+    #[tokio::test]
+    async fn test_xxviii_j_439() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/J/439")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, None);
+        
+    }
+
+
 }

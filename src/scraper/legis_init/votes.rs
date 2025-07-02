@@ -10,13 +10,13 @@ use crate::{
 
 use super::extract_invisibly_declined_from_text;
 
-pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option<HiddenVotes>) {
+pub async fn extract_hidden_votes(legis_content: &Value, ityp: &str) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
     let status = legis_content.get("status");
 
     if legis_content.get("phase").is_none() {
         if let Some(stages) = legis_content.get("stages") {
-            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status, ityp).await;
         }
 
         return most_fitting_votes;
@@ -39,7 +39,7 @@ pub async fn extract_hidden_votes(legis_content: &Value) -> (Option<u64>, Option
             .unwrap()
             .contains("Plenarberatungen NR")
         {
-            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status, ityp).await;
             break;
         }
     }
@@ -86,9 +86,15 @@ pub fn classify_vote_stage(text: &str) -> Option<VoteStage> {
     Some(vote_stage)
 }
 
+#[inline]
+pub fn contains_multiple_of(text: &str, of: &str) -> bool {
+    text.find(of) != text.rfind(of)
+}
+
 pub async fn extract_most_fitting_votes(
     stages: &Value,
     status: Option<&Value>,
+    ityp: &str,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let sitzung_id_regex = Regex::new(r"(\d+). Sitzung").unwrap();
     let is_site_stored_regex = Regex::new(r"SEITE_\d+").unwrap();
@@ -117,6 +123,7 @@ pub async fn extract_most_fitting_votes(
             || text.contains("angenommen")
             || (text.contains("Nationalrates: Genehmigung")))
             || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
+            || (contains_multiple_of(text, "gegenstand/") && !(ityp == "UEA" && text.contains("/E")))
         {
             continue;
         }

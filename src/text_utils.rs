@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(text, "Tim mit kleinen  Geräten ");
         println!("text: {text}");
     }
-    
+
     #[test]
     fn test_remove_paran_contents_at_beginning() {
         let (_, text) = remove_paran_contents(
@@ -106,15 +106,10 @@ mod tests {
 
     #[test]
     fn test_remove_paran_contents2_but_none_there() {
-        let (_, text) = remove_paran_contents(
-            "hallo",
-            '(',
-            ')',
-        );
+        let (_, text) = remove_paran_contents("hallo", '(', ')');
         assert_eq!(text, "hallo");
         // println!("text: {text}");
     }
-
 
     #[test]
     fn test_remove_multiple_spaces_in_name() {
@@ -139,5 +134,4 @@ mod tests {
 
         assert_eq!(res, "Lukas Rötzer")
     }
- 
 }

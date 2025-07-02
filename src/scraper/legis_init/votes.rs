@@ -10,7 +10,10 @@ use crate::{
 
 use super::extract_invisibly_declined_from_text;
 
-pub async fn extract_hidden_votes(legis_content: &Value, ityp: &str) -> (Option<u64>, Option<HiddenVotes>) {
+pub async fn extract_hidden_votes(
+    legis_content: &Value,
+    ityp: &str,
+) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
     let status = legis_content.get("status");
 
@@ -123,7 +126,8 @@ pub async fn extract_most_fitting_votes(
             || text.contains("angenommen")
             || (text.contains("Nationalrates: Genehmigung")))
             || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
-            || (contains_multiple_of(text, "gegenstand/") && !(ityp == "UEA" && text.contains("/E")))
+            || (contains_multiple_of(text, "gegenstand/")
+                && !(ityp == "UEA" && text.contains("/E")))
         {
             continue;
         }

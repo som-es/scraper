@@ -16,8 +16,8 @@ pub struct Enactment {
     pub legislative_initiative: LegislativeInitiative,
 }
 
-#[async_trait]
-pub trait EnactmentScraper: Scraper {
+// #[async_trait]
+pub trait EnactmentScraper: Scraper + Send + Sync {
     const FILTER_PATH: &'static str;
 
     async fn post_enactment_payload(&self) -> Result<Value, ScraperError> {
@@ -41,7 +41,7 @@ pub trait EnactmentScraper: Scraper {
     fn legis_inits_from_enactments();
 }
 
-#[async_trait]
+// #[async_trait]
 impl EnactmentScraper for AustriaScraper {
     const FILTER_PATH: &'static str = "/Filter/api/filter/data/101?js=eval&showAll=true";
 

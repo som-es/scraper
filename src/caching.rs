@@ -1,5 +1,6 @@
 use std::{path::PathBuf, time::SystemTime};
 
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 #[inline]
@@ -10,6 +11,38 @@ fn cache_dir() -> String {
 #[inline]
 fn ignore_cache_xxvii() -> bool {
     std::env::var("SCRAPER_IGNORE_CACHE_XXVII").unwrap_or("true".into()) == "true"
+}
+
+pub async fn get_disk_cache_parsed<T>(
+    entry: &str,
+    redo_secs: u64,
+    redo_secs_cb: impl AsyncFn(Value) -> (Option<T>, Option<u64>),
+) -> Option<T> {
+    if entry.contains("XXVIII/") && ignore_cache_xxvii() {
+        //     // ignores cache
+        return None;
+    }
+    let cache_path = format!("{}{entry}.json", cache_dir());
+    if !tokio::fs::try_exists(&cache_path).await.ok()? {
+        return None;
+    }
+    let last_modified = tokio::fs::metadata(&cache_path)
+        .await
+        .ok()?
+        .modified()
+        .ok()?;
+
+    let cached = tokio::fs::read_to_string(cache_path).await.ok()?;
+    let data = serde_json::from_str::<Value>(&cached).ok()?;
+    let (data, new_redo_secs) = redo_secs_cb(data).await;
+    let redo_secs = new_redo_secs.unwrap_or(redo_secs);
+
+    let last_modified_duration = SystemTime::now().duration_since(last_modified).ok()?;
+    if last_modified_duration.as_secs() > redo_secs {
+        return None;
+    }
+
+    data
 }
 
 pub async fn get_disk_cache(entry: &str, redo_secs: u64) -> Option<String> {

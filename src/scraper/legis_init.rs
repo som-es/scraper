@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use votes::extract_hidden_votes;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
+    caching::{disk_caching, get_disk_cache_json, get_disk_cache_parsed},
     documents,
     error::ScraperError,
     extract_from_gegenstand_url, extract_from_gegenstand_url_text, extract_plenar_documents,
@@ -36,8 +36,7 @@ impl LastUpdated for LegislativeInitiative {
     }
 }
 
-#[async_trait]
-pub trait LegislativeInitiatives: Scraper {
+pub trait LegislativeInitiatives: Scraper + Sync {
     const FILTER_PATH: &'static str;
 
     fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload;
@@ -71,20 +70,36 @@ pub trait LegislativeInitiatives: Scraper {
                 return Err(ScraperError::NoVoteFound);
             }
         }
-        let raw = match get_disk_cache_json(proposal_path).await {
-            Some(raw) => raw,
+        match get_disk_cache_parsed::<_>(proposal_path, 60 * 60 * 24 * 190, async |raw| {
+            let legis_init = self.raw_legis_into_legis(raw).await;
+            let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
+                let dur = chrono::Local::now().date_naive() - legis_init.created_at.date();
+                let seconds = ((dur.num_days() as f32).powf(1.54) as i64 * 50)
+                    .min(60 * 60 * 24 * 400)
+                    .max(500);
+                Some(seconds as u64)
+            } else {
+                None
+            };
+
+            (legis_init, redo_secs)
+        })
+        .await
+        {
+            Some(legis_init) => Ok(legis_init),
             None => {
                 log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
                 let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
+
                 if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
                     log::warn!("could cache raw {proposal_path}: {e:?}")
                 }
-                raw_proposal
+
+                self.raw_legis_into_legis(raw_proposal)
+                    .await
+                    .ok_or(ScraperError::LegisInitParseError)
             }
-        };
-        self.raw_legis_into_legis(raw)
-            .await
-            .ok_or(ScraperError::LegisInitParseError)
+        }
     }
 }
 
@@ -97,7 +112,7 @@ pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
     "RVVB", "USVL", "BUA", "UEAM",
 ];
 
-#[async_trait]
+// #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
@@ -194,7 +209,9 @@ impl LegislativeInitiatives for AustriaScraper {
         let mut eurovoc_topics = extract_topics(legis_content, "eurovoc").unwrap_or_default();
         let other_keyword_topics = extract_topics(legis_content, "headwords").unwrap_or_default();
 
-        let is_urgent = other_keyword_topics.iter().any(|x| x.contains("Dringliche"));
+        let is_urgent = other_keyword_topics
+            .iter()
+            .any(|x| x.contains("Dringliche"));
 
         let mut speeches: Vec<Speech> = extract_speeches(legis_content, true).unwrap_or_default();
         let date = extract_date(legis_content)?;
@@ -2553,7 +2570,7 @@ mod tests {
             vec!["F".into(), "V".into(), "S".to_string(), "N".into(),]
         );
     }
-   // XXVII/A/769  
+    // XXVII/A/769
     #[tokio::test]
     async fn test_wrong_refs_xxvii_a_769() {
         let scraper = AustriaScraper::default();
@@ -2582,12 +2599,21 @@ mod tests {
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert_eq!(
-            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap().pro,
+            res.hidden_votes_info
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .pro,
             vec!["S".to_string()]
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
-            vec!["V".to_string(), "F".to_string(), "G".to_string(), "N".to_string()]
+            vec![
+                "V".to_string(),
+                "F".to_string(),
+                "G".to_string(),
+                "N".to_string()
+            ]
         );
     }
 
@@ -2603,7 +2629,7 @@ mod tests {
         assert_eq!(res.accepted, None);
         assert!(res.is_urgent);
     }
-   // https://www.parlament.gv.at/gegenstand/XXVII/A/110?selectedStage=100 
+    // https://www.parlament.gv.at/gegenstand/XXVII/A/110?selectedStage=100
     #[tokio::test]
     async fn test_xxvii_a_110() {
         let scraper = AustriaScraper::default();
@@ -2628,8 +2654,12 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert!(res.is_urgent);
         assert_eq!(
-            res.hidden_votes_info.pro_contra_parties.as_ref().unwrap().pro,
+            res.hidden_votes_info
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .pro,
             vec!["S".to_string()]
         );
-    } 
+    }
 }

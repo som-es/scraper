@@ -5,12 +5,12 @@ use common_scrapes::Party;
 
 use crate::{error::ScraperError, legis_init::LegislativeInitiatives, AustriaScraper, Scraper};
 
-#[async_trait]
-pub trait Parties: Scraper {
+// #[async_trait]
+pub trait Parties: Scraper + Send {
     async fn get_parties(&self) -> Result<Vec<Party>, ScraperError>;
 }
 
-#[async_trait]
+// #[async_trait]
 impl Parties for AustriaScraper {
     async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
         /*let raw_enactment_paths = self.post_enactment_payload().await?;

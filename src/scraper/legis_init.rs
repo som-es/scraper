@@ -1,4 +1,6 @@
 mod come_into_effect;
+use std::future::Future;
+
 pub use come_into_effect::*;
 mod votes;
 
@@ -41,63 +43,71 @@ pub trait LegislativeInitiatives: Scraper + Sync {
 
     fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload;
 
-    async fn post_legis_payload(
+    fn post_legis_payload(
         &self,
         searched_doktyps: Option<&[&str]>,
-    ) -> Result<Value, ScraperError> {
-        let payload = self.legis_payload(searched_doktyps);
-        self.post_payload(
-            payload,
-            format!(
-                "{base_url}{filter}",
-                base_url = Self::BASE_URL,
-                filter = Self::FILTER_PATH
-            ),
-        )
-        .await
+    ) -> impl Future<Output = Result<Value, ScraperError>> {
+        async move {
+            let payload = self.legis_payload(searched_doktyps);
+            self.post_payload(
+                payload,
+                format!(
+                    "{base_url}{filter}",
+                    base_url = Self::BASE_URL,
+                    filter = Self::FILTER_PATH
+                ),
+            )
+            .await
+        }
     }
 
-    async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative>;
+    fn raw_legis_into_legis(
+        &self,
+        raw_legis: Value,
+    ) -> impl Future<Output = Option<LegislativeInitiative>>;
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError>;
 
-    async fn get_legis_init(
+    fn get_legis_init(
         &self,
         proposal_path: &str,
-    ) -> Result<LegislativeInitiative, ScraperError> {
-        for ityp in LEGIS_IGNORE_ITYPS {
-            if proposal_path.contains(&format!("{ityp}/")) {
-                return Err(ScraperError::NoVoteFound);
-            }
-        }
-        match get_disk_cache_parsed::<_>(proposal_path, 60 * 60 * 24 * 190, async |raw| {
-            let legis_init = self.raw_legis_into_legis(raw).await;
-            let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
-                let dur = chrono::Local::now().date_naive() - legis_init.created_at.date();
-                let seconds = ((dur.num_days() as f32).powf(1.54) as i64 * 50)
-                    .min(60 * 60 * 24 * 400)
-                    .max(500);
-                Some(seconds as u64)
-            } else {
-                None
-            };
-
-            (legis_init, redo_secs)
-        })
-        .await
-        {
-            Some(legis_init) => Ok(legis_init),
-            None => {
-                log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
-                let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
-
-                if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
-                    log::warn!("could cache raw {proposal_path}: {e:?}")
+    ) -> impl Future<Output = Result<LegislativeInitiative, ScraperError>> {
+        async move {
+            for ityp in LEGIS_IGNORE_ITYPS {
+                if proposal_path.contains(&format!("{ityp}/")) {
+                    return Err(ScraperError::NoVoteFound);
                 }
+            }
+            match get_disk_cache_parsed::<_>(proposal_path, 60 * 60 * 24 * 190, async |raw| {
+                let legis_init = self.raw_legis_into_legis(raw).await;
+                let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
+                    let dur = chrono::Local::now().date_naive() - legis_init.created_at.date();
+                    let seconds = ((dur.num_days() as f32).powf(1.54) as i64 * 50)
+                        .min(60 * 60 * 24 * 400)
+                        .max(500);
+                    Some(seconds as u64)
+                } else {
+                    None
+                };
 
-                self.raw_legis_into_legis(raw_proposal)
-                    .await
-                    .ok_or(ScraperError::LegisInitParseError)
+                (legis_init, redo_secs)
+            })
+            .await
+            {
+                Some(legis_init) => Ok(legis_init),
+                None => {
+                    log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
+                    
+                    let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
+
+                    if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
+                        log::warn!("could cache raw {proposal_path}: {e:?}")
+                    }
+
+                    self.raw_legis_into_legis(raw_proposal)
+                        .await
+                        .ok_or(ScraperError::LegisInitParseError)
+                }
             }
         }
     }

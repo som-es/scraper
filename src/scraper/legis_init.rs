@@ -8,8 +8,9 @@ use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
 use common_scrapes::{
     AcceptedState, FileType, LegislativeInitiative, Party, Reference, RelatedDelegate, Speech,
-    Vote, VoteType,
+    Vote, VoteType, Voting,
 };
+use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use votes::extract_hidden_votes;
 
@@ -116,6 +117,7 @@ pub trait LegislativeInitiatives: Scraper + Sync {
 // pub const IGNORE_ITYPS: [&str; 3] = ["J", "EUBTG", "AB"];
 pub const LEGIS_IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
 pub const LEGIS_LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
+pub const LEGIS_AMENDMENT_DETERMINATORS: [&str; 2] = ["A(E)", "UEA"];
 
 pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
     "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2",
@@ -330,7 +332,19 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
+        let mut voting = None;
+
         let is_law = LEGIS_LAW_DETERMINATORS.contains(&doktyp.as_str());
+        if is_law {
+            voting = Some(Voting::Law);
+        }
+        let is_amendment = LEGIS_AMENDMENT_DETERMINATORS.contains(&doktyp.as_str());
+        if is_amendment {
+            voting = Some(Voting::Amendment);
+        }
+        if doktyp.as_str() == "AA" {
+            voting = Some(Voting::Resolution);
+        }
 
         let mut is_voteable_on = is_law;
 
@@ -390,6 +404,7 @@ impl LegislativeInitiatives for AustriaScraper {
             come_into_effect_info,
             is_voteable_on,
             is_urgent,
+            voting,
         })
     }
 

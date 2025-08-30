@@ -98,7 +98,7 @@ pub trait LegislativeInitiatives: Scraper + Sync {
                 Some(legis_init) => Ok(legis_init),
                 None => {
                     log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
-                    
+
                     let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
 
                     if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
@@ -2686,5 +2686,15 @@ mod tests {
                 .pro,
             vec!["S".to_string()]
         );
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_xxviii_i_136() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/I/136")
+            .await
+            .unwrap();
+        // println!("res: {res:?}");
     }
 }

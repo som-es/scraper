@@ -203,6 +203,31 @@ pub fn extract_text_from_html_till_next_name_attribute(html: &str, name_attribut
     spoken_text
 }
 
+pub fn extract_text_from_html_via_rn_id(document: &Html, name_attribute: &str) -> String {
+    let selector = Selector::parse(&format!("[id=\"{}\"]", name_attribute)).unwrap();
+
+    document
+        .select(&selector)
+        .flat_map(|node| {
+            let mut html = String::new();
+            let mut current_sibling = node.next_sibling()?;
+            while let Some(sibling) = current_sibling.next_sibling() {
+                let Some(el) = ElementRef::wrap(sibling) else {
+                    break;
+                };
+                if el.attr("class") == Some("randnummer") {
+                    break;
+                }
+                html.push_str(&format!("{}\n", el.html()));
+                current_sibling = sibling;
+            }
+
+            let text = extract_text_from_html(&html);
+            Some(text)
+        })
+        .collect::<String>()
+}
+
 pub fn extract_text_from_html_via_name_attribute_parent_parent(
     document: &Html,
     name_attribute: &str,
@@ -227,7 +252,8 @@ pub fn extract_text_from_html_via_name_attribute(document: &Html, name_attribute
     document
         .select(&selector)
         .flat_map(|node| {
-            let html = ElementRef::wrap(node.last_child()?)?.html();
+            // let html = ElementRef::wrap(node.last_child()?)?.html();
+            let html = node.html();
             let text = extract_text_from_html(&html);
             // let (_, text) = remove_paran_contents(&html, '<', '>');
             // let text = text.replace("&nbsp;", " ");
@@ -253,17 +279,22 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
         dbg!(&first_variant);
         return Some(first_variant);
     }*/
+    if name_attribute.starts_with("RU_") {
+        let second_variant =
+            extract_text_from_html_via_name_attribute_next_section(&document, name_attribute, 2, 1)
+                .unwrap_or_default();
 
-    let second_variant =
-        extract_text_from_html_via_name_attribute_next_section(&document, name_attribute, 2, 1)?;
+        let first_variant =
+            extract_text_from_html_via_name_attribute_parent_parent(&document, name_attribute);
 
-    let first_variant =
-        extract_text_from_html_via_name_attribute_parent_parent(&document, name_attribute);
-
-    if first_variant.len() > second_variant.len() {
-        Some(first_variant)
+        if first_variant.len() > second_variant.len() {
+            Some(first_variant)
+        } else {
+            Some(second_variant)
+        }
     } else {
-        Some(second_variant)
+        // resolve via Randnummern RN
+        Some(extract_text_from_html_via_rn_id(document, name_attribute))
     }
 }
 

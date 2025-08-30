@@ -104,11 +104,11 @@ pub const UNREALISTIC_SPEECH_LENGTH: usize = 36000;
 
 impl TextExtractor {
     pub fn new(base_url: &str) -> Self {
-        let president_regex = Regex::new(r"\nPräsident(?:[^P!,])*?:.*[Nn]ächste.*").unwrap();
-        let president_last_regex = Regex::new(r"\nPräsident(?:[^P!,])*?:.*[lL]etzte.*").unwrap();
+        let president_regex = Regex::new(r"\nPräsident(?:[^!,])*?:.*[Nn]ächste.*").unwrap();
+        let president_last_regex = Regex::new(r"\nPräsident(?:[^!,])*?:.*[lL]etzte.*").unwrap();
         let president_no_one_left =
-            Regex::new(r"\nPräsident(?:[^P!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
-        let only_president = Regex::new(r"\nPräsident(?:[^P!,])*?:").unwrap();
+            Regex::new(r"\nPräsident(?:[^!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
+        let only_president = Regex::new(r"\nPräsident(?:[^!,])*?:").unwrap();
         let steno_info_regex =
             Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
 
@@ -179,6 +179,7 @@ impl TextExtractor {
             )
             // .inspect(|x| println!("--------------------- {x}\n --------------"))
             .map(|text| self.remove_steno_info(&text));
+
             self.cached_html = Arc::new(RwLock::new(Some(html)));
             return text;
         }

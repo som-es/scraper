@@ -286,7 +286,6 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
         Regex::new(r"(?m)Mit\s*.*Nein.*\s*stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:")
             .unwrap();
 
-    // println!("form {from_html_text}");
     let pro_match = pro_regex.find(from_html_text)?;
     let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;
     // println!("from html text: {from_html_text}");

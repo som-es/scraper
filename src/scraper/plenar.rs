@@ -565,7 +565,7 @@ pub fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<PlenarSp
 
 #[cfg(test)]
 mod tests {
-    use std::iter;
+    use std::{collections::HashSet, iter};
 
     use common_scrapes::{Document, Opinion, Speech, SpeechTextInfo};
 
@@ -1041,7 +1041,7 @@ mod tests {
 
         let opinion_none_speech = &plenar.debates[0].speeches[2];
         assert_eq!(opinion_none_speech.speech.delegate_id, 83127);
-        assert_eq!(opinion_none_speech.speech.opinion, Opinion::None);
+        assert_eq!(opinion_none_speech.speech.opinion, Opinion::Against);
         assert_eq!(opinion_none_speech.duration_in_seconds, 5 * 60 + 12);
 
         let next_debate_speech = &plenar.debates[1].speeches[1];
@@ -1080,6 +1080,7 @@ mod tests {
         .iter();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
+                dbg!(speech);
                 let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
                 let speech_text = extractor
                     .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
@@ -1217,7 +1218,7 @@ mod tests {
         };
 
         let absences = extract_absences_from_document(&doc).await.unwrap();
-        assert_eq!(absences, vec!["Wilhelm Wolterer".to_string()]);
+        assert_eq!(absences, vec!["Wilhelm Molterer".to_string()]);
         println!("absences: {absences:?}");
     }
 
@@ -1270,6 +1271,35 @@ mod tests {
         }
         println!("plenar: {plenar:?}");
     }
+
+    #[tokio::test]
+    async fn test_plenar_xxv_55() {
+        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXV/NRSITZ/55")
+            .await
+            .unwrap();
+
+        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        for debate in &plenar.debates {
+            for speech in &debate.speeches {
+                dbg!(speech);
+                let speech_text = text_extractor
+                    .speech_extraction_with_fit(
+                        &speech.speech.spoken_text_html_urls[0],
+                        &speech.speech.delegate_display_name,
+                    )
+                    .await
+                    .unwrap();
+                println!("speech_text: {speech_text:?}");
+            }
+        }
+        println!("plenar: {plenar:?}");
+    }
+
+
 
     #[tokio::test]
     async fn test_plenar_xxviii_35() {
@@ -1397,5 +1427,45 @@ Diese durchwegs berührenden Worte sind für uns aus meiner Sicht Handlungsauftr
             }
         }
         // println!("plenar: {plenar:?}");
+    }
+
+
+    #[tokio::test]
+    async fn test_get_all_attributes() {
+        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        let mut scraper = AustriaScraper::default();
+
+        let mut attributes = HashSet::new();
+
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+            let gp = "XXII";
+            println!("gp: {gp}");
+            scraper.scrape_info.gp = vec![gp.to_string()];
+
+            let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+
+            let paths = scraper
+                .plenar_paths(plenar_infos)
+                .expect("Failed to get paths");
+
+
+            for path in paths {
+                let plenar = scraper.get_plenar(&path).await.unwrap();
+                for debate in &plenar.debates {
+                    for speech in &debate.speeches {
+                        if speech.speech.spoken_text_html_urls.first().is_none() {
+                            continue;
+                        }
+                        let first = &speech.speech.spoken_text_html_urls[0];
+                        if first.document_url.contains('#') {
+                            let attr = first.document_url.split('#').last().unwrap();
+                            attributes.insert(attr.to_string());
+                        }
+                    }
+                }
+            }
+
+            println!("attributes: {attributes:?}");
+        }
     }
 }

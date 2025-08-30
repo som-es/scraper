@@ -279,7 +279,7 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
         dbg!(&first_variant);
         return Some(first_variant);
     }*/
-    if name_attribute.starts_with("RU_") {
+    if name_attribute.starts_with("RU_") || name_attribute.starts_with("R_") || name_attribute.starts_with("T_") {
         let second_variant =
             extract_text_from_html_via_name_attribute_next_section(&document, name_attribute, 2, 1)
                 .unwrap_or_default();

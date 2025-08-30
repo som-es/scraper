@@ -117,7 +117,7 @@ pub trait LegislativeInitiatives: Scraper + Sync {
 // pub const IGNORE_ITYPS: [&str; 3] = ["J", "EUBTG", "AB"];
 pub const LEGIS_IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
 pub const LEGIS_LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
-pub const LEGIS_AMENDMENT_DETERMINATORS: [&str; 2] = ["A(E)", "UEA"];
+pub const LEGIS_RESOLUTION_DETERMINATORS: [&str; 2] = ["A(E)", "UEA"];
 
 pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
     "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2",
@@ -338,12 +338,12 @@ impl LegislativeInitiatives for AustriaScraper {
         if is_law {
             voting = Some(Voting::Law);
         }
-        let is_amendment = LEGIS_AMENDMENT_DETERMINATORS.contains(&doktyp.as_str());
-        if is_amendment {
-            voting = Some(Voting::Amendment);
+        let is_resolution = LEGIS_RESOLUTION_DETERMINATORS.contains(&doktyp.as_str());
+        if is_resolution {
+            voting = Some(Voting::Resolution);
         }
         if doktyp.as_str() == "AA" {
-            voting = Some(Voting::Resolution);
+            voting = Some(Voting::Amendment);
         }
 
         let mut is_voteable_on = is_law;
@@ -578,7 +578,7 @@ mod tests {
 
     use chrono::{Days, NaiveDate};
     use common_scrapes::{
-        AcceptedState, FileType, Opinion, Party, ProContra, Stage, VoteStage, VoteType,
+        AcceptedState, FileType, Opinion, Party, ProContra, Stage, VoteStage, VoteType, Voting,
     };
 
     use crate::{
@@ -2535,6 +2535,8 @@ mod tests {
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
             vec!["S".to_string()]
         );
+
+        assert_eq!(res.voting.unwrap(), Voting::Resolution)
     }
 
     // gegenstand/XXVIII/AA/6

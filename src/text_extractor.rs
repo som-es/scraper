@@ -10,11 +10,12 @@ use scraper::Html;
 
 use crate::{
     caching::{disk_caching, get_disk_cache},
-    extract_text_from_html, extract_text_from_html_via_name_attribute_finding_optimal_solution,
-    extract_text_from_html_via_name_attribute_next_section, remove_page_info, remove_plenar_info,
-    remove_steno_info,
+    remove_page_info, remove_plenar_info, remove_steno_info,
     text_utils::{remove_multiple_of, remove_paran_contents},
 };
+
+mod text_from_html;
+pub use text_from_html::*;
 
 pub trait HasHTMLUrl {
     fn html_url(&self) -> &str;
@@ -436,35 +437,44 @@ pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Opti
     let probably_contains_votes_no_indicator =
         Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
-    // let document = Html::parse_document(html);
-    for parent in 1..3 {
-        for skip in 0..6 {
-            let variant = extract_text_from_html_via_name_attribute_next_section(
-                &document,
-                name_attribute,
-                parent,
-                skip,
-            )
-            .unwrap_or_default();
+    if NAME_ATTRIBUTES
+        .iter()
+        .any(|attr| name_attribute.starts_with(attr))
+    {
+        // let document = Html::parse_document(html);
+        for parent in 1..3 {
+            for skip in 0..6 {
+                let extract_text_from_html_via_name_attribute_next_section =
+                    extract_text_from_html_via_name_attribute_next_section(
+                        &document,
+                        name_attribute,
+                        parent,
+                        skip,
+                    )
+                    .unwrap_or_default();
+                let variant = extract_text_from_html_via_name_attribute_next_section;
 
-            let new_lines = variant.chars().filter(|c| *c == '\n').count();
-            if new_lines >= 140 {
-                continue;
-            }
+                let new_lines = variant.chars().filter(|c| *c == '\n').count();
+                if new_lines >= 140 {
+                    continue;
+                }
 
-            // checking for one, because if multiple votes are inside, do not process
-            if probably_contains_votes_yes_indicator
-                .find_iter(&variant)
-                .count()
-                == 1
-                && probably_contains_votes_no_indicator
+                // checking for one, because if multiple votes are inside, do not process
+                if probably_contains_votes_yes_indicator
                     .find_iter(&variant)
                     .count()
                     == 1
-            {
-                return Some(variant);
+                    && probably_contains_votes_no_indicator
+                        .find_iter(&variant)
+                        .count()
+                        == 1
+                {
+                    return Some(variant);
+                }
             }
         }
+    } else {
+        return Some(extract_text_from_html_via_rn_id(document, name_attribute))
     }
     None
 }

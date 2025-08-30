@@ -217,6 +217,7 @@ pub async fn extract_most_fitting_votes(
                         None => continue,
                     }
                 } else {
+                    dbg!(&url);
                     match extractor
                         .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
                         .await

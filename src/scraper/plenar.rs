@@ -1299,8 +1299,6 @@ mod tests {
         println!("plenar: {plenar:?}");
     }
 
-
-
     #[tokio::test]
     async fn test_plenar_xxviii_35() {
         // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
@@ -1429,7 +1427,6 @@ Diese durchwegs berührenden Worte sind für uns aus meiner Sicht Handlungsauftr
         // println!("plenar: {plenar:?}");
     }
 
-
     #[tokio::test]
     async fn test_get_all_attributes() {
         std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
@@ -1447,7 +1444,6 @@ Diese durchwegs berührenden Worte sind für uns aus meiner Sicht Handlungsauftr
             let paths = scraper
                 .plenar_paths(plenar_infos)
                 .expect("Failed to get paths");
-
 
             for path in paths {
                 let plenar = scraper.get_plenar(&path).await.unwrap();

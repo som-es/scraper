@@ -2698,12 +2698,34 @@ mod tests {
             .await
             .unwrap();
         println!("res: {res:?}");
-        let pro_contra = res.hidden_votes_info.voted_by_name_data.unwrap().delegates_pro_contra.unwrap();
-        for pro_checks in ["Auer", "Baumann", "Deckenbacher", "Dengler", "Doppelbauer", "Eder", "Zopf", "Zarits"] {
+        let pro_contra = res
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+        for pro_checks in [
+            "Auer",
+            "Baumann",
+            "Deckenbacher",
+            "Dengler",
+            "Doppelbauer",
+            "Eder",
+            "Zopf",
+            "Zarits",
+        ] {
             assert!(pro_contra.pro.contains(&pro_checks.to_string()));
         }
-        
-        for contra_checks in ["Belakowitsch", "Darmann", "Fuchs", "Nemeth", "Voglauer", "Zanger", "Zorba"] {
+
+        for contra_checks in [
+            "Belakowitsch",
+            "Darmann",
+            "Fuchs",
+            "Nemeth",
+            "Voglauer",
+            "Zanger",
+            "Zorba",
+        ] {
             assert!(pro_contra.contra.contains(&contra_checks.to_string()));
         }
     }

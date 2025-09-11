@@ -474,7 +474,7 @@ pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Opti
             }
         }
     } else {
-        return Some(extract_text_from_html_via_rn_id(document, name_attribute))
+        return Some(extract_text_from_html_via_rn_id(document, name_attribute));
     }
     None
 }

@@ -1,7 +1,6 @@
 use std::future::Future;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use serde::Serialize;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -18,16 +17,17 @@ pub enum FilterDimension {
     Format,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Gremium {
     Nationalrat,
     Bundesrat,
     Bundesversammlung,
     #[serde(rename = "Parlamentsdirektion / Klubs")]
     ParlamentsdirektionKlubs,
+    Other(String)
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Terminart {
     #[serde(rename = "Plenarsitzung")]
     Plenarsitzung,
@@ -55,6 +55,7 @@ pub enum Terminart {
     Pressekonferenz,
     #[serde(rename = "Führung")]
     Fuehrung,
+    Other(String),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -67,8 +68,12 @@ pub struct DateRange {
 
 impl DateRange {
     pub fn to_vec(&self) -> Vec<Option<String>> {
-        vec![self.from.map(|x| x.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()), 
-        self.to.map(|x| x.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())]
+        vec![
+            self.from
+                .map(|x| x.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()),
+            self.to
+                .map(|x| x.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()),
+        ]
     }
 }
 
@@ -115,66 +120,70 @@ impl DateFilter {
     }
 }
 
-
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParliamentDate {
-    pub datum: Option<NaiveDate>,
-    pub datesort: Option<NaiveDateTime>,
-    pub uhrzeit: Option<NaiveTime>,
-    pub bezeichnung: Option<String>,
+    pub date: NaiveDate,
+    pub date_sort: Option<NaiveDateTime>,
+    pub time: Option<NaiveTime>,
+    pub title: String,
     pub link: Option<String>,
-    pub terminart: Option<String>,
-    pub terminart_anzeige: Option<String>,
+    pub appointment_type: Terminart,
+    pub appointment_type_display: Option<String>,
     pub info_link: Option<String>,
-    pub ort: Option<String>,
-    pub themen: Vec<String>,
-    pub gremium: Option<String>,
-    pub jahr_monat: Option<String>, // keep raw "yyyymm"
-    pub datum_wiederholt: Option<NaiveDate>,
-    pub monat_jahr: Option<String>,
-    pub medienrelevant: bool,
+    pub location: Option<String>,
+    pub topics: Vec<String>,
+    pub committee: Gremium,
+    pub year_month: Option<String>, // keep raw "yyyymm"
+    pub repeated_date: Option<NaiveDate>,
+    pub month_year: Option<String>,
+    pub media_relevant: bool,
     pub start: Option<NaiveDateTime>,
-    pub ende: Option<NaiveDateTime>,
-    pub vergangen: bool,
-    pub tag_mit_datum: Option<String>, // textual day + date
-    pub fuehrungsformat: Option<String>,
-    pub technik1: Option<i64>,
-    pub technik2: Option<String>,
-    pub technik3: Vec<String>,
+    pub end: Option<NaiveDateTime>,
+    pub past: bool,
+    pub day_with_date: Option<String>, // textual day + date
+    pub tour_format: Option<String>,
+    pub tech1: Option<i64>,
+    pub tech2: Option<String>,
+    pub tech3: Vec<String>,
 }
 
-impl From<Value> for ParliamentDate {
-    fn from(value: Value) -> Self {
+impl ParliamentDate {
+    fn new(value: Value) -> Option<Self> {
         let row = value;
         let parse_date = |s: &str| NaiveDate::parse_from_str(s, "%d.%m.%Y").ok();
         let parse_time = |s: &str| NaiveTime::parse_from_str(s, "%H:%M").ok();
         let parse_datetime = |s: &str| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok();
 
-        let datum = row.get(0).and_then(|v| v.as_str()).and_then(parse_date);
-        let datesort = row
+        let date = row.get(0).and_then(|v| v.as_str()).and_then(parse_date)?;
+        let date_sort = row
             .get(1)
             .and_then(|v| v.as_str())
             .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y%m%d%H%M").ok());
-        let uhrzeit = row.get(2).and_then(|v| v.as_str()).and_then(parse_time);
-        let bezeichnung = row.get(3).and_then(|v| v.as_str()).map(String::from);
+        let time = row.get(2).and_then(|v| v.as_str()).and_then(parse_time);
+        let title = row.get(3).and_then(|v| v.as_str()).map(String::from)?;
         let link = row.get(4).and_then(|v| v.as_str()).map(String::from);
-        let terminart = row.get(5).and_then(|v| v.as_str()).map(String::from);
-        let terminart_anzeige = row.get(6).and_then(|v| v.as_str()).map(String::from);
+        let appointment_type = row.get(5).and_then(|v| {
+            serde_json::from_value(v.clone())
+                .unwrap_or_else(|_e| Some(Terminart::Other(v.as_str()?.to_string())))
+        })?;
+        let appointment_type_display = row.get(6).and_then(|v| v.as_str()).map(String::from);
         let info_link = row.get(7).and_then(|v| v.as_str()).map(String::from);
-        let ort = row.get(8).and_then(|v| v.as_str()).map(String::from);
+        let location = row.get(8).and_then(|v| v.as_str()).map(String::from);
 
-        let themen = row
+        let topics = row
             .get(9)
             .and_then(|v| v.as_str())
             .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
             .unwrap_or_default();
 
-        let gremium = row.get(10).and_then(|v| v.as_str()).map(String::from);
-        let jahr_monat = row.get(11).and_then(|v| v.as_str()).map(String::from);
-        let datum_wiederholt = row.get(12).and_then(|v| v.as_str()).and_then(parse_date);
-        let monat_jahr = row.get(13).and_then(|v| v.as_str()).map(String::from);
+        let committee = row.get(10).and_then(|v| serde_json::from_value(v.clone())
+                .unwrap_or_else(|_e| Some(Gremium::Other(v.as_str()?.to_string())))
+    )?;
+        let year_month = row.get(11).and_then(|v| v.as_str()).map(String::from);
+        let repeated_date = row.get(12).and_then(|v| v.as_str()).and_then(parse_date);
+        let month_year = row.get(13).and_then(|v| v.as_str()).map(String::from);
 
-        let medienrelevant = row
+        let media_relevant = row
             .get(14)
             .and_then(|v| v.as_str())
             .map(|s| s == "J")
@@ -183,55 +192,55 @@ impl From<Value> for ParliamentDate {
             .get(15)
             .and_then(|v| v.as_str())
             .and_then(parse_datetime);
-        let ende = row
+        let end = row
             .get(16)
             .and_then(|v| v.as_str())
             .and_then(parse_datetime);
-        let vergangen = row
+        let past = row
             .get(17)
             .and_then(|v| v.as_str())
             .map(|s| s == "J")
             .unwrap_or(false);
 
-        let tag_mit_datum = row.get(18).and_then(|v| v.as_str()).map(String::from);
-        let fuehrungsformat = row.get(19).and_then(|v| v.as_str()).map(String::from);
+        let day_with_date = row.get(18).and_then(|v| v.as_str()).map(String::from);
+        let tour_format = row.get(19).and_then(|v| v.as_str()).map(String::from);
 
-        let technik1 = row
+        let tech1 = row
             .get(20)
             .and_then(|v| v.as_str())
             .and_then(|s| s.parse::<i64>().ok());
-        let technik2 = row.get(21).and_then(|v| v.as_str()).map(String::from);
-        let technik3 = row
+        let tech2 = row.get(21).and_then(|v| v.as_str()).map(String::from);
+        let tech3 = row
             .get(22)
             .and_then(|v| v.as_str())
             .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
             .unwrap_or_default();
 
-        ParliamentDate {
-            datum,
-            datesort,
-            uhrzeit,
-            bezeichnung,
+        Some(ParliamentDate {
+            date,
+            date_sort,
+            time,
+            title,
             link,
-            terminart,
-            terminart_anzeige,
+            appointment_type,
+            appointment_type_display,
             info_link,
-            ort,
-            themen,
-            gremium,
-            jahr_monat,
-            datum_wiederholt,
-            monat_jahr,
-            medienrelevant,
+            location,
+            topics,
+            committee,
+            year_month,
+            repeated_date,
+            month_year,
+            media_relevant,
             start,
-            ende,
-            vergangen,
-            tag_mit_datum,
-            fuehrungsformat,
-            technik1,
-            technik2,
-            technik3,
-        }
+            end,
+            past,
+            day_with_date,
+            tour_format,
+            tech1,
+            tech2,
+            tech3,
+        })
     }
 }
 
@@ -244,13 +253,11 @@ pub trait Dates: Scraper + Sync {
         &self,
         raw_legis: Value,
     ) -> impl Future<Output = Option<Vec<ParliamentDate>>>;
-    
+
     async fn post_dates_payload(&self, date_filter: &DateFilter) -> Result<Value, ScraperError> {
         self.post_payload_filter(self.dates_payload(date_filter), Self::FILTER_PATH)
             .await
     }
-
-
 }
 
 impl Dates for AustriaScraper {
@@ -268,7 +275,7 @@ impl Dates for AustriaScraper {
                 .as_array()?
                 .iter()
                 .cloned()
-                .map(|row| ParliamentDate::from(row))
+                .flat_map(|row| ParliamentDate::new(row))
                 .collect(),
         )
     }
@@ -278,26 +285,38 @@ impl Dates for AustriaScraper {
 mod tests {
     use chrono::{NaiveDateTime, Utc};
 
-    use crate::{dates::{DateFilter, DateRange, Dates, Terminart}, AustriaScraper};
+    use crate::{
+        dates::{DateFilter, DateRange, Dates, Terminart},
+        AustriaScraper,
+    };
 
     #[tokio::test]
     async fn test_dates() {
         let scraper = AustriaScraper::default();
-        let res = scraper.post_dates_payload(&DateFilter::default()).await.unwrap();
+        let res = scraper
+            .post_dates_payload(&DateFilter::default())
+            .await
+            .unwrap();
         let dates = scraper.raw_dates_into_parliament_dates(res).await.unwrap();
         dbg!(dates);
     }
-    
+
     #[tokio::test]
     async fn test_dates_filtering() {
         let now: NaiveDateTime = Utc::now().naive_utc();
         // today();
         let scraper = AustriaScraper::default();
-        let res = scraper.post_dates_payload(&DateFilter {
-            daterange: Some(DateRange { from: Some(now), to: None }),
-            terminart: vec![Terminart::Plenarsitzung],
-            ..Default::default()
-        }).await.unwrap();
+        let res = scraper
+            .post_dates_payload(&DateFilter {
+                daterange: Some(DateRange {
+                    from: Some(now),
+                    to: None,
+                }),
+                terminart: vec![Terminart::Plenarsitzung],
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         let dates = scraper.raw_dates_into_parliament_dates(res).await.unwrap();
         dbg!(dates);
     }

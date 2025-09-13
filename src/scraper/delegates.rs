@@ -637,6 +637,13 @@ mod tests {
             serde_json::to_string_pretty(&delegate).unwrap()
         );
     }
+
+    #[tokio::test]
+    pub async fn test_schallenberg() {
+        let scraper = AustriaScraper::default();
+        let delegate = scraper.get_delegate("/person/5430".into()).await.unwrap();
+        dbg!(delegate);
+    }
 }
 
 //   curl -s \

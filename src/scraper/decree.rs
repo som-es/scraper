@@ -50,12 +50,15 @@ pub trait RisScraper: Scraper {
 
     fn general_parse_thing(&self, thing_raw: &Value) -> Option<Thing> {
         let data = &thing_raw["Data"]["Metadaten"];
+        println!("data: {}", serde_json::to_string_pretty(data).unwrap());
+        let document_url = data["Allgemein"]["DokumentUrl"].as_str()?.to_string();
         let technical_data = &data["Technisch"];
         let id = technical_data["ID"].as_str().unwrap();
         let issuer = technical_data["Einbringer"].as_str().unwrap();
         let organization = technical_data["Organ"].as_str().unwrap();
 
         let general_info = &data["Bundesrecht"];
+        let eli = general_info["Eli"].as_str().unwrap().to_string();
         let title = general_info["Titel"].as_str().unwrap();
         let short_title = general_info["Kurztitel"].as_str().unwrap();
 
@@ -94,6 +97,8 @@ pub trait RisScraper: Scraper {
             date: NaiveDate::from_str(date).unwrap(),
             thing_type: thing_type.to_string(),
             part: part.to_string(),
+            eli,
+            document_url,
             documents,
         })
     }
@@ -116,7 +121,7 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_and_parse_ministrial_decrees() {
         let scraper = AustriaScraper::default();
-        let decrees = scraper.fetch_and_parse_ministrial_decrees(1).await.unwrap();
+        let decrees = scraper.fetch_and_parse_ministrial_decrees(30).await.unwrap();
         assert!(!decrees.is_empty());
         println!("decrees count: {}", decrees.len());
         dbg!(&decrees[..10]);

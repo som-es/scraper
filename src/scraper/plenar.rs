@@ -236,7 +236,10 @@ async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
         {
-            return extract_absences_from_document(document).await;
+            let Some(extracted_absences) = extract_absences_from_document(document).await else {
+                continue;
+            };
+            return Some(extracted_absences);
         }
     }
     None
@@ -880,6 +883,25 @@ mod tests {
                 "Daniela Gmeinbauer".to_string(),
                 "Olga Voglauer".to_string(),
                 "Alma Zadić".to_string()
+            ])
+        );
+        println!("plenar: {plenar:?}");
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxviii_nrsitz_41_absences() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/41")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences,
+            Some(vec![
+                "Elisabeth Heiß".to_string(),
+                "Reinhold Binder".to_string(),
             ])
         );
         println!("plenar: {plenar:?}");

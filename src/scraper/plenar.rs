@@ -166,16 +166,19 @@ impl Plenar for AustriaScraper {
         let mut documents = documents(&raw_documents).unwrap_or_default();
 
         if let Some(content_2) = raw_plenar["content"].as_array()?.get(2) {
-            if let Some(raw_praesidium) = extract_praesidium_from_progress(&content_2["progress"]) {
-                documents.extend(
-                    extract_praesidium_documents(raw_praesidium)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|mut x| {
-                            x.title = "stenographisches".to_string();
-                            x
-                        }),
-                )
+            if let Some(raw_praesidiums) = extract_praesidium_from_progress(&content_2["progress"])
+            {
+                for raw_praesidium in raw_praesidiums {
+                    documents.extend(
+                        extract_praesidium_documents(raw_praesidium)
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|mut x| {
+                                x.title = "stenographisches".to_string();
+                                x
+                            }),
+                    )
+                }
             }
         }
 
@@ -202,13 +205,26 @@ impl Plenar for AustriaScraper {
     }
 }
 
-fn extract_praesidium_from_progress(raw_progress: &Value) -> Option<&Value> {
-    for step in raw_progress.as_array()? {
-        if step["text"].as_str()?.to_lowercase().contains("präsidium") {
-            return Some(step);
-        }
-    }
-    None
+fn extract_praesidium_from_progress(raw_progress: &Value) -> Option<Vec<&Value>> {
+    Some(
+        raw_progress
+            .as_array()?
+            .iter()
+            .filter_map(|step| {
+                if step["text"].as_str()?.to_lowercase().contains("präsidium") {
+                    return Some(step);
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    )
+    // for step in raw_progress.as_array()? {
+    //     if step["text"].as_str()?.to_lowercase().contains("präsidium") {
+    //         return Some(step);
+    //     }
+    // }
+    // None
 }
 
 fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>> {
@@ -1357,10 +1373,10 @@ mod tests {
         assert_eq!(speech_text, "Martina Diesner-Wais (ÖVP): Sehr geehrte Frau Präsidentin! Liebe Abgeordnete! Liebe Zuseher hier im Parlament und auch vor den Fernsehgeräten! Ich möchte gleich zu Beginn im Namen meiner Kollegin Bettina Zopf den Seniorenbund von Neukirchen begrüßen. – Willkommen im Parlament! (Beifall bei der ÖVP sowie bei Abgeordneten von FPÖ und SPÖ. – Präsident Rosenkranz übernimmt den Vorsitz.)
 Meine Damen und Herren, wir befassen uns heute mit der Nachnominierung und der Wahl eines neuen Mitglieds der Volksanwaltschaft. Diese Nachnominierung ist notwendig geworden, weil Herr Dr. Rosenkranz, der bisher Volksanwalt war, in das Nationalratspräsidium gewechselt ist.
 Unsere Volksanwaltschaft ist ein unabhängiges Kontrollorgan und hat eine tragende Rolle in der demokratischen Kultur in unserem Land. Die Volksanwaltschaft ist Ansprechpartner für Bürgerinnen und Bürger, die Missstände in der Verwaltung sehen und aufzeigen wollen, und sorgt dafür, dass die Verwaltung auch weiterhin fair, bürgernah und rechtskonform bleibt.
-Die Volksanwaltschaft ist niederschwellig erreichbar. Sie können sie entweder an Sprechtagen telefonisch, über das Internet oder natürlich auch persönlich erreichen. Sie ist eine Institution, die dazu beiträgt, das Vertrauen der Bevölkerung in unsere staatlichen Einrichtungen zu stärken. 
+Die Volksanwaltschaft ist niederschwellig erreichbar. Sie können sie entweder an Sprechtagen telefonisch, über das Internet oder natürlich auch persönlich erreichen. Sie ist eine Institution, die dazu beiträgt, das Vertrauen der Bevölkerung in unsere staatlichen Einrichtungen zu stärken.
 Die Volksanwaltschaft ist aber auch zum Schutz der Menschenrechte da und wird dahin gehend auch immer wieder tätig. Die Aufgabenbereiche, die Dr. Walter Rosenkranz in der Volksanwaltschaft innehatte, wird nun unsere neue Volksanwältin übernehmen, und dies sind wichtige Themenbereiche.
 Sie umfassen Polizei, Fremden- und Asylrecht, Denkmalschutz, Land-, Forst- und Wasserwirtschaft, Natur- und Umweltschutz, Gewerbe und Betriebsanlagen, Kindergärten, Schulen, Universitäten, Verkehr, Gemeindeabgaben und auch Agrarangelegenheiten. Das ist eine große Bandbreite, und daher ist es eine anspruchsvolle und wirklich auch verantwortungsvolle Funktion.
-Die Volksanwaltschaft ist ein Organ, der verlängerte Arm unseres Parlaments, und durch die Berichte der Volksanwaltschaft konnten wir hier auch schon viele Verbesserungen erzielen. Wir haben in Österreich einen verfassungsrechtlichen Bestellmodus, der besagt, dass die drei stärksten Parteien die Vorschläge für die Volksanwälte bringen können, und das gibt nun der FPÖ die Möglichkeit, Frau MMag. Elisabeth Schwetz vorzuschlagen. 
+Die Volksanwaltschaft ist ein Organ, der verlängerte Arm unseres Parlaments, und durch die Berichte der Volksanwaltschaft konnten wir hier auch schon viele Verbesserungen erzielen. Wir haben in Österreich einen verfassungsrechtlichen Bestellmodus, der besagt, dass die drei stärksten Parteien die Vorschläge für die Volksanwälte bringen können, und das gibt nun der FPÖ die Möglichkeit, Frau MMag. Elisabeth Schwetz vorzuschlagen.
 Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanwaltschaftsausschusses freue mich schon auf eine gute Zusammenarbeit, denn es ist wichtig, dass die Volksanwaltschaft und das Parlament gut zusammenarbeiten – im Sinne unserer Bürger und Bürgerinnen. (Beifall bei der ÖVP.)
 14.59");
     }
@@ -1389,7 +1405,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .await
             .unwrap_or_default();
         println!("speech_text: {speech_text}");
-        assert_eq!(speech_text, "Paul Stich (SPÖ): Vielen Dank, Herr Präsident! Sehr geehrte Frau Ministerin! Liebe Kolleginnen und Kollegen! Liebe Zuseherinnen und Zuseher, sofern Sie zu dieser späten Stunde noch auf sind! Die geopolitischen Konflikte auf der Welt spitzen sich zu, nicht zuletzt durch neu oder wieder aufs politische Parkett kommende scheinbare Kriegstreiber wie Donald Trump. Das zeigt sich in Debatten hier im Haus, das zeigt sich auch im Landesverteidigungsbericht, und das ergibt einerseits ganz viel an militärstrategischer Denkaufgabe und auf der anderen Seite aber auch vielfältige Aufgaben für das österreichische Bundesheer. 
+        assert_eq!(speech_text, "Paul Stich (SPÖ): Vielen Dank, Herr Präsident! Sehr geehrte Frau Ministerin! Liebe Kolleginnen und Kollegen! Liebe Zuseherinnen und Zuseher, sofern Sie zu dieser späten Stunde noch auf sind! Die geopolitischen Konflikte auf der Welt spitzen sich zu, nicht zuletzt durch neu oder wieder aufs politische Parkett kommende scheinbare Kriegstreiber wie Donald Trump. Das zeigt sich in Debatten hier im Haus, das zeigt sich auch im Landesverteidigungsbericht, und das ergibt einerseits ganz viel an militärstrategischer Denkaufgabe und auf der anderen Seite aber auch vielfältige Aufgaben für das österreichische Bundesheer.
 Wenn wir über die geopolitischen Ereignisse sprechen, gilt es aus unserer Sicht vor allem eines herauszustreichen: dass es Krieg immer und überall mit allen Mitteln zu verhindern gilt. Es ist traurig, dass wir in einer Welt leben, in der diese Einschätzung nicht von allen und nicht überall geteilt wird, denn für manche scheint Krieg vielmehr wie eine Art Schachspiel zu sein. Die sitzen dann vor dem PC auf Twitter, meistens in ruhigen, recht gut geschützten Räumen, und diskutieren darüber, ob man nicht vielleicht doch irgendwo ein paar Leute opfern soll, quasi wie einen Bauern beim Schach irgendwo vorziehen sollte, um kurzfristig Menschen zu opfern, um langfristig daraus einen strategischen Vorteil zu ziehen. Ich glaube, gerade in diesem Zusammenhang ist es wichtig, da auch einen sehr bewussten Kontrastpunkt zu setzen, denn Krieg bringt Leid, Tod und Zerstörung, bringt Wunden in Familien, die über Generationen da sind, und wer beginnt, tote Zivilist:innen aufzurechnen, um daraus Legitimation für weitere Angriffe oder Tote zu schaffen, der wird menschlich am Ende des Tages immer verlieren. (Beifall bei der SPÖ.)
 Denn: Wie fühlt sich Krieg für diejenigen an, die ihn hautnah erleben? – Die meisten von uns, und zum Glück auch ich, können diese Frage nicht persönlich beantworten. Deshalb will ich mich der Worte der persönlichen Erinnerung von Almasa Salihović bedienen, einer Überlebenden des Massakers von Srebrenica und Mitarbeiterin im Srebrenica Memorial Center, die sie gestern im Rahmen einer sehr würdigen Gedenkveranstaltung hier im Parlament hat ausführen können. Sie sagt ganz konkret über die Schrecken des Krieges – ich zitiere –: Meine Mutter, meine Schwester und ich mussten mit ansehen, wie Männer und Jungen von den Soldaten getrennt wurden. Ich erinnere mich an das Schreien, an das Flehen, an die Hilflosigkeit. Mein Bruder Abdullah wurde nie wieder gesehen. Er war erst 18 Jahre alt. Er hatte versucht, mit meiner Schwester die Basis zu verlassen, wurde aber festgenommen. Aus ihrem Bericht weiß ich, sie sahen sich noch einmal an, bevor er abgeführt wurde. Sie wusste es, er wusste es, und nun weiß auch ich es: Das war ihr letzter Abschied. – Zitatende.
 Diese durchwegs berührenden Worte sind für uns aus meiner Sicht Handlungsauftrag auf zwei Ebenen: zum einen, weil das österreichische Bundesheer – und hier schließt sich zu einem gewissen Grad der Kreis – seit Jahrzehnten ja auch Friedenstruppen in Bosnien stellt, um den Frieden von 1995 abzusichern, was ein sehr gutes Beispiel dafür ist, wie man ganz besonders auch als neutraler Staat einen wichtigen Beitrag in der internationalen Gemeinschaft leistet, ganz besonders in einer Situation, in der sich auch in Bosnien innenpolitisch die Lage durchwegs zuspitzt; und zum anderen, weil es natürlich auch ein politischer Auftrag ist, der untrennbar mit der militärischen Debatte, die wir hier führen, verbunden ist, nämlich dass wir sehen, dass die Tendenz immer mehr wieder dahin geht, dass Krieg und außenpolitisch-militärische Schläge zu einem tolerierten Mittel der globalen Außenpolitik werden. Diese Entwicklung ist brandgefährlich, und wir werden im Rahmen dieser Plenartage auch noch über die Kandidatur Österreichs für den UN-Sicherheitsrat sprechen. Lassen Sie mich nur so viel vorgreifen: Ich halte das für einen guten, richtigen und wichtigen Schritt, damit die Stimmen der Deeskalation und der friedlichen Koexistenz ganz besonders im Sinne der österreichischen Neutralitätspolitik auch international wieder gestärkt werden (Beifall bei der SPÖ), damit Soldaten dieser Welt – egal ob im österreichischen Bundesheer oder in allen anderen Heeren – die Schlachtfelder weiterhin nur aus den Geschichtsbüchern kennen. – Vielen Dank. (Beifall bei der SPÖ und bei Abgeordneten der ÖVP.)

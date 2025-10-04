@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 pub fn remove_multiple_of(text: &str, of: char) -> String {
     let mut had_of_before = false;
     text.chars()
@@ -42,6 +44,19 @@ pub fn remove_paran_contents(
     }
 
     (paran_contents_string_components, out_text)
+}
+
+pub fn compare_words(src: &str, dst: &str) -> f32 {
+    let src_words = src
+        .split_whitespace()
+        .filter(|x| !x.is_empty())
+        .collect::<HashSet<_>>();
+    let dst_words = dst
+        .split_whitespace()
+        .filter(|x| !x.is_empty())
+        .collect::<HashSet<_>>();
+
+    src_words.intersection(&dst_words).count() as f32 / src_words.len() as f32
 }
 
 #[cfg(test)]

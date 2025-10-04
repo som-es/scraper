@@ -132,7 +132,7 @@ mod tests {
 
         let len = text.len();
         println!("text: {text}, len: {len}");
-        assert_eq!(len, 5220);
+        assert_eq!(len, 5215);
     }
 
     //
@@ -171,7 +171,7 @@ mod tests {
             .unwrap();
 
         let len = text.len();
-        assert_eq!(len, 4846);
+        assert_eq!(len, 4837);
         // println!("text: {text}, len: {len}");
     }
     // Mag. Dr. Matthias Strolz (N)
@@ -194,7 +194,7 @@ mod tests {
 
         let len = text.len();
         println!("text: {text}, len: {len}");
-        assert_eq!(len, 4740);
+        assert_eq!(len, 4739);
     }
 
     // /dokument/XXVII/NRSITZ/268/A_-_10_14_45_00326331.html
@@ -217,6 +217,6 @@ mod tests {
 
         let len = text.len();
         println!("text: {text}, len: {len}");
-        assert_eq!(len, 3898);
+        assert_eq!(len, 3905);
     }
 }

@@ -9,7 +9,7 @@ use scraper::Html;
 
 use crate::{
     caching::{disk_caching, get_disk_cache},
-    remove_page_info, remove_plenar_info, remove_steno_info,
+    remove_page_info, remove_plenar_info, remove_steno_info, remove_titles_from_str,
     text_utils::{remove_multiple_of, remove_paran_contents},
 };
 
@@ -184,13 +184,7 @@ impl TextExtractor {
         Some(text)
     }
 
-    pub async fn speech_extraction_with_fit(
-        &mut self,
-        speech_info: &SpeechTextInfo,
-        name: &str,
-    ) -> Option<String> {
-        let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
-
+    pub fn fit_speech(&mut self, unfitted_speech: String, name: &str) -> Option<String> {
         let unfitted_speech = unfitted_speech.replace('\u{ad}', "");
         let unfitted_speech = unfitted_speech.replace('\u{a0}', " ");
         let unfitted_speech = unfitted_speech.replace("\r\n", "\n");
@@ -199,13 +193,15 @@ impl TextExtractor {
 
         let (_, name) = remove_paran_contents(name, '(', ')');
         let name = name.trim_matches(char::is_whitespace);
-        let name_regex = name
-            .split_whitespace()
-            .fold(String::new(), |mut output, split| {
+        let name = remove_titles_from_str(name);
+        let name_regex = name.split_whitespace().filter(|x| *x != "BM").fold(
+            String::new(),
+            |mut output, split| {
                 use std::fmt::Write;
                 let _ = write!(output, r"{split}\s*");
                 output
-            });
+            },
+        );
 
         let name_regex = Regex::new(&name_regex).unwrap();
 
@@ -262,6 +258,16 @@ impl TextExtractor {
             }
         }
         speech_text
+    }
+
+    pub async fn speech_extraction_with_fit(
+        &mut self,
+        speech_info: &SpeechTextInfo,
+        name: &str,
+    ) -> Option<String> {
+        let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
+        dbg!(&unfitted_speech);
+        self.fit_speech(unfitted_speech, name)
     }
 
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
@@ -755,5 +761,22 @@ mod tests {
             )
             .await;
         println!("text: {text:?}");
+    }
+
+    #[tokio::test]
+    async fn test_title_back_speech_fit() {
+        let speech = "Bundesminister für Land- und Forstwirtschaft, Klima- und Umweltschutz, Regionen und Wasserwirtschaft Mag. Norbert Totschnig, MSc: Vielen Dank, sehr geehrter Herr Präsident! Geschätzte Damen und Herren Nationalrätinnen und Nationalräte! Hohes Haus! Ich möchte mein Statement erstens in die UG 42: Landwirtschaft, Forstwirtschaft und Wasserwirtschaft, und zweitens in die UG 43: Umwelt, Klimawandelanpassung und Kreislaufwirtschaft, unterteilen.
+
+        Zur Landwirtschaft: Mit dem Budget für die Land- und Forstwirtschaft, Wasserwirtschaft und Regionen setzen wir ein klares Zeichen für unsere bäuerlichen Familienbetriebe, für intakte Regionen, für eine nachhaltige Ressourcennutzung. Das ist ein klares Statement für eine ökosoziale Verantwortung, die wir seit vielen Jahren in diesem Land leben. Es stehen rund 3 Milliarden Euro zur Verfügung, genau sind es 2,84 Milliarden Euro für 2025 und 2,88 Milliarden Euro für 2026. Damit sichern wir die Versorgung im Land, damit sichern wir die Lebensqualität im ländlichen Raum.
+
+        Herr Kollege Schmiedlechner, ich weiß nicht, über welches Budget du geredet hast, es waren jedenfalls nicht das Budget 2025 und das Budget 2026. (Abg. Reiter [ÖVP]: Wahrscheinlich hat er es nicht gelesen!) Natürlich sparen wir auch im Bereich der Landwirtschaft ein. Wir sparen in der Verwaltung ein. Das führt dazu, dass wir in Zukunft auch mehr an Effizienz brauchen. Wir müssen KI einsetzen, es werden da und dort auch keine Posten nachbesetzt. Da sparen wir insgesamt 16 Millionen Euro ein. Wenn wir alles zusammenrechnen, inklusive der Mittel für die Förderungen, technische Anpassungen im Bereich der Gemeinsamen Agrarpolitik, in der Landwirtschaft, Forstwirtschaft und beim Wald – vorhin schon angesprochen –, dann reden wir von 125 Millionen Euro in beiden Jahren, bei einem Budget von insgesamt fast 6 Milliarden Euro. Also wir sparen, aber es ist noch genügend Geld da, vor allem in den Bereichen, in denen wir Wert darauf legen, dass die Finanzierung auch weiterhin gesichert ist. (Beifall bei der ÖVP.)";
+
+        let name = "Norbert Totschnig, MSc (ÖVP)";
+
+        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let fitted_speech = text_extractor.fit_speech(speech.to_string(), name);
+        let truth_fitted_speech = "Norbert Totschnig, MSc: Vielen Dank, sehr geehrter Herr Präsident! Geschätzte Damen und Herren Nationalrätinnen und Nationalräte! Hohes Haus! Ich möchte mein Statement erstens in die UG 42: Landwirtschaft, Forstwirtschaft und Wasserwirtschaft, und zweitens in die UG 43: Umwelt, Klimawandelanpassung und Kreislaufwirtschaft, unterteilen.\n        Zur Landwirtschaft: Mit dem Budget für die Land- und Forstwirtschaft, Wasserwirtschaft und Regionen setzen wir ein klares Zeichen für unsere bäuerlichen Familienbetriebe, für intakte Regionen, für eine nachhaltige Ressourcennutzung. Das ist ein klares Statement für eine ökosoziale Verantwortung, die wir seit vielen Jahren in diesem Land leben. Es stehen rund 3 Milliarden Euro zur Verfügung, genau sind es 2,84 Milliarden Euro für 2025 und 2,88 Milliarden Euro für 2026. Damit sichern wir die Versorgung im Land, damit sichern wir die Lebensqualität im ländlichen Raum.\n        Herr Kollege Schmiedlechner, ich weiß nicht, über welches Budget du geredet hast, es waren jedenfalls nicht das Budget 2025 und das Budget 2026. (Abg. Reiter [ÖVP]: Wahrscheinlich hat er es nicht gelesen!) Natürlich sparen wir auch im Bereich der Landwirtschaft ein. Wir sparen in der Verwaltung ein. Das führt dazu, dass wir in Zukunft auch mehr an Effizienz brauchen. Wir müssen KI einsetzen, es werden da und dort auch keine Posten nachbesetzt. Da sparen wir insgesamt 16 Millionen Euro ein. Wenn wir alles zusammenrechnen, inklusive der Mittel für die Förderungen, technische Anpassungen im Bereich der Gemeinsamen Agrarpolitik, in der Landwirtschaft, Forstwirtschaft und beim Wald – vorhin schon angesprochen –, dann reden wir von 125 Millionen Euro in beiden Jahren, bei einem Budget von insgesamt fast 6 Milliarden Euro. Also wir sparen, aber es ist noch genügend Geld da, vor allem in den Bereichen, in denen wir Wert darauf legen, dass die Finanzierung auch weiterhin gesichert ist. (Beifall bei der ÖVP.)";
+
+        assert_eq!(truth_fitted_speech, fitted_speech.unwrap());
     }
 }

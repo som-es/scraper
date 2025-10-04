@@ -62,45 +62,98 @@ pub fn yes_no_votes_inside_regex() -> Regex {
         .unwrap()
 }
 
-pub fn unique_titles() -> HashSet<&'static str> {
-    HashSet::from([
-        "Dipl.-Kffr.",
-        "Dr.in",
-        "LL.M.",
-        "M.A.I.S.",
-        "Dipl.-Kfm.",
-        "mult.",
-        "Mag.",
-        "h.c",
-        "Ing.",
-        "Dr.-Ing.",
-        "J.",
-        "Bakk.",
-        "Mst.",
-        "Dr.",
-        "MMst.",
-        "iur.",
-        "A.",
-        "Mag.",
-        "lic.oec.",
-        "F.",
-        "Mag.a",
-        "L.",
-        "Mst.",
-        "abs.",
-        "Dipl.-Ing.",
-        "MMag.",
-        "Dipl.-Kfm.",
-        "h.c.",
-        "Dr.",
-        "Dipl.-Ing.",
-        "DDDr.",
-        "DDr.",
-        "Dipl.-Vw.",
-        "MMag.",
-        "MMMag.",
-        "Ing.",
-    ])
+pub fn remove_titles_from_str(text: &str) -> String {
+    let titles = unique_titles();
+
+    text.split_inclusive(' ')
+        .map(|x| x.trim_matches(char::is_whitespace).trim_matches(','))
+        .filter(|x| !titles.contains(x.to_lowercase().as_str()))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[rustfmt::skip]
+fn unique_titles() -> HashSet<&'static str> {
+    [
+        // Original titles
+        "Dr.", "Mag.", "Dipl.-Kfm.", "Dipl.-Kfm. Dr.", "Dipl.-Kfm. Mag.", "Dipl.-Ing.",
+        "Dipl.-Ing. Dr.", "Dipl.-Ing. (FH)", "Dipl.-Kffr. (FH)", "Dipl.-Vw.", "Dipl.-Vw. Dr.",
+        "Dipl.-Ing., MBA", "Dipl.-Ing., MAS", "Dipl.-Kfm., MBA", "DDr.", "Dr. Dr. h.c.",
+        "Dr. Dr. h.c. mult.", "Dr. h.c.", "Dr., MBA", "Dr., LL.M.", "Dr., MBL-HSG",
+        "Mag. Dr.", "Mag. (FH)", "Mag., BA", "Mag., MA", "Mag., MBA", "Mag. Dr., BA",
+        "Mag. Dr., MSc", "Mag. Dr., MBL-HSG", "MMag.", "MMag. Dr.", "MMag., BA", "MMag., LL.M.",
+        "MA", "MA MLS", "MSc", "MSc (WU)", "MBA", "BSc", "BSc (WU)", "BA", "BA MA", "BA MA MA",
+        "BEd", "BEd BEd", "MA, MAS", "MPA", "MES", "MMSc BA", "MEd MA", "MMMag. Dr.",
+        "MMMag.", "abs. iur.", "Freiherr von", "Ritter", "Graf", "Edler von",
+        "LL.M.", "LL.M. (WU)", "LL.M. (LSE)", "LL.M. (King’s College London)",
+        "MBL-HSG", "MAS", "MMag.", "MMag. Dr.", "MMst. Mag. (FH)", "lic.oec. HSG",
+        "Dr. h.c. mult.", "Dr. Dr.", "Dipl.-Kfm.", "Dipl.-Kfm. Dr.", "Dipl.-Ing. Dr.",
+        "Dipl.-Kfm. Dr. h.c.", "Dipl.-Vw. Dr.", "Dipl.-Ing. Mag.", "MSc BA", "MA MLS", "MA, MSc",
+        "Dr. Dr. h.c. mult.", "Dipl.-Kfm.", "Ing.", "Ing. Mag.", "Ing. Dr.", "Ing. MSc",
+        "Mst.", "Mst. DI (FH)", "Mag. (FH)", "PMM", "abs. iur.", "Edler von", "Ritter von",
+        "BM", "StS",
+
+        "BM", "StS", "MEP", "PRRH", "VA", "VK", "BK", "GAST",
+        "Dr.", "Mag.", "Dipl.-Kfm.", "Dipl.-Ing.", "Dipl.-Kffr.", "Dipl.-Vw.",
+        "DDr.", "Dr. Dr. h.c.", "Dr. Dr. h.c. mult.", "Dr. h.c.", "Dr. h.c. mult.", "Dr. Dr.",
+        "Mag. Dr.", "Mag. (FH)", "MMag.", "MMag. Dr.", "MMMag.", "MMMag. Dr.",
+        "MA", "MSc", "MBA", "BSc", "BA", "BEd", "MPA", "MES", "MBL-HSG", "MAS", "PMM",
+        "LL.M.", "abs. iur.", "lic.oec. HSG",
+        "Freiherr von", "Ritter", "Ritter von", "Graf", "Edler von",
+        "Ing.", "Mst.", "MMst.",
+        "Dr., MBA", "Dr., LL.M.", "Dr., MBL-HSG", "Mag., BA", "Mag., MA", "Mag., MBA",
+        "Dipl.-Ing., MBA", "Dipl.-Ing., MAS", "Dipl.-Kfm., MBA",
+        "Mag. Dr., BA", "Mag. Dr., MSc", "Mag. Dr., MBL-HSG",
+        "MMag., BA", "MMag., LL.M.", "MMst. Mag. (FH)",
+        "MA MLS", "MSc (WU)", "BSc (WU)", "BA MA", "BA MA MA", "BEd BEd",
+        "MA, MAS", "MMSc BA", "MEd MA", "MSc BA", "MA, MSc",
+        "LL.M. (WU)", "LL.M. (LSE)", "LL.M. (King’s College London)",
+        "Mst. DI (FH)", "Ing. Mag.", "Ing. Dr.", "Ing. MSc",
+        "Dipl.-Ing. (FH)", "Dipl.-Kffr. (FH)", "Dipl.-Ing. Dr.", "Dipl.-Ing. Mag.",
+        "Dipl.-Kfm. Dr.", "Dipl.-Kfm. Mag.", "Dipl.-Vw. Dr.",
+        "Dipl.-Kfm. Dr. h.c.",
+        "Mst.", "Ing. Mst. DI (FH)",
+
+        // Lowercased titles
+        "dr.", "mag.", "dipl.-kfm.", "dipl.-kfm. dr.", "dipl.-kfm. mag.", "dipl.-ing.",
+        "dipl.-ing. dr.", "dipl.-ing. (fh)", "dipl.-kffr. (fh)", "dipl.-vw.", "dipl.-vw. dr.",
+        "dipl.-ing., mba", "dipl.-ing., mas", "dipl.-kfm., mba", "ddr.", "dr. dr. h.c.",
+        "dr. dr. h.c. mult.", "dr. h.c.", "dr., mba", "dr., ll.m.", "dr., mbl-hsg",
+        "mag. dr.", "mag. (fh)", "mag., ba", "mag., ma", "mag., mba", "mag. dr., ba",
+        "mag. dr., msc", "mag. dr., mbl-hsg", "mmag.", "mmag. dr.", "mmag., ba", "mmag., ll.m.",
+        "ma", "ma mls", "msc", "msc (wu)", "mba", "bsc", "bsc (wu)", "ba", "ba ma", "ba ma ma",
+        "bed", "bed bed", "ma, mas", "mpa", "mes", "mmsc ba", "med ma", "mmmag. dr.",
+        "mmmag.", "abs. iur.", "freiherr von", "ritter", "graf", "edler von",
+        "ll.m.", "ll.m. (wu)", "ll.m. (lse)", "ll.m. (king’s college london)",
+        "mbl-hsg", "mas", "mmag.", "mmag. dr.", "mmst. mag. (fh)", "lic.oec. hsg",
+        "dr. h.c. mult.", "dr. dr.", "dipl.-kfm.", "dipl.-kfm. dr.", "dipl.-ing. dr.",
+        "dipl.-kfm. dr. h.c.", "dipl.-vw. dr.", "dipl.-ing. mag.", "msc ba", "ma mls", "ma, msc",
+        "dr. dr. h.c. mult.", "dipl.-kfm.", "ing.", "ing. mag.", "ing. dr.", "ing. msc",
+        "mst.", "mst. di (fh)", "mag. (fh)", "pmm", "abs. iur.", "edler von", "ritter von", "bm", "sts",
+
+        "bm", "sts", "mep", "prrh", "va", "vk", "bk", "gast",
+        "dr.", "mag.", "dipl.-kfm.", "dipl.-ing.", "dipl.-kffr.", "dipl.-vw.",
+        "ddr.", "dr. dr. h.c.", "dr. dr. h.c. mult.", "dr. h.c.", "dr. h.c. mult.", "dr. dr.",
+        "mag. dr.", "mag. (fh)", "mmag.", "mmag. dr.", "mmmag.", "mmmag. dr.",
+        "ma", "msc", "mba", "bsc", "ba", "bed", "mpa", "mes", "mbl-hsg", "mas", "pmm",
+        "ll.m.", "abs. iur.", "lic.oec. hsg",
+        "freiherr von", "ritter", "ritter von", "graf", "edler von",
+        "ing.", "mst.", "mmst.",
+        "dr., mba", "dr., ll.m.", "dr., mbl-hsg", "mag., ba", "mag., ma", "mag., mba",
+        "dipl.-ing., mba", "dipl.-ing., mas", "dipl.-kfm., mba",
+        "mag. dr., ba", "mag. dr., msc", "mag. dr., mbl-hsg",
+        "mmag., ba", "mmag., ll.m.", "mmst. mag. (fh)",
+        "ma mls", "msc (wu)", "bsc (wu)", "ba ma", "ba ma ma", "bed bed",
+        "ma, mas", "mmsc ba", "med ma", "msc ba", "ma, msc",
+        "ll.m. (wu)", "ll.m. (lse)", "ll.m. (king’s college london)",
+        "mst. di (fh)", "ing. mag.", "ing. dr.", "ing. msc",
+        "dipl.-ing. (fh)", "dipl.-kffr. (fh)", "dipl.-ing. dr.", "dipl.-ing. mag.",
+        "dipl.-kfm. dr.", "dipl.-kfm. mag.", "dipl.-vw. dr.",
+        "dipl.-kfm. dr. h.c.",
+        "mst.", "ing. mst. di (fh)"
+    ]
+    .into_iter()
+    .collect()
 }
 
 pub type DeclineUrlGegenstand = (String, String, Option<u32>);
@@ -171,7 +224,7 @@ mod tests {
     use crate::{
         extract_pro_contra_party_codes_from_string,
         extract_text_from_html_till_next_name_attribute,
-        extract_text_from_html_via_name_attribute_parent_parent,
+        extract_text_from_html_via_name_attribute_parent_parent, remove_titles_from_str,
     };
 
     #[test]
@@ -225,5 +278,21 @@ Dafür: V, G. Dagegen: S, F, N (Gesetzentwurf findet nicht die erforderliche 2/3
             party_codes.contra,
             vec!["S".to_string(), "F".to_string(), "N".to_string()]
         );
+    }
+
+    #[test]
+    fn test_remove_titles_back() {
+        let name = "Dieter Brosz, Msc";
+
+        let name = remove_titles_from_str(name);
+        assert_eq!("Dieter Brosz", name);
+    }
+
+    #[test]
+    fn test_remove_titles_front() {
+        let name = "Dr. Dieter Brosz, Msc";
+
+        let name = remove_titles_from_str(name);
+        assert_eq!("Dieter Brosz", name);
     }
 }

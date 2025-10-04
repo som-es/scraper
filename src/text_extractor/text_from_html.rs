@@ -160,11 +160,11 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
         .any(|attr| name_attribute.starts_with(attr))
     {
         let second_variant =
-            extract_text_from_html_via_name_attribute_next_section(&document, name_attribute, 2, 1)
+            extract_text_from_html_via_name_attribute_next_section(document, name_attribute, 2, 1)
                 .unwrap_or_default();
 
         let first_variant =
-            extract_text_from_html_via_name_attribute_parent_parent(&document, name_attribute);
+            extract_text_from_html_via_name_attribute_parent_parent(document, name_attribute);
 
         if first_variant.len() > second_variant.len() {
             Some(first_variant)

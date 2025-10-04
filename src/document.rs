@@ -85,7 +85,7 @@ pub fn extract_plenar_documents(legis_content: &Value) -> Option<Vec<Document>> 
                     .contains("Plenarberatungen NR")
             })
             .into_iter()
-            .flat_map(|nr_phase| Some(documents(&nr_phase["documents"].as_array()?)))
+            .flat_map(|nr_phase| Some(documents(nr_phase["documents"].as_array()?)))
             .flatten()
             .flatten()
             .collect(),

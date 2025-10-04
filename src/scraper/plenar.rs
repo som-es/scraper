@@ -212,7 +212,7 @@ fn extract_praesidium_from_progress(raw_progress: &Value) -> Option<Vec<&Value>>
             .iter()
             .filter_map(|step| {
                 if step["text"].as_str()?.to_lowercase().contains("präsidium") {
-                    return Some(step);
+                    Some(step)
                 } else {
                     None
                 }

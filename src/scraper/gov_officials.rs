@@ -3,7 +3,7 @@ use common_scrapes::GovOfficial;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json, get_disk_cache_json_with_secs},
+    caching::{disk_caching, get_disk_cache_json_with_secs},
     delegates::DelegateScraper,
     error::ScraperError,
     extract_text_from_html, AustriaScraper, Scraper,
@@ -43,7 +43,7 @@ pub fn extract_id_from_unnecessary_link(link_containing_id: &str) -> Option<u64>
 
 pub async fn extract_gov_official(
     raw_official: &Value,
-    delegate_scraper: &(impl DelegateScraper + Sync),
+    _delegate_scraper: &(impl DelegateScraper + Sync),
 ) -> Option<GovOfficial> {
     // println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
     let raw_official = raw_official.as_array()?;
@@ -127,7 +127,7 @@ pub struct FunctionAndDates<'a> {
     pub end_date: Option<&'a str>,
 }
 
-fn extract_function_and_dates(function_text: &str) -> Option<FunctionAndDates> {
+fn extract_function_and_dates<'a>(function_text: &'a str) -> Option<FunctionAndDates<'a>> {
     let break_str = if function_text.contains("<br>") {
         "<br>"
     } else if function_text.contains("<br/>") {

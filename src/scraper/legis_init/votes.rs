@@ -104,13 +104,11 @@ pub async fn extract_most_fitting_votes(
 
     let mut hidden_votes = HiddenVotes::default();
     hidden_votes.vote_stage = status
-        .map(|status| status["description"].as_str())
-        .flatten()
-        .map(|desc| {
+        .and_then(|status| status["description"].as_str())
+        .and_then(|desc| {
             let desc = &desc[desc.find("Nationalrat").unwrap_or_default()..];
             classify_vote_stage(desc)
-        })
-        .flatten();
+        });
 
     let mut plenary_session = None;
 
@@ -298,11 +296,7 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     //     .chars()
     //     .collect::<String>());
 
-    // let from_html_text = from_html_text.chars().collect::<Vec<char>>();
-    // let pro_open_ended = &from_html_text[pro_votes_start_idx..];
-    // let pro_open_ended = &pro_open_ended[pro_open_ended.iter().position(|x| *x == ':')? + 1..];
     let pro_open_ended = &from_html_text[pro_match.end()..];
-    // let end_pro_idx = pro_open_ended.iter().position(|x| *x == '.')?;
     let end_pro_idx = pro_open_ended.find('.');
     let pro_delegates = match end_pro_idx {
         Some(end_pro_idx) => {
@@ -315,16 +309,9 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
 
     // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
 
-    // let pro_delegates = group_names_from_vote_section(&pro_delegates.iter().collect::<String>());
     let pro_delegates = group_names_from_vote_section(pro_delegates);
-    // println!("------------ pro_delegates: {pro_delegates:?}");
-    // println!("--------------- text: {from_html_text}");
 
-    // dbg!(contra_votes_start_idx);
-    // let contra_open_ended = &from_html_text[contra_votes_start_idx..];
-    // let contra_open_ended = &contra_open_ended[contra_open_ended.iter().position(|x| *x == ':')? + 1..];
     let contra_open_ended = &from_html_text[contra_match.end() + 1..];
-    // let end_contra_idx = contra_open_ended.iter().position(|x| *x == '.')?;
     let end_contra_idx = contra_open_ended.find('.');
     let contra_delegates = match end_contra_idx {
         Some(end_contra_idx) => {
@@ -342,10 +329,8 @@ fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
         }
     };
 
-    // let contra_delegates = group_names_from_vote_section(&contra_delegates.iter().collect::<String>());
     let contra_delegates = group_names_from_vote_section(contra_delegates);
 
-    // println!("-------------------- contra_delegates: {contra_delegates:?}");
     Some(ProContra {
         pro: pro_delegates,
         contra: contra_delegates,

@@ -14,7 +14,6 @@ mod scraper;
 mod speeches;
 mod text_extractor;
 pub mod text_utils;
-mod url;
 
 pub use text_extractor::*;
 
@@ -27,11 +26,11 @@ pub mod serde_json {
     pub use ::serde_json::*;
 }
 
-const PARTIES_IN_NR: usize = 5;
-
 /// /person/83153 -> 83153
 fn person_url_to_id(url: &str) -> Option<u64> {
-    url.split('/').last().and_then(|id| id.parse::<u64>().ok())
+    url.split('/')
+        .next_back()
+        .and_then(|id| id.parse::<u64>().ok())
 }
 
 pub fn remove_page_info(haystack: &str) -> String {

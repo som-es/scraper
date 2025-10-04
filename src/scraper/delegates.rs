@@ -283,7 +283,7 @@ pub fn extract_mandate(raw_mandate: &Value) -> Option<Mandate> {
         NaiveDate::parse_from_str(&end, "%d.%m.%Y").ok()
     };
 
-    let ref_function = function.as_ref().map(|x| x.as_str());
+    let ref_function = function.as_deref();
 
     let mut is_gov = false;
     let mut is_ministry = false;

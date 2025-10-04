@@ -1,6 +1,5 @@
 use std::{path::PathBuf, time::SystemTime};
 
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 #[inline]

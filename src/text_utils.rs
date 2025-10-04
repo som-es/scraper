@@ -1,7 +1,3 @@
-use std::collections::HashMap;
-
-use scraper::{html, Selector};
-
 pub fn remove_multiple_of(text: &str, of: char) -> String {
     let mut had_of_before = false;
     text.chars()
@@ -11,13 +7,6 @@ pub fn remove_multiple_of(text: &str, of: char) -> String {
             !res || !had_of_before
         })
         .collect::<String>()
-}
-
-pub fn inner_text_to_href_link(html: &str) -> HashMap<String, String> {
-    let doc = html::Html::parse_document(html);
-
-    let selector = Selector::parse("a").unwrap();
-    todo!()
 }
 
 pub fn remove_paran_contents(
@@ -33,8 +22,7 @@ pub fn remove_paran_contents(
         if char as char == opening_paran {
             stack.push((opening_paran, idx));
         }
-        if char as char == closening_paran
-            && stack.last().map_or(false, |&(c, _)| c == opening_paran)
+        if char as char == closening_paran && stack.last().is_some_and(|&(c, _)| c == opening_paran)
         {
             let paran_start_idx = stack.pop().unwrap().1;
             if stack.is_empty() {

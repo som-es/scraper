@@ -1,4 +1,5 @@
-use async_trait::async_trait;
+use std::future::Future;
+
 use chrono::NaiveDate;
 use common_scrapes::LegislativeInitiative;
 use serde_derive::{Deserialize, Serialize};
@@ -20,22 +21,29 @@ pub struct Enactment {
 pub trait EnactmentScraper: Scraper + Send + Sync {
     const FILTER_PATH: &'static str;
 
-    async fn post_enactment_payload(&self) -> Result<Value, ScraperError> {
+    fn post_enactment_payload(&self) -> impl Future<Output = Result<Value, ScraperError>> {
         self.post_payload_filter(self.enactment_payload(), Self::FILTER_PATH)
-            .await
     }
 
     fn enactment_payload(&self) -> Self::Payload;
 
     fn enactment_paths(&self, raw_enactments: Value) -> Option<GegenstandPaths>;
 
-    async fn raw_enactment_into_enactment(&self, raw_enactment: &Value) -> Option<Enactment>;
+    fn raw_enactment_into_enactment(
+        &self,
+        raw_enactment: &Value,
+    ) -> impl Future<Output = Option<Enactment>>;
 
-    async fn get_enactment(&self, enactment_path: &str) -> Result<Enactment, ScraperError> {
-        let raw_enactment = self.get_gegenstand_info(enactment_path).await.unwrap();
-        self.raw_enactment_into_enactment(&raw_enactment)
-            .await
-            .ok_or(ScraperError::NoEnactmentError)
+    fn get_enactment(
+        &self,
+        enactment_path: &str,
+    ) -> impl Future<Output = Result<Enactment, ScraperError>> {
+        async move {
+            let raw_enactment = self.get_gegenstand_info(enactment_path).await.unwrap();
+            self.raw_enactment_into_enactment(&raw_enactment)
+                .await
+                .ok_or(ScraperError::NoEnactmentError)
+        }
     }
 
     fn legis_inits_from_enactments();

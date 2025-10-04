@@ -24,7 +24,7 @@ pub enum Gremium {
     Bundesversammlung,
     #[serde(rename = "Parlamentsdirektion / Klubs")]
     ParlamentsdirektionKlubs,
-    Other(String)
+    Other(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,9 +176,10 @@ impl ParliamentDate {
             .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
             .unwrap_or_default();
 
-        let committee = row.get(10).and_then(|v| serde_json::from_value(v.clone())
+        let committee = row.get(10).and_then(|v| {
+            serde_json::from_value(v.clone())
                 .unwrap_or_else(|_e| Some(Gremium::Other(v.as_str()?.to_string())))
-    )?;
+        })?;
         let year_month = row.get(11).and_then(|v| v.as_str()).map(String::from);
         let repeated_date = row.get(12).and_then(|v| v.as_str()).and_then(parse_date);
         let month_year = row.get(13).and_then(|v| v.as_str()).map(String::from);
@@ -254,9 +255,11 @@ pub trait Dates: Scraper + Sync {
         raw_legis: Value,
     ) -> impl Future<Output = Option<Vec<ParliamentDate>>>;
 
-    async fn post_dates_payload(&self, date_filter: &DateFilter) -> Result<Value, ScraperError> {
+    fn post_dates_payload(
+        &self,
+        date_filter: &DateFilter,
+    ) -> impl Future<Output = Result<Value, ScraperError>> {
         self.post_payload_filter(self.dates_payload(date_filter), Self::FILTER_PATH)
-            .await
     }
 }
 
@@ -275,7 +278,7 @@ impl Dates for AustriaScraper {
                 .as_array()?
                 .iter()
                 .cloned()
-                .flat_map(|row| ParliamentDate::new(row))
+                .flat_map(ParliamentDate::new)
                 .collect(),
         )
     }

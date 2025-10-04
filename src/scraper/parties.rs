@@ -1,13 +1,12 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, future::Future};
 
-use async_trait::async_trait;
 use common_scrapes::Party;
 
 use crate::{error::ScraperError, legis_init::LegislativeInitiatives, AustriaScraper, Scraper};
 
 // #[async_trait]
 pub trait Parties: Scraper + Send {
-    async fn get_parties(&self) -> Result<Vec<Party>, ScraperError>;
+    fn get_parties(&self) -> impl Future<Output = Result<Vec<Party>, ScraperError>>;
 }
 
 // #[async_trait]
@@ -23,7 +22,7 @@ impl Parties for AustriaScraper {
         let legis_paths = self.legis_paths(raw)?;
         let mut votes = HashSet::new();
         let mut added_vote_legis_inits = 0;
-        for (_idx, path) in legis_paths.iter().rev().enumerate() {
+        for path in legis_paths.iter().rev() {
             // println!("path: {path}");
             let Ok(legis_init) = self.get_legis_init(path).await else {
                 continue;
@@ -47,7 +46,7 @@ impl Parties for AustriaScraper {
         }
 
         added_vote_legis_inits = 0;
-        for (_idx, path) in legis_paths.iter().enumerate() {
+        for path in legis_paths.iter() {
             let Ok(legis_init) = self.get_legis_init(path).await else {
                 continue;
             };

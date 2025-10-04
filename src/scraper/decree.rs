@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{future::Future, str::FromStr};
 
 use chrono::NaiveDate;
 use common_scrapes::{Document, FileType, Thing};
@@ -13,29 +13,31 @@ pub trait RisScraper: Scraper {
     const STATE_LAW_URL: &'static str = "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht";
     const DECREE_QUERY_PARAMS: &'static str = "?Applikation=BgblAuth&Typ.SucheInVerordnungen=true";
 
-    async fn fetch_decrees(&self, page: u32) -> Result<Value, ScraperError> {
+    fn fetch_decrees(&self, page: u32) -> impl Future<Output = Result<Value, ScraperError>> {
         let url = format!(
             "{}{}&Seitennummer={}&DokumenteProSeite=OneHundred",
             Self::STATE_LAW_URL,
             Self::DECREE_QUERY_PARAMS,
             page
         );
-        request::request(Method::GET, self.client(), (), &url).await
+        request::request(Method::GET, self.client(), (), url)
     }
 
-    async fn fetch_and_parse_ministrial_decrees(
+    fn fetch_and_parse_ministrial_decrees(
         &self,
         page: u32,
-    ) -> Result<Vec<Thing>, ScraperError> {
-        let decree = self.fetch_decrees(page).await?;
-        let decrees = decree["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"]
-            .as_array()
-            .ok_or(ScraperError::ParseError)?
-            .iter()
-            .filter_map(|decree| self.parse_ministrial_decree(&decree))
-            .collect::<Vec<Thing>>();
+    ) -> impl Future<Output = Result<Vec<Thing>, ScraperError>> {
+        async move {
+            let decree = self.fetch_decrees(page).await?;
+            let decrees = decree["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"]
+                .as_array()
+                .ok_or(ScraperError::ParseError)?
+                .iter()
+                .filter_map(|decree| self.parse_ministrial_decree(decree))
+                .collect::<Vec<Thing>>();
 
-        Ok(decrees)
+            Ok(decrees)
+        }
     }
 
     fn parse_ministrial_decree(&self, decree_raw: &Value) -> Option<Thing> {
@@ -121,7 +123,10 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_and_parse_ministrial_decrees() {
         let scraper = AustriaScraper::default();
-        let decrees = scraper.fetch_and_parse_ministrial_decrees(30).await.unwrap();
+        let decrees = scraper
+            .fetch_and_parse_ministrial_decrees(30)
+            .await
+            .unwrap();
         assert!(!decrees.is_empty());
         println!("decrees count: {}", decrees.len());
         dbg!(&decrees[..10]);

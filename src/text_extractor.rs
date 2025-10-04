@@ -1,7 +1,6 @@
 use std::{
-    collections::HashMap,
-    ops::{RangeBounds, RangeInclusive},
-    sync::{Arc, Mutex, RwLock},
+    ops::RangeInclusive,
+    sync::{Arc, RwLock},
 };
 
 use common_scrapes::{Document, PlenarSpeech, Speech, SpeechTextInfo};
@@ -124,13 +123,6 @@ impl TextExtractor {
             only_president,
             steno_info_regex,
         }
-    }
-
-    pub fn parse_html(&mut self, html: &str) -> Html {
-        let html = Html::parse_document(html);
-
-        // self.html_cache.swap_remove_index(0);
-        todo!()
     }
 
     pub fn remove_steno_info(&self, haystack: &str) -> String {
@@ -446,7 +438,7 @@ pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Opti
             for skip in 0..6 {
                 let extract_text_from_html_via_name_attribute_next_section =
                     extract_text_from_html_via_name_attribute_next_section(
-                        &document,
+                        document,
                         name_attribute,
                         parent,
                         skip,

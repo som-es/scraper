@@ -40,7 +40,7 @@ fn convert_month_to_number(month: &str) -> Option<usize> {
 
 pub fn extract_german_date_from_str(text: &str) -> Option<NaiveDate> {
     let date_pattern = r"(\d{1,2})\.\s([A-Za-zä]+)\s(\d{4})";
-    let date_regex = Regex::new(&date_pattern).unwrap();
+    let date_regex = Regex::new(date_pattern).unwrap();
     let date_captures = date_regex.captures(text)?;
     let day = date_captures.get(1)?.as_str().trim();
     let month = date_captures.get(2)?.as_str().trim();
@@ -52,7 +52,7 @@ pub fn extract_german_date_from_str(text: &str) -> Option<NaiveDate> {
 
 pub fn extract_come_into_effect(text: &str) -> Option<ComeIntoEffectInfo> {
     let into_effect_regex = r"in\s+Kraft";
-    let into_effect_regex = Regex::new(&into_effect_regex).unwrap();
+    let into_effect_regex = Regex::new(into_effect_regex).unwrap();
     let Some(come_into_effect_idx) = into_effect_regex.find(text) else {
         return None;
     };
@@ -95,7 +95,7 @@ pub fn extract_come_into_effect(text: &str) -> Option<ComeIntoEffectInfo> {
     }
 
     let expire_regex = r"außer\s+Kraft";
-    let expire_regex = Regex::new(&expire_regex).unwrap();
+    let expire_regex = Regex::new(expire_regex).unwrap();
     let Some(expire_idx) = expire_regex.find(text) else {
         return Some(come_into_effect_info);
     };
@@ -118,7 +118,7 @@ fn get_reversed_date_idx(come_into_effect: &str) -> usize {
             if come_into_effect
                 .as_bytes()
                 .get(date_idx - 1)
-                .map(|x| (*x as char).is_digit(10))
+                .map(|x| (*x as char).is_ascii_digit())
                 .unwrap_or_default()
             {
                 date_idx -= 1

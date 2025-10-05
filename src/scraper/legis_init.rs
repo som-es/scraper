@@ -386,9 +386,12 @@ mod tests {
     };
 
     use crate::{
-        extract_text_from_html,
-        legis_init::{votes::extract_vote_count, LegislativeInitiatives},
-        AustriaScraper, Scraper,
+        extract_text_from_html, find_optimal_votes_by_name,
+        legis_init::{
+            votes::{extract_vote_count, extract_votes_by_name},
+            LegislativeInitiatives,
+        },
+        AustriaScraper, Scraper, TextExtractor,
     };
 
     use super::is_accepted_based_on_votes;
@@ -2492,6 +2495,72 @@ mod tests {
                 .pro,
             vec!["S".to_string()]
         );
+    }
+    #[tokio::test]
+    async fn test_named_vote_xxviii_a_372() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/372")
+            .await
+            .unwrap();
+
+        let pro_contra = res
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+        for pro_checks in ["Auer", "Baumann", "Köllner", "Maurer"] {
+            assert!(pro_contra.pro.contains(&pro_checks.to_string()));
+        }
+
+        for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
+            assert!(pro_contra.contra.contains(&contra_checks.to_string()));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_xxviii_a_372_by_document_link() {
+        let url = "/dokument/XXVIII/NRSITZ/41/A_-_17_40_32_00837360.html#121.11";
+        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let text = text_extractor
+            .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
+            .await
+            .unwrap();
+
+        let res = extract_votes_by_name(&text).unwrap();
+
+        let pro_contra = res;
+        for pro_checks in ["Auer", "Baumann", "Köllner", "Maurer"] {
+            assert!(pro_contra.pro.contains(&pro_checks.to_string()));
+        }
+
+        for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
+            assert!(pro_contra.contra.contains(&contra_checks.to_string()));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_xxviii_a_353() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/353")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+        let pro_contra = res
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+        for pro_checks in ["Dengler", "Shetty", "Köllner", "Grüner"] {
+            assert!(pro_contra.pro.contains(&pro_checks.to_string()));
+        }
+
+        for contra_checks in ["Tomaselli", "Stögmüller", "Kaniak", "Lausch"] {
+            assert!(pro_contra.contra.contains(&contra_checks.to_string()));
+        }
     }
 
     #[tokio::test]

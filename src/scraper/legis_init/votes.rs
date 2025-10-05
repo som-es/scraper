@@ -1,4 +1,4 @@
-use common_scrapes::{HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedByName};
+use common_scrapes::{Document, HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedByName};
 use regex::Regex;
 use serde_json::Value;
 
@@ -215,7 +215,6 @@ pub async fn extract_most_fitting_votes(
                         None => continue,
                     }
                 } else {
-                    dbg!(&url);
                     match extractor
                         .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
                         .await
@@ -269,7 +268,7 @@ pub fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     ))
 }
 
-fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
+pub fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let yes_no_regex = yes_no_votes_inside_regex();
     let start_of_yes_no_idx = yes_no_regex
         .find(from_html_text)

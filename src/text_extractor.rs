@@ -266,7 +266,6 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
-        dbg!(&unfitted_speech);
         self.fit_speech(unfitted_speech, name)
     }
 
@@ -429,17 +428,21 @@ impl TextExtractor {
     }
 }
 
+fn contains_single_named_votes(yes_indicator: &Regex, no_indicator: &Regex, text: &str) -> bool {
+    return yes_indicator.find_iter(&text).count() == 1
+        && no_indicator.find_iter(&text).count() == 1;
+}
+
 pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Option<String> {
-    let probably_contains_votes_yes_indicator =
+    let votes_yes_indicator =
         Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
-    let probably_contains_votes_no_indicator =
+    let votes_no_indicator =
         Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
 
     if NAME_ATTRIBUTES
         .iter()
         .any(|attr| name_attribute.starts_with(attr))
     {
-        // let document = Html::parse_document(html);
         for parent in 1..3 {
             for skip in 0..6 {
                 let extract_text_from_html_via_name_attribute_next_section =
@@ -458,21 +461,25 @@ pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Opti
                 }
 
                 // checking for one, because if multiple votes are inside, do not process
-                if probably_contains_votes_yes_indicator
-                    .find_iter(&variant)
-                    .count()
-                    == 1
-                    && probably_contains_votes_no_indicator
-                        .find_iter(&variant)
-                        .count()
-                        == 1
+                if contains_single_named_votes(&votes_yes_indicator, &votes_no_indicator, &variant)
                 {
                     return Some(variant);
                 }
             }
         }
     } else {
-        return Some(extract_text_from_html_via_rn_id(document, name_attribute));
+        let text = extract_text_from_html_via_rn_id(document, name_attribute);
+        if contains_single_named_votes(&votes_yes_indicator, &votes_no_indicator, &text) {
+            return Some(text);
+        }
+        // it is possible (and it occured) that the parlamentsdirektion adds a wrong sub RN link e.g. https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/41/A_-_17_40_32_00837360.html#121.11
+        if let Some(top_name_attribute) = name_attribute.split('.').next() {
+            let text = extract_text_from_html_via_rn_id(document, top_name_attribute);
+            if contains_single_named_votes(&votes_yes_indicator, &votes_no_indicator, &text) {
+                return Some(text);
+            }
+        }
+        return None;
     }
     None
 }

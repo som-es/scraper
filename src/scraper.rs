@@ -161,6 +161,7 @@ impl AustriaScraper {
                 .iter()
                 .flat_map(|gegenstand| {
                     let person = gegenstand.as_array()?;
+                    dbg!(person);
                     Some(person[gegenstand_path_idx].as_str()?.to_string())
                 })
                 .collect(),

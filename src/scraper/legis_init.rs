@@ -392,6 +392,7 @@ fn find_gegenstand_paths_from_rows(
                     Some(inr) => inr.to_string(),
                     None => gegenstand[2].as_i64()?.to_string(),
                 };
+                let inr = inr.trim_start_matches('0');
                 Some(format!("/gegenstand/{gp}/{ityp}/{inr}"))
             })
             .collect(),
@@ -418,6 +419,13 @@ mod tests {
     };
 
     use super::is_accepted_based_on_votes;
+
+    #[test]
+    fn test_trim_potential_trailing_zeros() {
+        let s = "00001";
+        let s = s.trim_start_matches('0');
+        assert_eq!(s, "1");
+    }
 
     #[tokio::test]
     pub async fn test_xxvii_a_4098() {

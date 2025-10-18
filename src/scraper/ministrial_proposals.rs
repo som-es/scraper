@@ -255,7 +255,11 @@ impl MinistrialProposalScraper for AustriaScraper {
 
 #[cfg(test)]
 mod tests {
-    use crate::{proposals::ProposalsPayload, AustriaScraper};
+    use chrono::NaiveDate;
+
+    use crate::{
+        ministrial_proposals::GegenstandInfo, proposals::ProposalsPayload, today, AustriaScraper,
+    };
 
     use super::MinistrialProposalScraper;
 
@@ -305,5 +309,21 @@ mod tests {
         }
 
         // println!("ministrial: {ministrial:?}");
+    }
+
+    // /gegenstand/XXVIII/ME/43
+    #[tokio::test]
+    async fn test_ministrial_prop_me_xxviii_43() {
+        let scraper = AustriaScraper::default();
+
+        let geg_info = GegenstandInfo {
+            path: "/gegenstand/XXVIII/ME/53".into(),
+            ressort: "".into(),
+            ressort_shortform: "".into(),
+            due_to: today(),
+        };
+        let ministerial_prop = scraper.get_ministrial_proposal(geg_info).await.unwrap();
+        let emphasis = ministerial_prop.emphasis.unwrap();
+        dbg!(emphasis);
     }
 }

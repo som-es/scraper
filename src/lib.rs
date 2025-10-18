@@ -182,6 +182,11 @@ pub fn convert_party_code_list_to_vec(party_list: &str) -> Vec<String> {
         .collect()
 }
 
+#[inline]
+pub fn today() -> chrono::NaiveDate {
+    chrono::Local::now().date_naive()
+}
+
 pub fn convert_party_code_list_to_vec_open_ended(party_list_open_ended: &str) -> Vec<String> {
     let mut contra = vec![];
 

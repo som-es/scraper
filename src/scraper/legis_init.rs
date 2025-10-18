@@ -79,7 +79,7 @@ pub trait LegislativeInitiatives: Scraper + Sync {
                 let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
                     let dur = chrono::Local::now().date_naive() - legis_init.created_at.date();
                     let seconds = ((dur.num_days() as f32).powf(1.54) as i64 * 50)
-                        .min(60 * 60 * 24 * 400)
+                        .min(60 * 60 * 24 * 80)
                         .max(500);
                     Some(seconds as u64)
                 } else {
@@ -370,9 +370,32 @@ impl LegislativeInitiatives for AustriaScraper {
     }
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError> {
-        self.gegenstand_paths(initiatives, 12 + 2)
+        find_gegenstand_paths_from_rows(Self::LIST_ENTRIES, initiatives)
             .ok_or(ScraperError::LegisInitParseError)
     }
+}
+
+fn find_gegenstand_paths_from_rows(
+    list_entries: &str,
+    rows_initiatives: Value,
+) -> Option<GegenstandPaths> {
+    Some(
+        rows_initiatives[list_entries]
+            .as_array()?
+            .iter()
+            .flat_map(|gegenstand| {
+                let gegenstand = gegenstand.as_array()?;
+                let gp = gegenstand[0].as_str()?;
+                let ityp = gegenstand[1].as_str()?;
+                let inr = gegenstand[2].as_str();
+                let inr = match inr {
+                    Some(inr) => inr.to_string(),
+                    None => gegenstand[2].as_i64()?.to_string(),
+                };
+                Some(format!("/gegenstand/{gp}/{ityp}/{inr}"))
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -389,7 +412,7 @@ mod tests {
         extract_text_from_html, find_optimal_votes_by_name,
         legis_init::{
             votes::{extract_vote_count, extract_votes_by_name},
-            LegislativeInitiatives,
+            LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES,
         },
         AustriaScraper, Scraper, TextExtractor,
     };
@@ -2601,5 +2624,21 @@ mod tests {
         ] {
             assert!(pro_contra.contra.contains(&contra_checks.to_string()));
         }
+    }
+
+    #[tokio::test]
+    async fn test_get_latest() {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.date_start = chrono::Local::now()
+            .naive_local()
+            .checked_sub_days(Days::new(100));
+
+        let legis_inits = scraper
+            .post_legis_payload(Some(LEGIS_IS_VOTEABLE_ON_DOKTYPES.as_slice()))
+            .await
+            .unwrap();
+        let legis_init_paths = scraper.legis_paths(legis_inits).unwrap();
+
+        println!("legis_init_paths: {legis_init_paths:?}");
     }
 }

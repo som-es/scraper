@@ -52,7 +52,7 @@ pub trait RisScraper: Scraper {
 
     fn general_parse_thing(&self, thing_raw: &Value) -> Option<Thing> {
         let data = &thing_raw["Data"]["Metadaten"];
-        println!("data: {}", serde_json::to_string_pretty(data).unwrap());
+        // println!("data: {}", serde_json::to_string_pretty(data).unwrap());
         let document_url = data["Allgemein"]["DokumentUrl"].as_str()?.to_string();
         let technical_data = &data["Technisch"];
         let id = technical_data["ID"].as_str().unwrap();

@@ -114,9 +114,9 @@ pub const LEGIS_IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
 pub const LEGIS_LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
 pub const LEGIS_RESOLUTION_DETERMINATORS: [&str; 2] = ["A(E)", "UEA"];
 
-pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 17] = [
+pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 23] = [
     "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2",
-    "RVVB", "USVL", "BUA", "UEAM",
+    "RVVB", "USVL", "BUA", "UEAM", "RVS", "AUB", "BRH", "BRG", "PET", "BI",
 ];
 
 // #[async_trait]

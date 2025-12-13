@@ -154,14 +154,19 @@ impl LegislativeInitiatives for AustriaScraper {
         let inr = legis_content["inr"].as_u64()?;
         let gp = legis_content["gp_code"].as_str()?.to_string();
 
-        let raw_documents = if let Some(preconst) = legis_content.get("preconst") {
-            let preconst = &preconst.as_array()?[0];
-            preconst["documents"].as_array()?
-        } else {
-            legis_content["documents"].as_array()?
-        };
-        let mut documents = documents(raw_documents)?;
-        documents.extend(extract_plenar_documents(legis_content).unwrap_or_default());
+        let mut raw_documents = legis_content["documents"].as_array();
+        if raw_documents.is_none() {
+            raw_documents = if let Some(preconst) = legis_content.get("preconst") {
+                let preconst = &preconst.as_array()?[0];
+                preconst["documents"].as_array()
+            } else {
+                None
+            };
+        }
+        let mut documents = documents(raw_documents?)?;
+        if documents.iter().find(|doc| doc.title == "Gesetzestext").is_none() {
+            documents.extend(extract_plenar_documents(legis_content).unwrap_or_default());
+        }
 
         let names = legis_content["names"]
             .as_array()
@@ -2572,6 +2577,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_vote_result_xxviii_a_468() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/468")
+            .await
+            .unwrap();
+        println!("res: {res:?}");
+    }
+
+    #[tokio::test]
     async fn test_named_vote_xxviii_a_353() {
         let scraper = AustriaScraper::default();
         let res = scraper
@@ -2648,5 +2663,19 @@ mod tests {
         let legis_init_paths = scraper.legis_paths(legis_inits).unwrap();
 
         println!("legis_init_paths: {legis_init_paths:?}");
+    }
+
+    #[tokio::test]
+    async fn test_documents_of_xxviii_i_296() {
+        // https://www.parlament.gv.at/gegenstand/XXVIII/I/296
+
+        let mut scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/I/296")
+            .await
+            .unwrap();
+
+        let docs = res.documents;
+        dbg!(docs);
     }
 }

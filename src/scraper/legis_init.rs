@@ -2652,17 +2652,19 @@ mod tests {
     #[tokio::test]
     async fn test_get_latest() {
         let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXVIII".to_string()];
         scraper.scrape_info.date_start = chrono::Local::now()
             .naive_local()
             .checked_sub_days(Days::new(100));
 
         let legis_inits = scraper
             .post_legis_payload(Some(LEGIS_IS_VOTEABLE_ON_DOKTYPES.as_slice()))
+            // .post_legis_payload(None)
             .await
             .unwrap();
         let legis_init_paths = scraper.legis_paths(legis_inits).unwrap();
 
-        println!("legis_init_paths: {legis_init_paths:?}");
+        println!("legis_init_paths: {:?}", &legis_init_paths[..]);
     }
 
     #[tokio::test]

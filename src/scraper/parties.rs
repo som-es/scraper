@@ -2,7 +2,7 @@ use std::{collections::HashSet, future::Future};
 
 use common_scrapes::Party;
 
-use crate::{error::ScraperError, legis_init::LegislativeInitiatives, AustriaScraper, Scraper};
+use crate::{AustriaScraper, Scraper, error::ScraperError, legis_init::{LEGIS_LAW_DETERMINATORS, LegislativeInitiatives}};
 
 // #[async_trait]
 pub trait Parties: Scraper + Send {
@@ -18,7 +18,7 @@ impl Parties for AustriaScraper {
             .ok_or(ScraperError::NoEnactmentError)?;
         let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;*/
 
-        let raw = self.post_legis_payload(None).await?;
+        let raw = self.post_legis_payload(Some(LEGIS_LAW_DETERMINATORS.as_slice())).await?;
         let legis_paths = self.legis_paths(raw)?;
         let mut votes = HashSet::new();
         let mut added_vote_legis_inits = 0;

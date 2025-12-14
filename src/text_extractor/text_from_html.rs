@@ -106,7 +106,7 @@ pub fn extract_text_from_html_via_name_attribute_parent_parent(
     document: &Html,
     name_attribute: &str,
 ) -> String {
-    let selector = Selector::parse(&format!("[name=\"{}\"]", name_attribute)).unwrap();
+    let selector = Selector::parse(&format!("p > a[name=\"{}\"]", name_attribute)).unwrap();
 
     document
         .select(&selector)
@@ -142,19 +142,6 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
     document: &Html,
     name_attribute: &str,
 ) -> Option<String> {
-    // let document = Html::parse_document(html);
-    /*if name_attribute.contains("Seite") {
-        let first_variant = extract_text_from_html_via_name_attribute_next_section(
-            &document,
-            name_attribute,
-            1,
-            0,
-        )?;
-
-        let first_variant = extract_text_from_html_via_name_attribute(&document, name_attribute);
-        dbg!(&first_variant);
-        return Some(first_variant);
-    }*/
     if NAME_ATTRIBUTES
         .iter()
         .any(|attr| name_attribute.starts_with(attr))

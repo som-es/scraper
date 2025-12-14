@@ -164,7 +164,11 @@ impl LegislativeInitiatives for AustriaScraper {
             };
         }
         let mut documents = documents(raw_documents?)?;
-        if documents.iter().find(|doc| doc.title == "Gesetzestext").is_none() {
+        if documents
+            .iter()
+            .find(|doc| doc.title == "Gesetzestext")
+            .is_none()
+        {
             documents.extend(extract_plenar_documents(legis_content).unwrap_or_default());
         }
 
@@ -410,8 +414,8 @@ mod tests {
 
     use chrono::{Days, NaiveDate};
     use common_scrapes::{
-        AcceptedState, FileType, Opinion, Party, ProContra, Stage, Vote, VoteStage, VoteType,
-        Voting,
+        AcceptedState, Document, FileType, Opinion, Party, ProContra, Stage, Vote, VoteStage,
+        VoteType, Voting,
     };
 
     use crate::{
@@ -2671,13 +2675,63 @@ mod tests {
     async fn test_documents_of_xxviii_i_296() {
         // https://www.parlament.gv.at/gegenstand/XXVIII/I/296
 
-        let mut scraper = AustriaScraper::default();
+        let scraper = AustriaScraper::default();
         let res = scraper
             .get_legis_init("/gegenstand/XXVIII/I/296")
             .await
             .unwrap();
 
         let docs = res.documents;
-        dbg!(docs);
+
+        let should_docs = [
+            Document {
+                title: "Gesetzestext".into(),
+                link: "/dokument/XXVIII/I/296/fname_1722531.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Gesetzestext".into(),
+                link: "/dokument/XXVIII/I/296/fnameorig_1722531.html".into(),
+                ftype: FileType::HTML,
+            },
+            Document {
+                title: "Datenschutz-Folgenabschätzung".into(),
+                link: "/dokument/XXVIII/I/296/imfname_1722533.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Erläuterungen".into(),
+                link: "/dokument/XXVIII/I/296/imfname_1722534.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Vorblatt und WFA".into(),
+                link: "/dokument/XXVIII/I/296/imfname_1722536.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Textgegenüberstellung".into(),
+                link: "/dokument/XXVIII/I/296/imfname_1722535.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+        ];
+        assert_eq!(should_docs.as_slice(), docs.as_slice());
+    }
+
+    #[tokio::test]
+    async fn test_legis_init_xxvii_i_2451() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/2451")
+            .await
+            .unwrap();
+
+        assert!(res
+            .other_keyword_topics
+            .contains(&"Bundesverfassung".to_string()));
+        assert!(res
+            .other_keyword_topics
+            .contains(&"Opferfürsorge und Opferschutz".to_string()));
+        assert_eq!(res.other_keyword_topics.len(), 2);
     }
 }

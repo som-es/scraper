@@ -2,7 +2,11 @@ use std::{collections::HashSet, future::Future};
 
 use common_scrapes::Party;
 
-use crate::{AustriaScraper, Scraper, error::ScraperError, legis_init::{LEGIS_LAW_DETERMINATORS, LegislativeInitiatives}};
+use crate::{
+    error::ScraperError,
+    legis_init::{LegislativeInitiatives, LEGIS_LAW_DETERMINATORS},
+    AustriaScraper, Scraper,
+};
 
 // #[async_trait]
 pub trait Parties: Scraper + Send {
@@ -18,7 +22,9 @@ impl Parties for AustriaScraper {
             .ok_or(ScraperError::NoEnactmentError)?;
         let enactment = self.get_enactment(&enactment_paths.get(0).ok_or(ScraperError::NoEnactmentError)?).await?;*/
 
-        let raw = self.post_legis_payload(Some(LEGIS_LAW_DETERMINATORS.as_slice())).await?;
+        let raw = self
+            .post_legis_payload(Some(LEGIS_LAW_DETERMINATORS.as_slice()))
+            .await?;
         let legis_paths = self.legis_paths(raw)?;
         let mut votes = HashSet::new();
         let mut added_vote_legis_inits = 0;
@@ -76,9 +82,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_parties_xxvii() {
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXVII".to_string()];
 
-        let parties = scraper.get_parties().await.unwrap();
+        let mut parties = scraper.get_parties().await.unwrap();
+        parties.sort_by(|a, b| b.fraction.cmp(&a.fraction));
         assert_eq!(
             parties,
             vec![
@@ -121,7 +129,8 @@ mod tests {
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXIII".to_string()];
 
-        let parties = scraper.get_parties().await.unwrap();
+        let mut parties = scraper.get_parties().await.unwrap();
+        parties.sort_by(|a, b| b.fraction.cmp(&a.fraction));
         assert_eq!(
             parties,
             vec![
@@ -138,16 +147,16 @@ mod tests {
                     code: "V".to_string(),
                 },
                 Party {
-                    name: "GRÜNE".to_string(),
-                    color: "#69B12E".to_string(),
-                    fraction: 21,
-                    code: "G".to_string(),
-                },
-                Party {
                     name: "FPÖ".to_string(),
                     color: "#0052FB".to_string(),
                     fraction: 21,
                     code: "F".to_string(),
+                },
+                Party {
+                    name: "GRÜNE".to_string(),
+                    color: "#69B12E".to_string(),
+                    fraction: 21,
+                    code: "G".to_string(),
                 },
                 Party {
                     name: "BZÖ".to_string(),

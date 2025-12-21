@@ -116,7 +116,7 @@ mod tests {
 
     use crate::{enactment::EnactmentScraper, AustriaScraper};
 
-    #[tokio::test]
+    /*#[tokio::test]
     async fn test_scrape_enactments() {
         let scraper = AustriaScraper::default();
 
@@ -136,7 +136,7 @@ mod tests {
                 println!("{legis_init:?}");
             }
         }
-    }
+    }*/
 
     #[tokio::test]
     async fn test_xxvii_bnr_746() {

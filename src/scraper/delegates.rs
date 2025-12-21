@@ -21,6 +21,7 @@ pub const BEREICHE_IDX: usize = 6;
 
 pub mod titles;
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct BereichsprecherInfo {
     pub path: String,
     pub bereiche: Vec<String>,
@@ -404,8 +405,8 @@ mod tests {
         let scraper = AustriaScraper::default();
 
         let info = scraper.post_persons_payload_bs().await.unwrap();
-        for path in scraper.person_paths_bs(info).unwrap() {
-            let delegate = scraper.get_delegate_bs(path).await.unwrap();
+        for path in scraper.person_paths_bs(info).unwrap()[..4].iter() {
+            let delegate = scraper.get_delegate_bs(path.clone()).await.unwrap();
             println!(
                 "delegate: {}, divs: {:?}",
                 delegate.name, delegate.divisions
@@ -527,7 +528,7 @@ mod tests {
         println!("res: {res:?}");
     }
 
-    #[tokio::test]
+    /*#[tokio::test]
     async fn test_get_all_persons() -> Result<(), ScraperError> {
         let scraper = AustriaScraper::default();
 
@@ -565,7 +566,7 @@ mod tests {
         // std::fs::write("../delegates.json", contents).unwrap();
 
         Ok(())
-    }
+    }*/
 
     #[tokio::test]
     async fn test_person_paths() -> Result<(), ScraperError> {

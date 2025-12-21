@@ -118,7 +118,7 @@ mod tests {
     #[tokio::test]
     async fn test_speech_missing_text1() {
         // fixed
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         let speech_info = SpeechTextInfo {
             site_start: Some(36),
@@ -138,7 +138,7 @@ mod tests {
     //
     #[tokio::test]
     async fn test_speech_missing_text2() {
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         let speech_info = SpeechTextInfo {
             site_start: Some(270),
@@ -156,7 +156,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_speech_missing_text3() {
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let speech_info = SpeechTextInfo {
@@ -178,7 +178,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_speech_missing_text4() {
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let speech_info = SpeechTextInfo {
@@ -201,7 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_speech_missing_text5() {
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
         let speech_info = SpeechTextInfo {

@@ -134,7 +134,7 @@ impl TextExtractor {
         url: &str,
         key: Option<&str>,
         cache_key: &str,
-        attribute_extraction_fn: Option<fn(&Html, &str,) -> Option<String>>,
+        attribute_extraction_fn: Option<fn(&Html, &str) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
         let mut html = match get_disk_cache(cache_key, 60 * 60 * 24 * 30).await {
@@ -195,14 +195,14 @@ impl TextExtractor {
         let name = name.trim_matches(char::is_whitespace);
         let name = remove_titles_from_str(name);
         // BK Werner Faymann (S) remove the BK, BM etc
-        let name_regex = name.split_whitespace().filter(|x| !(*x == "BM" || *x == "RM" || *x == "BK")).fold(
-            String::new(),
-            |mut output, split| {
+        let name_regex = name
+            .split_whitespace()
+            .filter(|x| !(*x == "BM" || *x == "RM" || *x == "BK"))
+            .fold(String::new(), |mut output, split| {
                 use std::fmt::Write;
                 let _ = write!(output, r"{split}\s*");
                 output
-            },
-        );
+            });
         let name_regex = Regex::new(&name_regex).unwrap();
 
         // dbg!(&name);

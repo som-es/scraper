@@ -1,23 +1,24 @@
-use std::collections::{BTreeMap, HashSet};
-
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Reference, Speech};
-use regex::Regex;
+use common_scrapes::{Document, PlenarSpeech, Reference};
 use serde_json::{json, Value};
+
+mod absences;
+mod call_to_orders;
+mod speeches;
 
 use crate::{
     caching::{disk_caching, get_disk_cache_json},
-    call_to_order::{
-        extract_call_to_order_id_from_path, extract_call_to_order_paths_from_stages,
-        CallToOrderInfo,
-    },
+    call_to_order::CallToOrderInfo,
     documents,
     error::ScraperError,
-    filter::filter_name_extraction,
-    person_url_to_id, remove_titles_from_str,
+    plenar::{
+        absences::extract_absences,
+        call_to_orders::extract_call_to_order_info_from_stages,
+        speeches::{combine_speech_info, extract_speeches},
+    },
     speeches::extract_speeches_from_stages,
-    unique_titles, AustriaScraper, GegenstandPaths, LastUpdated, Scraper, TextExtractor,
+    AustriaScraper, GegenstandPaths, LastUpdated, Scraper,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -107,9 +108,6 @@ impl Plenar for AustriaScraper {
     }
 
     async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo> {
-        // let string = serde_json::to_string_pretty(&raw_plenar).unwrap();
-        // println!("string {string}");
-
         let description = raw_plenar["meta"]["description"]
             .as_str()
             .unwrap()
@@ -219,367 +217,10 @@ fn extract_praesidium_from_progress(raw_progress: &Value) -> Option<Vec<&Value>>
             })
             .collect(),
     )
-    // for step in raw_progress.as_array()? {
-    //     if step["text"].as_str()?.to_lowercase().contains("präsidium") {
-    //         return Some(step);
-    //     }
-    // }
-    // None
 }
 
 fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>> {
     documents(raw_praesidium["protocol"]["data"]["links"].as_array()?)
-}
-
-async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
-    for document in documents {
-        if document.ftype == FileType::HTML
-            && document.title.to_lowercase().contains("stenographisches")
-        {
-            let Some(extracted_absences) = extract_absences_from_document(document).await else {
-                continue;
-            };
-            return Some(extracted_absences);
-        }
-    }
-    None
-}
-
-async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
-    let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
-    let text = extractor
-        .extract_text_from_url(&doc.link, None, true)
-        .await?;
-    // println!("processing noew: absence doc: {doc:?}");
-    extract_absences_from_text(&text)
-}
-
-fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
-    // remove this later -> only for testing purposes
-    // if text.len() < 50000 {
-    //     return None;
-    // }
-
-    let text = &text.replace('\u{a0}', " ");
-    let text = text.replace('\u{ad}', "");
-    let titles = unique_titles();
-
-    let text = text
-        .split_inclusive(' ')
-        .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
-        .collect::<String>();
-
-    let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
-    let absence_match = absence_marker_regex.find(&text)?;
-
-    let mut start_idx = absence_match.start();
-
-    const STOP_CHARS: [u8; 4] = [b'.', b'!', b'\n', b'?'];
-
-    // should handle these "Ich gebe bekannt, dass Frau Dr. Mertel, Frau Dr. Partik-Pablé, Frau Dr. Povysil, Herr Dr. Puttinger und Herr Ing. Maderthaner für die heutige Sitzung als verhindert gemeldet sind."
-    while !STOP_CHARS.contains(&text.as_bytes()[start_idx]) {
-        start_idx -= 1;
-    }
-
-    let open_ended_absence = &text[start_idx + 1..];
-    // println!("open_ended_absence: {}", &open_ended_absence[..500]);
-
-    // let print = &text[start_idx..start_idx + 400];
-    // println!("print: {print}");
-
-    // open_ended_absence.replace(&["Hi", "Bi"], " ");
-
-    // println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
-    let info = &open_ended_absence[..open_ended_absence
-        .find(".\n")
-        .unwrap_or(usize::MAX)
-        .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(".\r\n").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(". \r\n").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(".  \n").unwrap_or(usize::MAX))
-        // need to find the specific absence entry (again)
-        // ? /dokument/XXV/NRSITZ/88/fnameorig_501525.html
-        .min(open_ended_absence.find(". (Abg").unwrap_or(usize::MAX))
-        .min(open_ended_absence.find(", die ich").unwrap_or(usize::MAX))
-        .min(
-            open_ended_absence
-                .find(", Zuweisungen")
-                .unwrap_or(usize::MAX),
-        )
-        .min(open_ended_absence.find(".").unwrap_or(usize::MAX))
-        .min(
-            open_ended_absence
-                .find(". (Ruf bei der ÖVP: ... alle von der SPÖ!)")
-                .unwrap_or(usize::MAX),
-        )
-        .min(
-            open_ended_absence
-                .find(". (s. auch S. 32)")
-                .unwrap_or(open_ended_absence.len()),
-        )];
-
-    log::info!(
-        "-------------
-    info: {info:?}"
-    );
-
-    let skip_words = [
-        "dass",
-        "MMSc",
-        "diplômé",
-        "verhindert",
-        "gemeldet",
-        "gemeldet:",
-        "für",
-        "die",
-        "heutige",
-        "Sitzung",
-        "ist",
-        "niemand",
-        "sind",
-        "Mitglieder",
-        "Hohen",
-        "Hauses",
-        "Abgeordnete:",
-        "Abgeordnete,",
-        "Abgeordneten",
-        "Abgeordneten:",
-        "heute",
-        "Abgeordneter",
-        "Abgeordnete",
-        "Herr",
-        "Nationalrates",
-        "Präsident",
-        "Präsidentin",
-        "unsere",
-        "leider",
-        "erkrankte",
-        "weiters",
-        "auch",
-        "Zweite",
-        "heutigen",
-        "Sitzungstag",
-        "Sitzungen",
-        "Frau",
-        "gebe",
-        "bekannt",
-        "folgende",
-        "diesem",
-        "Sinne",
-        "Pilz:",
-        "doch",
-        "nicht",
-        "Kickl!",
-        "keine",
-        "Klubvorsitzende",
-        "Klubvorsitzender",
-        "weitere",
-        "Zwischenrufe",
-        "Zwischenruf",
-        "(Rufe",
-        "Heiterkeit",
-        "wird",
-        "immer",
-        "automatisch",
-        "entschuldigt!)",
-        "Kollege",
-        "herzlichen",
-        "Dank!",
-        "sollten",
-        "darüber",
-        "unterhalten",
-        "warum",
-        "fehlend",
-        "eingetragen",
-        "Grünen)",
-        "insgesamt",
-        "42",
-        "nämlich",
-        "ganze",
-        "vertreten",
-        "durch",
-        "Vizekanzler",
-        "entschuldigt",
-        "damit",
-        "Kollegen",
-        "Kolleginnen",
-        "einige",
-        "nämlich",
-        "Dipl",
-        "heute",
-    ]
-    .into_iter()
-    .collect::<HashSet<_>>();
-
-    let info = info
-        .split(',')
-        .flat_map(|x| x.split("und"))
-        .flat_map(|x| x.split("sowie"))
-        .map(|x| {
-            x.split_inclusive(char::is_whitespace).filter(|split| {
-                !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
-                    || split.contains('.')
-                    || {
-                        let mut ret = false;
-                        if skip_words.contains(split.trim_matches(char::is_whitespace)) {
-                            ret = true;
-                        }
-                        ret
-                    })
-            })
-        })
-        .map(|x| x.collect::<String>())
-        .collect::<Vec<_>>();
-
-    Some(
-        filter_name_extraction(info.iter().map(|x| x.as_str()))
-            .filter(|x| !x.is_empty())
-            .collect::<Vec<_>>(),
-    )
-}
-
-fn extract_call_to_order_info_from_stages(
-    ityp: &str,
-    inr: u64,
-    stages: &Value,
-) -> Vec<CallToOrderInfo> {
-    let mut call_to_orders = vec![];
-    for (person_path, person_name, call_to_order_path) in
-        extract_call_to_order_paths_from_stages(stages).unwrap_or_default()
-    {
-        let receiver_id = person_url_to_id(&person_path).unwrap();
-        let (call_to_order_inr, call_to_order_ityp) =
-            extract_call_to_order_id_from_path(&call_to_order_path);
-
-        call_to_orders.push(CallToOrderInfo {
-            description: "".into(),
-            ityp: call_to_order_ityp.unwrap_or("GO").into(),
-            inr: call_to_order_inr.unwrap().parse().unwrap(),
-            receiver: person_name,
-            receiver_id,
-            links_to: Some(format!("{ityp}/{inr}")),
-        });
-    }
-    call_to_orders
-}
-
-// #[macro_export]
-// macro_rules! key_from_speeches {
-//     ($speeches:ident) => {
-//         $speeches
-//             .iter()
-//             .map(|speech| speech.delegate_id)
-//             .collect::<Vec<u64>>()
-//     };
-// }
-
-fn combine_speech_info(
-    debates_with_speeches: Vec<(DebateInfo, Vec<PlenarSpeech>)>,
-    document_link_speeches: Vec<Vec<Speech>>,
-) -> Vec<Debate> {
-    let document_link_speeches = document_link_speeches
-        .into_iter()
-        .map(|speeches| {
-            (
-                speeches
-                    .iter()
-                    .map(|speech| speech.delegate_id)
-                    .collect::<Vec<_>>(),
-                speeches,
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
-    let debates_with_speeches_keys = debates_with_speeches
-        .into_iter()
-        .map(|(about, speeches)| {
-            (
-                speeches
-                    .iter()
-                    .map(|speech| speech.speech.delegate_id)
-                    .collect::<Vec<_>>(),
-                about,
-                speeches,
-            )
-        })
-        .collect::<Vec<_>>();
-
-    let mut debates = vec![];
-    for (debates_key, debate_info, mut debate_speeches) in debates_with_speeches_keys {
-        let document_link_speeches = document_link_speeches
-            .get(&debates_key)
-            .map(|speeches| speeches.as_slice())
-            .unwrap_or_default();
-        if document_link_speeches.is_empty() {
-            log::warn!(
-                "Keine document links! Aber {} speeches",
-                debate_speeches.len()
-            );
-        }
-        for (debate_speech, document_link_speech) in
-            debate_speeches.iter_mut().zip(document_link_speeches)
-        {
-            debate_speech.speech = document_link_speech.clone();
-        }
-        debates.push(Debate {
-            info: debate_info,
-            speeches: debate_speeches,
-        });
-    }
-    debates
-}
-
-pub fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<PlenarSpeech>)> {
-    past_debates
-        .iter()
-        .flat_map(|past_debate| {
-            Some((
-                past_debate["text"].as_str()?,
-                past_debate["speeches"].as_array()?,
-                past_debate["agenda"].as_array()?,
-            ))
-        })
-        .filter(|(_, speeches, _)| !speeches.is_empty())
-        .flat_map(|(text, speeches, refs)| {
-            let references = refs
-                .iter()
-                .flat_map(|x| {
-                    Some(Reference {
-                        gp: x["gp_code"].as_str()?.to_string(),
-                        ityp: x["ityp"].as_str()?.to_string(),
-                        inr: x["inr"].as_i64()? as u32,
-                    })
-                })
-                .collect::<Vec<_>>();
-            Some((
-                DebateInfo {
-                    about: text.to_string(),
-                    references,
-                },
-                speeches
-                    .iter()
-                    .flat_map(|speech| {
-                        let delegate_id = speech[3].as_u64()?;
-                        let ty = speech[5].as_str()?.to_string();
-                        let duration = speech[7].as_str()?.split(':').collect::<Vec<&str>>();
-                        let duration_in_seconds = duration[0].parse::<u32>().ok()? * 60
-                            + duration[1].parse::<u32>().ok()?;
-
-                        Some(PlenarSpeech {
-                            // TODO: get spoken text html urls, use content[0]
-                            speech: Speech {
-                                delegate_id,
-                                delegate_display_name: String::new(),
-                                opinion: Opinion::None,
-                                spoken_text_html_urls: vec![],
-                            },
-                            ty,
-                            duration_in_seconds,
-                        })
-                    })
-                    .collect::<Vec<_>>(),
-            ))
-        })
-        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
@@ -588,10 +229,7 @@ mod tests {
 
     use common_scrapes::{Document, Opinion, Speech, SpeechTextInfo};
 
-    use crate::{
-        plenar::extract_absences_from_document, text_utils::compare_words, AustriaScraper, Scraper,
-        TextExtractor,
-    };
+    use crate::{text_utils::compare_words, AustriaScraper, Scraper, TextExtractor};
 
     use super::Plenar;
 
@@ -635,7 +273,7 @@ mod tests {
 
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut all_speeches_count = 0;
         let mut i = 0;
         'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
@@ -700,7 +338,7 @@ mod tests {
     async fn test_look_all_plenar_speech_delegate_display_names() {
         return;
         let mut scraper = AustriaScraper::default();
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut unique_display_names = HashSet::new();
         'outer: for gp in [
             "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
@@ -742,7 +380,7 @@ mod tests {
 
         let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut all_speeches_count = 0;
         let mut i = 0;
         'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
@@ -1009,7 +647,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_all_plenar_things_but_with_speech_fit_extraction() {
         return;
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe {
+            std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        }
         let mut scraper = AustriaScraper::default();
 
         for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
@@ -1056,7 +696,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxii_nrsitz_117() {
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let scraper = AustriaScraper::default();
 
         let plenar = scraper
@@ -1067,8 +707,10 @@ mod tests {
 
         let mut lengths = vec![];
         let mut required_lengths = [
-            14849, 12113, 9962, 12434, 9509, 11478, 10657, 9885, 9146, 9220, 6056, 5109, 5084, // Row checked for exact speeches
-            4511, 7507, 5851, 7427, 5631, 2145, 1786, 1593, 3360, 4653, 693, 3012, 3531, 1238, // Row checked for exact speeches
+            14849, 12113, 9962, 12434, 9509, 11478, 10657, 9885, 9146, 9220, 6056, 5109,
+            5084, // Row checked for exact speeches
+            4511, 7507, 5851, 7427, 5631, 2145, 1786, 1593, 3360, 4653, 693, 3012, 3531,
+            1238, // Row checked for exact speeches
             4336, 2845, 2945, 2413, 5636, 5753, 7728, 5483, 171, 5930, 4689, 2682, 2906, 2063,
             4767, 3727, 2943, 3815, 4253, 2113, 2153, 2614, 1779, 2367, 2469, 2183, 8286, 3212,
             6162, 1723, 2025, 3330, 4470, 1565, 1629, 1812, 2780, 1222, 2148, 1544, 2220, 2076,
@@ -1113,7 +755,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxvii_nrsitz_117() {
-        std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+        unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let scraper = AustriaScraper::default();
 
         let plenar = scraper
@@ -1281,35 +923,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_absences_extraction_from_doc() {
-        let link = "/dokument/XXIII/NRSITZ/72/fnameorig_144783.html".to_string();
-        let doc = Document {
-            title: "nix".into(),
-            link,
-            ftype: common_scrapes::FileType::HTML,
-        };
-
-        let absences = extract_absences_from_document(&doc).await.unwrap();
-        println!("absences: {absences:?}");
-        assert_eq!(&absences, &Vec::<String>::new());
-    }
-
-    //
-    #[tokio::test]
-    async fn test_absences_extraction_from_doc2() {
-        let link = "/dokument/XXIV/NRSITZ/1/fnameorig_144815.html".to_string();
-        let doc = Document {
-            title: "nix".into(),
-            link,
-            ftype: common_scrapes::FileType::HTML,
-        };
-
-        let absences = extract_absences_from_document(&doc).await.unwrap();
-        assert_eq!(absences, vec!["Wilhelm Molterer".to_string()]);
-        println!("absences: {absences:?}");
-    }
-
-    #[tokio::test]
     async fn test_plenar_xxvii_189() {
         // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
@@ -1343,7 +956,18 @@ mod tests {
             .await
             .unwrap();
 
-        let req_lengths = [10116, 1240, 5362, 4587, 5923, 3917, 5936, 5201, 3820, 4742, 5778, 6082, 4654, 5098, 3544, 3359, 4444, 6437, 4856, 3947, 3528, 3012, 2730, 3648, 4967, 3886, 2770, 3469, 3607, 3688, 1720, 2483, 3433, 2512, 8295, 3782, 3010, 4917, 4390, 4314, 2258, 2040, 2495, 4400, 2988, 3387, 2095, 3035, 2355, 4046, 3016, 5154, 5052, 4445, 6002, 3444, 3294, 5248, 4778, 612, 4517, 2069, 3846, 1838, 4630, 2430, 6422, 21490, 36132, 9803, 7917, 7437, 6809, 7348, 10395, 1029, 8710, 5951, 5517, 7636, 5264, 6929, 6866, 4361, 6025, 5479, 6707, 3872, 4411, 5194, 3364, 2646, 4269, 2873, 10117, 3752, 3416, 5095, 4141, 4791, 3497, 5242, 5668, 9795, 3035, 2809, 2103, 3752, 783, 2620, 2822, 2610, 2572, 1139, 3243, 2186, 3026, 2342, 5423, 6178, 5338, 2150, 1882, 2739, 2484, 3642, 3760, 2227, 651, 1157, 1926, 3337, 3064, 2499, 1661, 1996, 3511, 3105];
+        let req_lengths = [
+            10116, 1240, 5362, 4587, 5923, 3917, 5936, 5201, 3820, 4742, 5778, 6082, 4654, 5098,
+            3544, 3359, 4444, 6437, 4856, 3947, 3528, 3012, 2730, 3648, 4967, 3886, 2770, 3469,
+            3607, 3688, 1720, 2483, 3433, 2512, 8295, 3782, 3010, 4917, 4390, 4314, 2258, 2040,
+            2495, 4400, 2988, 3387, 2095, 3035, 2355, 4046, 3016, 5154, 5052, 4445, 6002, 3444,
+            3294, 5248, 4778, 612, 4517, 2069, 3846, 1838, 4630, 2430, 6422, 21490, 36132, 9803,
+            7917, 7437, 6809, 7348, 10395, 1029, 8710, 5951, 5517, 7636, 5264, 6929, 6866, 4361,
+            6025, 5479, 6707, 3872, 4411, 5194, 3364, 2646, 4269, 2873, 10117, 3752, 3416, 5095,
+            4141, 4791, 3497, 5242, 5668, 9795, 3035, 2809, 2103, 3752, 783, 2620, 2822, 2610,
+            2572, 1139, 3243, 2186, 3026, 2342, 5423, 6178, 5338, 2150, 1882, 2739, 2484, 3642,
+            3760, 2227, 651, 1157, 1926, 3337, 3064, 2499, 1661, 1996, 3511, 3105,
+        ];
         let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
         let mut lengths = vec![];
         let mut i = 0;
@@ -2022,5 +1646,33 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
         Was wir brauchen, ist mehr verpflichtender Turnunterricht in der Schule! (Präsidentin Mag. Prammer gibt das Glockenzeichen.) Es hilft leider nicht, Herr Staatssekretär, dass wir uns gemeinsam anstrengen, ein bisserl etwas in Kooperation zu tun. (Präsi­dentin Mag. Prammer gibt neuerlich das Glockenzeichen.) Es muss pflichtmäßig eine tägliche Bewegungsstunde in den Schulen geben. (Beifall bei der SPÖ und den Grü­nen.)
         ";
         assert!(compare_words(truth, &speech_text) > 0.96);
+    }
+
+    // XXVII/NRSITZ/62/
+    #[tokio::test]
+    async fn test_speeches_xxvii_62() {
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/62")
+            .await
+            .unwrap();
+
+        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        for debate in &plenar.debates {
+            for speech in &debate.speeches {
+                if speech.speech.spoken_text_html_urls.is_empty() {
+                    continue;
+                }
+                dbg!(speech);
+                let speech_text = text_extractor
+                    .speech_extraction_with_fit(
+                        &speech.speech.spoken_text_html_urls[0],
+                        &speech.speech.delegate_display_name,
+                    )
+                    .await
+                    .unwrap();
+                println!("speech_text: {speech_text:?}");
+            }
+        }
     }
 }

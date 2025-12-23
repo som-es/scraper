@@ -164,12 +164,17 @@ impl LegislativeInitiatives for AustriaScraper {
             };
         }
         let mut documents = documents(raw_documents?)?;
-        if documents
+
+        let plenar_stage_documents = extract_plenar_documents(legis_content).unwrap_or_default();  
+        let new_law_text_files = plenar_stage_documents
             .iter()
-            .find(|doc| doc.title == "Gesetzestext")
-            .is_none()
-        {
-            documents.extend(extract_plenar_documents(legis_content).unwrap_or_default());
+            .filter(|doc| doc.title == "Gesetzestext")
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if !new_law_text_files.is_empty() {
+            documents.retain(|doc| !doc.title.contains("Gesetzestext"));
+            documents.extend(new_law_text_files);
         }
 
         let names = legis_content["names"]
@@ -2733,5 +2738,15 @@ mod tests {
             .other_keyword_topics
             .contains(&"Opferfürsorge und Opferschutz".to_string()));
         assert_eq!(res.other_keyword_topics.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_legis_init_xxviii_a_658() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/658")
+            .await
+            .unwrap();
+        dbg!(&res.documents);
     }
 }

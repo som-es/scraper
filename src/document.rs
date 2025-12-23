@@ -64,7 +64,7 @@ pub fn documents(raw_documents: &[Value]) -> Option<Vec<Document>> {
                 FileType::Unknown
             };
 
-            let title = title.clone();
+            let title = title.clone().trim().to_string();
             documents.push(Document { title, link, ftype })
         }
     }

@@ -1675,4 +1675,14 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_speeches_xxviii_57() {
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/57")
+            .await
+            .unwrap();
+
+    }
 }

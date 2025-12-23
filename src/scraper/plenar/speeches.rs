@@ -62,6 +62,7 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
     past_debates
         .iter()
         .flat_map(|past_debate| {
+            dbg!(past_debate);
             Some((
                 past_debate["text"].as_str()?,
                 past_debate["speeches"].as_array()?,

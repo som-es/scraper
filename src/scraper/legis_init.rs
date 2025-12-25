@@ -320,6 +320,10 @@ impl LegislativeInitiatives for AustriaScraper {
             voting = Some(Voting::Amendment);
         }
 
+        if ityp.as_str() == "III" {
+            voting = Some(Voting::Report);
+        }
+
         let mut is_voteable_on = is_law;
 
         if LEGIS_IS_VOTEABLE_ON_DOKTYPES.contains(&doktyp.as_str()) {
@@ -2754,4 +2758,70 @@ mod tests {
         assert_eq!(docs, res.documents);
         dbg!(&res.documents);
     }
+
+    // XXVIII/AA/48
+    #[tokio::test]
+    async fn test_legis_init_xxviii_aa_48() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/AA/48")
+            .await
+            .unwrap();
+        // pro GRÜNE
+        // contra alle anderen
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            vec!["GRÜNE".to_string()]
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            vec!["FPÖ".to_string(), "ÖVP".to_string(), "SPÖ".to_string(), "NEOS".to_string()]
+        );
+    
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+    }
+    // XXVIII/UEA/161
+    #[tokio::test]
+    async fn test_legis_init_xxviii_uea_161() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/UEA/161")
+            .await
+            .unwrap();
+        // pro GRÜNE
+        // contra alle anderen
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            vec!["GRÜNE".to_string()]
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            vec!["FPÖ".to_string(), "ÖVP".to_string(), "SPÖ".to_string(), "NEOS".to_string()]
+        );
+    
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+    }
+
+    // XXVIII/AA/43
+    #[tokio::test]
+    async fn test_legis_init_xxviii_aa_43() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/AA/43")
+            .await
+            .unwrap();
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            vec!["FPÖ".to_string(), "GRÜNE".to_string()]
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            vec!["ÖVP".to_string(), "SPÖ".to_string(), "NEOS".to_string()]
+        );
+    
+        assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
+    }
+
+
 }
+

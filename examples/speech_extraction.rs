@@ -4,7 +4,7 @@ use somes_scraper::{AustriaScraper, Scraper, SpeechTextInfo, TextExtractor};
 async fn main() {
     dbg!("start");
     std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
-    let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+    let mut extractor = TextExtractor::new();
     let speech_info = SpeechTextInfo {
         site_start: None,
         site_end: None,

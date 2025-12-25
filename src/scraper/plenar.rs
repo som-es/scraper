@@ -161,7 +161,7 @@ impl Plenar for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let mut documents = documents(&raw_documents).unwrap_or_default();
+        let mut documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
 
         if let Some(content_2) = raw_plenar["content"].as_array()?.get(2) {
             if let Some(raw_praesidiums) = extract_praesidium_from_progress(&content_2["progress"])
@@ -220,7 +220,10 @@ fn extract_praesidium_from_progress(raw_progress: &Value) -> Option<Vec<&Value>>
 }
 
 fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>> {
-    documents(raw_praesidium["protocol"]["data"]["links"].as_array()?)
+    documents(
+        raw_praesidium["protocol"]["data"]["links"].as_array()?,
+        AustriaScraper::BASE_URL,
+    )
 }
 
 #[cfg(test)]
@@ -271,7 +274,7 @@ mod tests {
         return;
         let mut scraper = AustriaScraper::default();
 
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut all_speeches_count = 0;
@@ -378,7 +381,7 @@ mod tests {
         return;
         let mut scraper = AustriaScraper::default();
 
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut all_speeches_count = 0;
@@ -662,7 +665,7 @@ mod tests {
                 .expect("Failed to get paths");
             for path in paths {
                 let plenar = scraper.get_plenar(&path).await.unwrap();
-                let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+                let mut extractor = TextExtractor::new();
 
                 for debate in &plenar.debates {
                     for speech in &debate.speeches {
@@ -703,7 +706,7 @@ mod tests {
             .get_plenar("/gegenstand/XXII/NRSITZ/117")
             .await
             .unwrap();
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let mut lengths = vec![];
         let mut required_lengths = [
@@ -788,7 +791,7 @@ mod tests {
         assert_eq!(next_debate_speech.speech.opinion, Opinion::Against);
         assert_eq!(next_debate_speech.duration_in_seconds, 4 * 60 + 28);
 
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let mut lengths = vec![];
         let mut required_lenghts = [
@@ -869,7 +872,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_speech_and_legis_init_speech_mapping() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -889,7 +892,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_plenar_speeches() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXIV".to_string()];
@@ -924,7 +927,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_xxvii_189() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -936,7 +939,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_xxvii_243() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -948,7 +951,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_xxiv_55() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -968,7 +971,7 @@ mod tests {
             2572, 1139, 3243, 2186, 3026, 2342, 5423, 6178, 5338, 2150, 1882, 2739, 2484, 3642,
             3760, 2227, 651, 1157, 1926, 3337, 3064, 2499, 1661, 1996, 3511, 3105,
         ];
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let mut lengths = vec![];
         let mut i = 0;
         for debate in &plenar.debates {
@@ -1014,7 +1017,7 @@ mod tests {
             }],
         };
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
 
         let speech_text = text_extractor
             .speech_extraction_with_fit(
@@ -1028,7 +1031,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_xxv_55() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -1036,7 +1039,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 dbg!(speech);
@@ -1055,7 +1058,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_xxviii_35() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -1063,7 +1066,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 dbg!(speech);
@@ -1082,7 +1085,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_xxvi_43() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -1090,7 +1093,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 dbg!(speech);
@@ -1117,9 +1120,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_plenar_speech_diesner_martina() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let speech = Speech {
             delegate_id: 16218,
             delegate_display_name: "Martina Diesner-Wais (V)".into(),
@@ -1152,9 +1155,9 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
     }
     #[tokio::test]
     async fn test_plenar_speech_paul_stich() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let speech = Speech {
             delegate_id: 30707,
             delegate_display_name: "Paul Stich (S)".into(),
@@ -1189,7 +1192,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
 
     #[tokio::test]
     async fn test_plenar_xxviii_3() {
-        // let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        // let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -1197,7 +1200,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 if speech.speech.spoken_text_html_urls.is_empty() {
@@ -1230,7 +1233,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1500,7 +1503,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1562,7 +1565,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1615,7 +1618,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1657,7 +1660,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 if speech.speech.spoken_text_html_urls.is_empty() {
@@ -1683,6 +1686,5 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .get_plenar("/gegenstand/XXVIII/NRSITZ/57")
             .await
             .unwrap();
-
     }
 }

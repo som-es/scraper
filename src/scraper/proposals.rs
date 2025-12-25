@@ -143,7 +143,7 @@ impl ProposalScraper for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let documents = match documents(&raw_documents) {
+        let documents = match documents(&raw_documents, AustriaScraper::BASE_URL) {
             Some(d) => d,
             None => {
                 // "Dieses Dokument ist nicht öffentlich zugänglich"
@@ -308,7 +308,8 @@ mod tests {
             proposal.documents[0],
             Document {
                 title: "Anfrage (gescanntes Original)".to_string(),
-                link: "/dokument/XXVII/J/14120/imfname_1518329.pdf".to_string(),
+                link: "https://www.parlament.gv.at/dokument/XXVII/J/14120/imfname_1518329.pdf"
+                    .to_string(),
                 ftype: FileType::OriginalPDF
             }
         );
@@ -317,7 +318,8 @@ mod tests {
             proposal.documents[1],
             Document {
                 title: "Anfrage (elektr. übermittelte Version)".to_string(),
-                link: "/dokument/XXVII/J/14120/fname_1518478.pdf".to_string(),
+                link: "https://www.parlament.gv.at/dokument/XXVII/J/14120/fname_1518478.pdf"
+                    .to_string(),
                 ftype: FileType::DigitalPDF
             }
         );
@@ -326,7 +328,8 @@ mod tests {
             proposal.documents[2],
             Document {
                 title: "Anfrage (elektr. übermittelte Version)".to_string(),
-                link: "/dokument/XXVII/J/14120/fnameorig_1518478.html".to_string(),
+                link: "https://www.parlament.gv.at/dokument/XXVII/J/14120/fnameorig_1518478.html"
+                    .to_string(),
                 ftype: FileType::HTML
             }
         );

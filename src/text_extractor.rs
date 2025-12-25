@@ -89,7 +89,6 @@ pub struct TextExtractor {
     pub cached_html: Arc<RwLock<Option<Html>>>,
     state: State,
     pub client: reqwest::Client,
-    pub base_url: String,
     pub president_regex: Regex,
     pub president_last_regex: Regex,
     pub president_no_one_left: Regex,
@@ -103,7 +102,7 @@ unsafe impl Send for TextExtractor {}
 pub const UNREALISTIC_SPEECH_LENGTH: usize = 50000;
 
 impl TextExtractor {
-    pub fn new(base_url: &str) -> Self {
+    pub fn new() -> Self {
         let president_regex = Regex::new(r"\nPräsident(?:[^!,])*?:.*[Nn]ächste.*").unwrap();
         let president_last_regex = Regex::new(r"\nPräsident(?:[^!,])*?:.*[lL]etzte.*").unwrap();
         let president_no_one_left =
@@ -116,7 +115,6 @@ impl TextExtractor {
             cached_html: Default::default(),
             state: State::NoCache,
             client: reqwest::Client::new(),
-            base_url: base_url.to_string(),
             president_regex,
             president_last_regex,
             president_no_one_left,
@@ -391,7 +389,7 @@ impl TextExtractor {
         search_strategy_fn: Option<fn(&Html, &str) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
-        let url = format!("{}{}", self.base_url, speech.html_url());
+        let url = speech.html_url();
 
         let key = if url.contains('#') {
             speech.html_url().split('#').next()
@@ -495,11 +493,11 @@ mod tests {
     // https://www.parlament.gv.at/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028
     #[tokio::test]
     async fn text_another_speech_extraction() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let res = extractor
             .extract_text_from_url(
-                &"/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028",
+                &"https://www.parlament.gv.at/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028",
                 None,
                 true,
             )
@@ -512,7 +510,7 @@ mod tests {
     async fn text_another_speech_extraction_with_actual_pages() {
         let scraper = AustriaScraper::default();
         // /gegenstand/XXIII/I/682
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
         let legis_init = scraper
             .get_legis_init("/gegenstand/XXIII/I/682")
             .await
@@ -539,7 +537,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
         for speech in init.speeches {
             println!("!!!!!!!! speech url {}", speech.html_url());
             let text = extractor.extract_text_from_url(&speech, None, true).await;
@@ -549,11 +547,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_missing_text_not_anymore_since_optimal_check() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let res = extractor
             .extract_text_from_url(
-                &"/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145",
+                &"https://www.parlament.gv.at/dokument/XXV/NRSITZ/186/fnameorig_673189.html#RU_173145",
                 None,
                 true,
             )
@@ -564,9 +562,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
-        let url = "/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
+        let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
         let res = extractor
             .extract_text_from_url(&url, None, true)
             .await
@@ -576,9 +574,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name_failing_not_anymore() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
-        let url = "/dokument/XXVII/NRSITZ/139/fnameorig_1463126.html#TEXTOBJ_260400";
+        let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/139/fnameorig_1463126.html#TEXTOBJ_260400";
         let res = extractor
             .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await
@@ -588,9 +586,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name_failing() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
-        let url = "/dokument/XXVII/NRSITZ/213/fnameorig_1632713.html#TEXTOBJ_296821";
+        let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/213/fnameorig_1632713.html#TEXTOBJ_296821";
         // let res = extractor.extract_text_from_url(&url, None, true).await.unwrap();
         let res = extractor
             .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
@@ -601,7 +599,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_wrong_text() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -625,11 +623,11 @@ mod tests {
     #[tokio::test]
     async fn test_text_extractor_fail_not_anymore() {
         // /dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let res = extractor
             .extract_text_from_url(
-                &"/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
+                &"https://www.parlament.gv.at/dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870",
                 None,
                 true,
             )
@@ -640,10 +638,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_no_steno_info() {
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let res = extractor
-            .extract_text_from_url(&"/dokument/XXV/NRSITZ/55/fnameorig_397751.html", None, true)
+            .extract_text_from_url(
+                &"https://www.parlament.gv.at/dokument/XXV/NRSITZ/55/fnameorig_397751.html",
+                None,
+                true,
+            )
             .await
             .unwrap();
 
@@ -657,11 +659,11 @@ mod tests {
     #[tokio::test]
     async fn test_text_extractor_fail_older() {
         // /dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let res = extractor
             .extract_text_from_url(
-                &"/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html",
+                &"https://www.parlament.gv.at/dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html",
                 Some(find_optimal_votes_by_name),
                 // None
                 true,
@@ -679,7 +681,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let mut prev_html = None;
         let mut once = false;
@@ -756,11 +758,11 @@ mod tests {
     #[tokio::test]
     async fn test_text_acc() {
         // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/185/SEITE_0171.html
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
 
         let text = text_extractor
             .text_accumulation(
-                "/dokument/XXIV/NRSITZ/185/",
+                "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/185/",
                 171..=173,
                 |_, _| false,
                 true,
@@ -780,7 +782,7 @@ mod tests {
 
         let name = "Norbert Totschnig, MSc (ÖVP)";
 
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut text_extractor = TextExtractor::new();
         let fitted_speech = text_extractor.fit_speech(speech.to_string(), name);
         let truth_fitted_speech = "Norbert Totschnig, MSc: Vielen Dank, sehr geehrter Herr Präsident! Geschätzte Damen und Herren Nationalrätinnen und Nationalräte! Hohes Haus! Ich möchte mein Statement erstens in die UG 42: Landwirtschaft, Forstwirtschaft und Wasserwirtschaft, und zweitens in die UG 43: Umwelt, Klimawandelanpassung und Kreislaufwirtschaft, unterteilen.\n        Zur Landwirtschaft: Mit dem Budget für die Land- und Forstwirtschaft, Wasserwirtschaft und Regionen setzen wir ein klares Zeichen für unsere bäuerlichen Familienbetriebe, für intakte Regionen, für eine nachhaltige Ressourcennutzung. Das ist ein klares Statement für eine ökosoziale Verantwortung, die wir seit vielen Jahren in diesem Land leben. Es stehen rund 3 Milliarden Euro zur Verfügung, genau sind es 2,84 Milliarden Euro für 2025 und 2,88 Milliarden Euro für 2026. Damit sichern wir die Versorgung im Land, damit sichern wir die Lebensqualität im ländlichen Raum.\n        Herr Kollege Schmiedlechner, ich weiß nicht, über welches Budget du geredet hast, es waren jedenfalls nicht das Budget 2025 und das Budget 2026. (Abg. Reiter [ÖVP]: Wahrscheinlich hat er es nicht gelesen!) Natürlich sparen wir auch im Bereich der Landwirtschaft ein. Wir sparen in der Verwaltung ein. Das führt dazu, dass wir in Zukunft auch mehr an Effizienz brauchen. Wir müssen KI einsetzen, es werden da und dort auch keine Posten nachbesetzt. Da sparen wir insgesamt 16 Millionen Euro ein. Wenn wir alles zusammenrechnen, inklusive der Mittel für die Förderungen, technische Anpassungen im Bereich der Gemeinsamen Agrarpolitik, in der Landwirtschaft, Forstwirtschaft und beim Wald – vorhin schon angesprochen –, dann reden wir von 125 Millionen Euro in beiden Jahren, bei einem Budget von insgesamt fast 6 Milliarden Euro. Also wir sparen, aber es ist noch genügend Geld da, vor allem in den Bereichen, in denen wir Wert darauf legen, dass die Finanzierung auch weiterhin gesichert ist. (Beifall bei der ÖVP.)";
 

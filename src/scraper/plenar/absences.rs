@@ -22,7 +22,7 @@ pub(super) async fn extract_absences(documents: &[Document]) -> Option<Vec<Strin
 }
 
 async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
-    let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+    let mut extractor = TextExtractor::new();
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;

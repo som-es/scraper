@@ -131,7 +131,7 @@ impl Default for AustriaScraper {
     fn default() -> Self {
         Self {
             client: Default::default(),
-            text_extractor: TextExtractor::new(AustriaScraper::BASE_URL),
+            text_extractor: TextExtractor::new(),
             scrape_info: Default::default(),
             proposal_payload: Default::default(),
         }

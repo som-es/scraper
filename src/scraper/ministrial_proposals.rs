@@ -169,7 +169,7 @@ impl MinistrialProposalScraper for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let documents = match documents(&raw_documents) {
+        let documents = match documents(&raw_documents, AustriaScraper::BASE_URL) {
             Some(d) => d,
             None => {
                 // "Dieses Dokument ist nicht öffentlich zugänglich"

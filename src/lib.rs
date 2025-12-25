@@ -196,7 +196,7 @@ pub fn convert_party_code_list_to_vec_open_ended(party_list_open_ended: &str) ->
             if char == ' ' || char == ',' {
                 continue;
             }
-            if char.is_ascii_uppercase() {
+            if char.is_uppercase() {
                 party_code.push(char);
             } else {
                 contra.push(party_code);
@@ -209,8 +209,8 @@ pub fn convert_party_code_list_to_vec_open_ended(party_list_open_ended: &str) ->
 }
 
 pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Option<ProContra> {
-    let pro_start = pro_contra_str.find("Dafür")?;
-    let contra_start = pro_contra_str.find("Dagegen")?;
+    let pro_start = pro_contra_str.to_lowercase().find("dafür")?;
+    let contra_start = pro_contra_str.to_lowercase().find("dagegen")?;
 
     let pro = &pro_contra_str[pro_start + 7..contra_start - 2];
     let pro = convert_party_code_list_to_vec(pro);

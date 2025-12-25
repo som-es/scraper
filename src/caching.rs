@@ -67,6 +67,14 @@ pub async fn get_disk_cache(entry: &str, redo_secs: u64) -> Option<String> {
 }
 
 pub async fn disk_caching(entry: &str, data: impl AsRef<[u8]>) -> std::io::Result<()> {
+    let entry = if entry.starts_with("http") {
+        entry
+            .find("://")
+            .and_then(|idx| Some(&entry[idx + 2..])) // +2, skip :/, keep starting with /
+            .unwrap_or(entry)
+    } else {
+        entry
+    };
     let cache_path = format!("{}{entry}.json", cache_dir());
     let cache_path = PathBuf::from(cache_path);
     tokio::fs::create_dir_all(&cache_path.parent().unwrap()).await?;

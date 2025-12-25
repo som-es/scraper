@@ -1,7 +1,7 @@
 use common_scrapes::{Opinion, Speech, SpeechTextInfo};
 use serde_json::Value;
 
-use crate::extract_text_from_html;
+use crate::{extract_text_from_html, AustriaScraper, Scraper};
 
 fn extract_spoken_text_html_urls(rede: &Value) -> Vec<SpeechTextInfo> {
     rede.get(2)
@@ -14,7 +14,10 @@ fn extract_spoken_text_html_urls(rede: &Value) -> Vec<SpeechTextInfo> {
                     Some(SpeechTextInfo {
                         site_start: info["fund_von"].as_u64(),
                         site_end: info["fund_bis"].as_u64(),
-                        document_url: info["url"].as_str()?.to_string(),
+                        document_url: crate::document::add_base_url_to_url(
+                            info["url"].as_str()?,
+                            AustriaScraper::BASE_URL,
+                        ),
                     })
                 })
                 .collect::<Vec<_>>()
@@ -119,11 +122,11 @@ mod tests {
     async fn test_speech_missing_text1() {
         // fixed
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
         let speech_info = SpeechTextInfo {
             site_start: Some(36),
             site_end: Some(38),
-            document_url: "/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html".into(),
+            document_url: "https://www.parlament.gv.at/dokument/XXV/NRSITZ/94/fnameorig_525316.html#Seite_0036.html".into(),
         };
         let text = extractor
             .speech_extraction_with_fit(&speech_info, "Mag. Elisabeth Grossmann (S)")
@@ -139,11 +142,11 @@ mod tests {
     #[tokio::test]
     async fn test_speech_missing_text2() {
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
         let speech_info = SpeechTextInfo {
             site_start: Some(270),
             site_end: None,
-            document_url: "/dokument/XXVII/NRSITZ/89/fnameorig_981234.html#Seite_0270.html".into(),
+            document_url: "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/89/fnameorig_981234.html#Seite_0270.html".into(),
         };
         let text = extractor
             .speech_extraction_with_fit(&speech_info, "Erwin Angerer (F)")
@@ -157,12 +160,12 @@ mod tests {
     #[tokio::test]
     async fn test_speech_missing_text3() {
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let speech_info = SpeechTextInfo {
             site_start: Some(16),
             site_end: Some(18),
-            document_url: "/dokument/XXV/NRSITZ/125/fnameorig_562456.html#Seite_0016.html".into(),
+            document_url: "https://www.parlament.gv.at/dokument/XXV/NRSITZ/125/fnameorig_562456.html#Seite_0016.html".into(),
         };
 
         let text = extractor
@@ -179,12 +182,14 @@ mod tests {
     #[tokio::test]
     async fn test_speech_missing_text4() {
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let speech_info = SpeechTextInfo {
             site_start: None,
             site_end: None,
-            document_url: "/dokument/XXVII/NRSITZ/268/A_-_12_54_45_00326501.html".into(),
+            document_url:
+                "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/268/A_-_12_54_45_00326501.html"
+                    .into(),
         };
 
         let text = extractor
@@ -202,12 +207,14 @@ mod tests {
     #[tokio::test]
     async fn test_speech_missing_text5() {
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
-        let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let mut extractor = TextExtractor::new();
 
         let speech_info = SpeechTextInfo {
             site_start: None,
             site_end: None,
-            document_url: "/dokument/XXVII/NRSITZ/268/A_-_10_14_45_00326331.html".into(),
+            document_url:
+                "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/268/A_-_10_14_45_00326331.html"
+                    .into(),
         };
 
         let text = extractor

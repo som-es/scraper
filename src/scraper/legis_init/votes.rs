@@ -3,7 +3,7 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::{
-    extract_pro_contra_party_codes_from_string, find_optimal_votes_by_name,
+    add_base_url_to_url, extract_pro_contra_party_codes_from_string, find_optimal_votes_by_name,
     legis_init::group_names_from_vote_section, yes_no_votes_inside_regex, yes_no_votes_regex,
     AustriaScraper, Scraper, TextExtractor,
 };
@@ -173,18 +173,9 @@ pub async fn extract_most_fitting_votes(
                     continue;
                 };
 
-                // let start_site = protocol_link_obj["fund_von"].as_u64();
-                // let end_site = protocol_link_obj["fund_bis"].as_u64();
-                // match (start_site, end_site) {
-                //     (Some(start_site), Some(end_site)) => {
-                //         // ahhh
-                //     }
-                //     (None, None) => {
-                //         // fine
-                //     }
-                //     _ => panic!("should not be possible hopefully"),
-                // }
-                let mut extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+                let url = add_base_url_to_url(url, AustriaScraper::BASE_URL);
+
+                let mut extractor = TextExtractor::new();
                 // dbg!(protocol_link_obj);
 
                 let html_text = if is_site_stored_regex.is_match(&url.to_ascii_uppercase()) {

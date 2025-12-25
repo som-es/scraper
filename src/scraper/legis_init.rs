@@ -1,5 +1,3 @@
-mod come_into_effect;
-pub use come_into_effect::*;
 mod extracting;
 pub use extracting::*;
 mod votes;
@@ -163,9 +161,9 @@ impl LegislativeInitiatives for AustriaScraper {
                 None
             };
         }
-        let mut documents = documents(raw_documents?)?;
+        let mut documents = documents(raw_documents?, AustriaScraper::BASE_URL)?;
 
-        let plenar_stage_documents = extract_plenar_documents(legis_content).unwrap_or_default();  
+        let plenar_stage_documents = extract_plenar_documents(legis_content).unwrap_or_default();
         let new_law_text_files = plenar_stage_documents
             .iter()
             .filter(|doc| doc.title == "Gesetzestext")
@@ -173,6 +171,7 @@ impl LegislativeInitiatives for AustriaScraper {
             .collect::<Vec<_>>();
 
         if !new_law_text_files.is_empty() {
+            // https://github.com/som-es/somes/issues/118
             documents.retain(|doc| !doc.title.contains("Gesetzestext"));
             documents.extend(new_law_text_files);
         }
@@ -327,26 +326,6 @@ impl LegislativeInitiatives for AustriaScraper {
             is_voteable_on = true;
         }
 
-        let mut come_into_effect_info = None;
-        if vote_infavor == Some(true) {
-            // search text for "in Kraft getreten" oder so
-            let law_file = documents
-                .iter()
-                .find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
-            if let Some(law_file) = law_file {
-                let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
-                let text = text_extractor
-                    .extract_text_from_url(law_file, None, true)
-                    .await;
-                if let Some(text) = text {
-                    come_into_effect_info = come_into_effect::extract_come_into_effect(&text);
-                }
-
-                // let url = format!("{}{}", AustriaScraper::BASE_URL, law_file.link);
-                // println!("{id}: doktyp: {doktyp} law_file: yes!: {url:?}");
-            }
-        }
-
         Some(LegislativeInitiative {
             title,
             description,
@@ -358,7 +337,13 @@ impl LegislativeInitiatives for AustriaScraper {
             ityp,
             id,
             votes,
-            documents,
+            documents: documents
+                .into_iter()
+                .map(|mut doc| {
+                    doc.link = crate::document::add_base_url_to_url(&doc.link, Self::BASE_URL);
+                    doc
+                })
+                .collect(),
             related_delegates,
             accepted,
             date,
@@ -376,7 +361,6 @@ impl LegislativeInitiatives for AustriaScraper {
             status,
             is_law,
             law_accepted: vote_infavor,
-            come_into_effect_info,
             is_voteable_on,
             is_urgent,
             voting,
@@ -442,43 +426,6 @@ mod tests {
     }
 
     #[tokio::test]
-    pub async fn test_xxvii_a_4098() {
-        let scraper = AustriaScraper::default();
-
-        let init = scraper
-            .get_legis_init("/gegenstand/XXVII/A/4098")
-            .await
-            .unwrap();
-
-        let cie = init.come_into_effect_info.unwrap();
-        assert_eq!(cie.by_publication, false);
-        assert_eq!(
-            cie.law_come_into_effect_date,
-            Some(NaiveDate::from_ymd_opt(2024, 7, 1).unwrap())
-        );
-        assert_eq!(cie.law_expires_on_date, None);
-    }
-
-    #[tokio::test]
-    pub async fn test_xxvii_a_3762() {
-        let scraper = AustriaScraper::default();
-
-        let init = scraper
-            .get_legis_init("/gegenstand/XXVII/A/3762")
-            .await
-            .unwrap();
-
-        assert!(init.is_law);
-        let cie = init.come_into_effect_info.unwrap();
-        assert_eq!(cie.by_publication, true);
-        assert_eq!(cie.law_come_into_effect_date, None);
-        assert_eq!(
-            cie.law_expires_on_date,
-            Some(NaiveDate::from_ymd_opt(2027, 12, 31).unwrap())
-        );
-    }
-
-    #[tokio::test]
     pub async fn test_xxvii_a_2173() {
         let scraper = AustriaScraper::default();
 
@@ -495,21 +442,6 @@ mod tests {
         //     cie.law_expires_on_date,
         //     Some(NaiveDate::from_ymd_opt(2027, 12, 31).unwrap())
         // );
-    }
-
-    // /gegenstand/XXVIII/I/22
-    #[tokio::test]
-    pub async fn test_xxviii_i_22() {
-        let scraper = AustriaScraper::default();
-
-        let init = scraper
-            .get_legis_init("/gegenstand/XXVIII/I/22")
-            .await
-            .unwrap();
-
-        assert!(init.is_law);
-        let cie = init.come_into_effect_info.unwrap();
-        assert_eq!(cie.by_publication, true);
     }
 
     #[test]
@@ -617,10 +549,13 @@ mod tests {
         assert_eq!(legis_init.accepted.unwrap(), AcceptedState::PreDeclined);
         assert!(!legis_init.speeches.is_empty());
         let party_codes = legis_init.hidden_votes_info.pro_contra_parties.unwrap();
-        assert_eq!(party_codes.pro, vec!["V".to_string(), "G".to_string()]);
+        assert_eq!(
+            party_codes.pro,
+            vec!["ÖVP".to_string(), "GRÜNE".to_string()]
+        );
         assert_eq!(
             party_codes.contra,
-            vec!["S".to_string(), "F".to_string(), "N".to_string()]
+            vec!["SPÖ".to_string(), "FPÖ".to_string(), "NEOS".to_string()]
         );
         assert_eq!(
             legis_init.hidden_votes_info.vote_stage.unwrap().stage,
@@ -1811,7 +1746,7 @@ mod tests {
             .await
             .unwrap();
         let pro_contras = res.hidden_votes_info.pro_contra_parties.unwrap();
-        assert_eq!(pro_contras.pro, ["S", "F"]);
+        assert_eq!(pro_contras.pro, ["SPÖ", "FPÖ"]);
     }
 
     #[tokio::test]
@@ -1947,12 +1882,12 @@ mod tests {
             res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
             &ProContra {
                 pro: vec![
-                    "V".to_string(),
-                    "S".to_string(),
-                    "G".to_string(),
-                    "N".to_string()
+                    "ÖVP".to_string(),
+                    "SPÖ".to_string(),
+                    "GRÜNE".to_string(),
+                    "NEOS".to_string()
                 ],
-                contra: vec!["F".into()]
+                contra: vec!["FPÖ".into()]
             }
         );
         println!("res: {res:?}");
@@ -1978,8 +1913,8 @@ mod tests {
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
             &ProContra {
-                contra: vec!["V".to_string(), "S".to_string(), "G".to_string()],
-                pro: vec!["F".into(), "N".into()]
+                contra: vec!["ÖVP".to_string(), "SPÖ".to_string(), "GRÜNE".to_string()],
+                pro: vec!["FPÖ".into(), "NEOS".into()]
             }
         );
         println!("res: {res:?}");
@@ -2092,18 +2027,18 @@ mod tests {
             res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
             &ProContra {
                 contra: vec![
-                    "V".to_string(),
-                    "S".to_string(),
-                    "G".to_string(),
-                    "N".into()
+                    "ÖVP".to_string(),
+                    "SPÖ".to_string(),
+                    "GRÜNE".to_string(),
+                    "NEOS".into()
                 ],
-                pro: vec!["F".into()]
+                pro: vec!["FPÖ".into()]
             }
         );
     }
 
     #[tokio::test]
-    async fn test_xxvii_a_571() {
+    async fn test_xxvi_a_571() {
         let scraper = AustriaScraper::default();
 
         let res = scraper
@@ -2123,8 +2058,8 @@ mod tests {
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
             &ProContra {
-                pro: vec!["S".to_string(), "N".to_string(), "J".to_string()],
-                contra: vec!["V".into(), "F".into()]
+                pro: vec!["SPÖ".to_string(), "NEOS".to_string(), "JETZT".to_string()],
+                contra: vec!["ÖVP".into(), "FPÖ".into()]
             }
         );
     }
@@ -2385,7 +2320,7 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
-            vec!["S".to_string()]
+            vec!["SPÖ".to_string()]
         );
 
         assert_eq!(res.voting.unwrap(), Voting::Resolution)
@@ -2405,7 +2340,7 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
-            vec!["V".into(), "S".to_string(), "N".into()]
+            vec!["ÖVP".into(), "SPÖ".to_string(), "NEOS".into()]
         );
     }
 
@@ -2424,11 +2359,11 @@ mod tests {
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
             vec![
-                "F".into(),
-                "V".into(),
-                "S".to_string(),
-                "N".into(),
-                "G".into()
+                "FPÖ".into(),
+                "ÖVP".into(),
+                "SPÖ".to_string(),
+                "NEOS".into(),
+                "GRÜNE".into()
             ]
         );
     }
@@ -2446,7 +2381,7 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
-            vec!["F".into(), "V".into(), "S".to_string(), "N".into(),]
+            vec!["FPÖ".into(), "ÖVP".into(), "SPÖ".to_string(), "NEOS".into(),]
         );
     }
     // XXVII/A/769
@@ -2463,7 +2398,7 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().pro,
-            vec!["S".to_string()]
+            vec!["SPÖ".to_string()]
         );
     }
 
@@ -2483,15 +2418,15 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .pro,
-            vec!["S".to_string()]
+            vec!["SPÖ".to_string()]
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
             vec![
-                "V".to_string(),
-                "F".to_string(),
-                "G".to_string(),
-                "N".to_string()
+                "ÖVP".to_string(),
+                "FPÖ".to_string(),
+                "GRÜNE".to_string(),
+                "NEOS".to_string()
             ]
         );
     }
@@ -2519,6 +2454,16 @@ mod tests {
         println!("res: {res:?}");
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
         assert!(res.is_urgent);
+        // SPÖ, GRÜNE, NEOS
+        let pro = ["SPÖ", "GRÜNE", "NEOS"];
+        assert_eq!(
+            res.hidden_votes_info
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .pro,
+            pro.iter().map(|s| s.to_string()).collect::<Vec<String>>()
+        );
     }
 
     //XXVII/A/769
@@ -2538,7 +2483,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .pro,
-            vec!["S".to_string()]
+            vec!["SPÖ".to_string()]
         );
     }
     #[tokio::test]
@@ -2566,8 +2511,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_named_vote_xxviii_a_372_by_document_link() {
-        let url = "/dokument/XXVIII/NRSITZ/41/A_-_17_40_32_00837360.html#121.11";
-        let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+        let url = "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/41/A_-_17_40_32_00837360.html#121.11";
+        let mut text_extractor = TextExtractor::new();
         let text = text_extractor
             .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await
@@ -2593,6 +2538,15 @@ mod tests {
             .await
             .unwrap();
         println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        let pro = res
+            .hidden_votes_info
+            .pro_contra_parties
+            .as_ref()
+            .unwrap()
+            .pro
+            .clone();
+        assert_eq!(pro, vec!["FPÖ", "ÖVP", "SPÖ", "NEOS", "GRÜNE"]);
     }
 
     #[tokio::test]
@@ -2686,40 +2640,48 @@ mod tests {
             .await
             .unwrap();
 
-        let docs = res.documents;
+        let mut docs = res.documents;
+        docs.sort_by(|a, b| a.title.cmp(&b.title));
 
-        let should_docs = [
+        let mut should_docs = vec![
             Document {
                 title: "Gesetzestext".into(),
-                link: "/dokument/XXVIII/I/296/fname_1722531.pdf".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/BNR/114/fname_1729614.pdf"
+                    .into(),
                 ftype: FileType::DigitalPDF,
             },
             Document {
                 title: "Gesetzestext".into(),
-                link: "/dokument/XXVIII/I/296/fnameorig_1722531.html".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/BNR/114/fnameorig_1729614.html"
+                    .into(),
                 ftype: FileType::HTML,
             },
             Document {
                 title: "Datenschutz-Folgenabschätzung".into(),
-                link: "/dokument/XXVIII/I/296/imfname_1722533.pdf".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/I/296/imfname_1722533.pdf"
+                    .into(),
                 ftype: FileType::DigitalPDF,
             },
             Document {
                 title: "Erläuterungen".into(),
-                link: "/dokument/XXVIII/I/296/imfname_1722534.pdf".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/I/296/imfname_1722534.pdf"
+                    .into(),
                 ftype: FileType::DigitalPDF,
             },
             Document {
                 title: "Vorblatt und WFA".into(),
-                link: "/dokument/XXVIII/I/296/imfname_1722536.pdf".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/I/296/imfname_1722536.pdf"
+                    .into(),
                 ftype: FileType::DigitalPDF,
             },
             Document {
                 title: "Textgegenüberstellung".into(),
-                link: "/dokument/XXVIII/I/296/imfname_1722535.pdf".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/I/296/imfname_1722535.pdf"
+                    .into(),
                 ftype: FileType::DigitalPDF,
             },
         ];
+        should_docs.sort_by(|a, b| a.title.cmp(&b.title));
         assert_eq!(should_docs.as_slice(), docs.as_slice());
     }
 
@@ -2747,6 +2709,49 @@ mod tests {
             .get_legis_init("/gegenstand/XXVIII/A/658")
             .await
             .unwrap();
+        let docs = vec![
+            Document {
+                title: "Selbständiger Antrag (gescanntes Original)".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/A/658/imfname_1729592.pdf"
+                    .into(),
+                ftype: FileType::OriginalPDF,
+            },
+            Document {
+                title: "Initiativantrag (elektr. übermittelte Version)".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/A/658/fname_1729625.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Initiativantrag (elektr. übermittelte Version)".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/A/658/fnameorig_1729625.html"
+                    .into(),
+                ftype: FileType::HTML,
+            },
+            Document {
+                title: "Textgegenüberstellung (Arbeitsdokument ParlDion)".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/A/658/fname_1729684.pdf".into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Textgegenüberstellung (Arbeitsdokument ParlDion)".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/A/658/fnameorig_1729684.html"
+                    .into(),
+                ftype: FileType::HTML,
+            },
+            Document {
+                title: "Gesetzestext".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/BNR/127/fname_1730566.pdf"
+                    .into(),
+                ftype: FileType::DigitalPDF,
+            },
+            Document {
+                title: "Gesetzestext".into(),
+                link: "https://www.parlament.gv.at/dokument/XXVIII/BNR/127/fnameorig_1730566.html"
+                    .into(),
+                ftype: FileType::HTML,
+            },
+        ];
+        assert_eq!(docs, res.documents);
         dbg!(&res.documents);
     }
 }

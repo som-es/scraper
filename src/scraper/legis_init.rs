@@ -566,6 +566,9 @@ mod tests {
             legis_init.hidden_votes_info.vote_stage.unwrap().stage,
             Stage::Second
         );
+
+        let voted_at_date = legis_init.hidden_votes_info.voted_at_date.unwrap();
+        assert_eq!(voted_at_date, NaiveDate::from_ymd_opt(2024, 7, 3).unwrap());
     }
 
     #[tokio::test]
@@ -771,11 +774,15 @@ mod tests {
         println!("init: {init:?}");
 
         assert_eq!(init.nr_plenary_activity_date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
+        assert_eq!(init.vote_date, Some(NaiveDate::from_ymd_opt(2023, 6, 1).unwrap()));
+        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
 
         assert_eq!(
             init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
+
+        
     }
     #[tokio::test]
     async fn test_get_legis_init_xxi_a_412() {
@@ -1675,7 +1682,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_xxvii_erroring_legis_init_i_405() {
+    async fn test_xxvii_erroring_legis_init_xxvii_i_405() {
         //https://www.parlament.gv.at/gegenstand/XXVII/I/405
         let scraper = AustriaScraper::default();
 
@@ -1683,6 +1690,12 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/I/405")
             .await
             .unwrap();
+
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(res.hidden_votes_info.voted_at_date.unwrap(), NaiveDate::from_ymd_opt(2020, 12, 10).unwrap());
+        // einstimmig
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["ÖVP", "SPÖ", "FPÖ", "GRÜNE", "NEOS"]);
+
     }
 
     #[tokio::test]
@@ -1694,7 +1707,8 @@ mod tests {
             .get_legis_init("/gegenstand/XXVI/A/110")
             .await
             .unwrap();
-        res.hidden_votes_info.pro_contra_parties.unwrap();
+        assert_eq!(res.vote_date, NaiveDate::from_ymd_opt(2018, 9, 26));
+        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().contra, vec!["ÖVP", "FPÖ", "NEOS"]);
     }
 
     // test may get invalid -> legis init got voted on potentially

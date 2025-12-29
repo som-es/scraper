@@ -112,10 +112,10 @@ pub const LEGIS_IGNORE_ITYPS: [&str; 1] = ["EUBTG"];
 pub const LEGIS_LAW_DETERMINATORS: [&str; 7] = ["RV", "A", "BRA", "BUA", "EBR", "GABR", "GABR13"];
 pub const LEGIS_RESOLUTION_DETERMINATORS: [&str; 2] = ["A(E)", "UEA"];
 
-pub const LEGIS_IS_VOTEABLE_ON_DOKTYPES: [&str; 23] = [
+pub const LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES: [&str; 22] = [
     "US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2",
-    "RVVB", "USVL", "BUA", "UEAM", "RVS", "AUB", "BRH", "BRG", "PET", "BI",
-];
+    "RVVB", "USVL", "BUA", "UEAM", "RVS", "BRH", "BRG", "PET", "BI",
+]; // MIND: there seems to be SOME, or at least a single AUB that has an actual plenary vote result XXIV/I/2455
 
 // #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
@@ -200,9 +200,9 @@ impl LegislativeInitiatives for AustriaScraper {
             .any(|x| x.contains("Dringliche"));
 
         let mut speeches: Vec<Speech> = extract_speeches(legis_content, true).unwrap_or_default();
-        let date = extract_date(legis_content)?;
+        let date = extract_nr_plenary_date(legis_content)?;
 
-        let date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
+        let nr_plenary_activity_date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
         let vote_infavor = legis_content["vote"]["infavor"].as_bool();
 
@@ -326,7 +326,7 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let mut is_voteable_on = is_law;
 
-        if LEGIS_IS_VOTEABLE_ON_DOKTYPES.contains(&doktyp.as_str()) {
+        if LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.contains(&doktyp.as_str()) {
             is_voteable_on = true;
         }
 
@@ -350,7 +350,8 @@ impl LegislativeInitiatives for AustriaScraper {
                 .collect(),
             related_delegates,
             accepted,
-            date,
+            nr_plenary_activity_date,
+            vote_date: hidden_votes.voted_at_date,
             speeches,
             topics,
             eurovoc_topics,
@@ -415,7 +416,7 @@ mod tests {
         extract_text_from_html, find_optimal_votes_by_name,
         legis_init::{
             votes::{extract_vote_count, extract_votes_by_name},
-            LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES,
+            LegislativeInitiatives, LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES,
         },
         AustriaScraper, Scraper, TextExtractor,
     };
@@ -769,7 +770,7 @@ mod tests {
             .unwrap();
         println!("init: {init:?}");
 
-        assert_eq!(init.date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
+        assert_eq!(init.nr_plenary_activity_date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
 
         assert_eq!(
             init.description,
@@ -2625,7 +2626,7 @@ mod tests {
             .checked_sub_days(Days::new(100));
 
         let legis_inits = scraper
-            .post_legis_payload(Some(LEGIS_IS_VOTEABLE_ON_DOKTYPES.as_slice()))
+            .post_legis_payload(Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice()))
             // .post_legis_payload(None)
             .await
             .unwrap();
@@ -2822,6 +2823,58 @@ mod tests {
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
     }
 
+    // XX/A/1145
+    #[tokio::test]
+    async fn test_legis_init_xx_a_1145() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XX/A/1145")
+            .await
+            .unwrap();
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            vec!["SPÖ".to_string(), "ÖVP".to_string()]
+        );
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            vec!["FPÖ".to_string(), "L".to_string(), "GRÜNE".to_string()]
+        );      
+    }
+    
 
+    // XX/I/308
+    #[tokio::test]
+    async fn test_legis_init_xx_i_308() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XX/I/308")
+            .await
+            .unwrap();
+        assert!(!res.is_voteable_on);
+        assert!(res.accepted.is_none(), "Expected no accepted state");
+    }
+
+    // XXVIII/I/318
+    #[tokio::test]
+    async fn test_legis_init_xxviii_i_318_aub() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/I/318")
+            .await
+            .unwrap();
+
+        assert!(!res.is_voteable_on);
+    }
+
+    // XXVIII/AEA/12
+    #[tokio::test]
+    async fn test_legis_init_xxviii_aea_12() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/AEA/12")
+            .await
+            .unwrap();
+        // assert!(res.is_voteable_on);
+    }
 }
 

@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use common_scrapes::{Document, HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedByName};
 use regex::Regex;
 use serde_json::Value;
@@ -123,9 +124,9 @@ pub async fn extract_most_fitting_votes(
             || text.contains("abgelehnt")
             || text.contains("angenommen")
             || (text.contains("Nationalrates: Genehmigung")))
-            || (text.to_lowercase().contains("ausschuss") && !text.contains("Nationalrat"))
-            || (contains_multiple_of(text, "gegenstand/")
-                && !(ityp == "UEA" && text.contains("/E")))
+            || ((text.to_lowercase().contains("ausschuss") || text.to_lowercase().contains("ausschuß")) && !text.contains("Nationalrat")) // auschuß: gp XX had these a lot e.g.  XX/I/308
+            || (contains_multiple_of(text, "gegenstand/") // better way would probably be to check for NRSITZ gegenstand link, if not present AND another gegenstand link is present => skip (Either zero links or a single NRSITZ link should be allowed) See: XXVII/I/604
+                && !(ityp == "UEA" && text.contains("/E"))) // AEA: what to do in the case of XXVIII/I/318?
         {
             continue;
         }
@@ -160,6 +161,15 @@ pub async fn extract_most_fitting_votes(
         hidden_votes.vote_stage = Some(vote_stage);
         let (was_declined, _) = extract_invisibly_declined_from_text(text);
         hidden_votes.was_declined = was_declined;
+
+        hidden_votes.voted_at_date = stage["date"].as_str().and_then(|date_str| {
+            NaiveDate::parse_from_str(date_str, "%d.%m.%Y ")
+                .ok()
+                .or_else(|| {
+                    log::error!("could not parse date from string: {date_str:?}");
+                    None
+                })
+        });
 
         if text.to_lowercase().contains("namentlich") {
             let Some((vote_sum, pro_count, contra_count, invalid_count)) = extract_vote_count(text)

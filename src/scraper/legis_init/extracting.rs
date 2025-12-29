@@ -66,7 +66,7 @@ pub fn extract_invisibly_declined(
     extract_invisibly_declined_from_text(status_description)
 }
 
-pub fn extract_date(legis_content: &Value) -> Option<&str> {
+pub fn extract_nr_plenary_date(legis_content: &Value) -> Option<&str> {
     let mut most_fitting_date = None;
     if legis_content.get("phase").is_none() {
         if let Some(stages) = legis_content.get("stages") {

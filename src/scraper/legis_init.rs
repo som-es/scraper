@@ -2,7 +2,7 @@ mod extracting;
 pub use extracting::*;
 mod votes;
 
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use common_scrapes::{
     AcceptedState, FileType, LegislativeInitiative, RelatedDelegate, Speech, VoteType, Voting,
 };
@@ -12,7 +12,7 @@ use votes::extract_hidden_votes;
 
 use crate::{
     caching::{disk_caching, get_disk_cache_parsed},
-    documents,
+    convert_vienna_datetime_to_utc, documents,
     error::ScraperError,
     extract_plenar_documents, extract_text_from_html, person_url_to_id,
     proposals::ProposalScraper,
@@ -26,9 +26,8 @@ use crate::{
 // });
 
 impl LastUpdated for LegislativeInitiative {
-    fn last_updated(&self) -> chrono::NaiveDateTime {
-        self.updated_at
-            .unwrap_or(chrono::Local::now().naive_local())
+    fn last_updated(&self) -> DateTime<Utc> {
+        self.updated_at.unwrap_or(chrono::Local::now().to_utc())
     }
 }
 
@@ -75,7 +74,7 @@ pub trait LegislativeInitiatives: Scraper + Sync {
             match get_disk_cache_parsed::<_>(proposal_path, 60 * 60 * 24 * 190, async |raw| {
                 let legis_init = self.raw_legis_into_legis(raw).await;
                 let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
-                    let dur = chrono::Local::now().date_naive() - legis_init.created_at.date();
+                    let dur = chrono::Local::now().to_utc() - legis_init.created_at;
                     let seconds = ((dur.num_days() as f32).powf(1.54) as i64 * 50)
                         .min(60 * 60 * 24 * 80)
                         .max(500);
@@ -227,12 +226,18 @@ impl LegislativeInitiatives for AustriaScraper {
         };
 
         let created_at = legis_content["einlangen"].as_str()?;
-        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?;
+        let created_at = convert_vienna_datetime_to_utc(
+            NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?,
+        )?;
 
         let updated_at = legis_content["update"].as_str();
-        let updated_at = updated_at.map(|updated_at| {
-            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
-        });
+        let updated_at = updated_at
+            .map(|updated_at| {
+                convert_vienna_datetime_to_utc(
+                    NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                )
+            })
+            .flatten();
 
         let requires_simple_majority =
             extract_majority_on_indicators(legis_content).unwrap_or(true);
@@ -773,16 +778,20 @@ mod tests {
             .unwrap();
         println!("init: {init:?}");
 
-        assert_eq!(init.nr_plenary_activity_date, NaiveDate::from_ymd_opt(2023, 6, 1).unwrap());
-        assert_eq!(init.vote_date, Some(NaiveDate::from_ymd_opt(2023, 6, 1).unwrap()));
+        assert_eq!(
+            init.nr_plenary_activity_date,
+            NaiveDate::from_ymd_opt(2023, 6, 1).unwrap()
+        );
+        assert_eq!(
+            init.vote_date,
+            Some(NaiveDate::from_ymd_opt(2023, 6, 1).unwrap())
+        );
         assert_eq!(init.accepted, Some(AcceptedState::Accepted));
 
         assert_eq!(
             init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
-
-        
     }
     #[tokio::test]
     async fn test_get_legis_init_xxi_a_412() {
@@ -1692,10 +1701,15 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        assert_eq!(res.hidden_votes_info.voted_at_date.unwrap(), NaiveDate::from_ymd_opt(2020, 12, 10).unwrap());
+        assert_eq!(
+            res.hidden_votes_info.voted_at_date.unwrap(),
+            NaiveDate::from_ymd_opt(2020, 12, 10).unwrap()
+        );
         // einstimmig
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().pro, vec!["ÖVP", "SPÖ", "FPÖ", "GRÜNE", "NEOS"]);
-
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().pro,
+            vec!["ÖVP", "SPÖ", "FPÖ", "GRÜNE", "NEOS"]
+        );
     }
 
     #[tokio::test]
@@ -1708,7 +1722,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.vote_date, NaiveDate::from_ymd_opt(2018, 9, 26));
-        assert_eq!(res.hidden_votes_info.pro_contra_parties.unwrap().contra, vec!["ÖVP", "FPÖ", "NEOS"]);
+        assert_eq!(
+            res.hidden_votes_info.pro_contra_parties.unwrap().contra,
+            vec!["ÖVP", "FPÖ", "NEOS"]
+        );
     }
 
     // test may get invalid -> legis init got voted on potentially
@@ -2785,14 +2802,23 @@ mod tests {
         // pro GRÜNE
         // contra alle anderen
         assert_eq!(
-            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            res.hidden_votes_info
+                .pro_contra_parties
+                .clone()
+                .unwrap()
+                .pro,
             vec!["GRÜNE".to_string()]
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
-            vec!["FPÖ".to_string(), "ÖVP".to_string(), "SPÖ".to_string(), "NEOS".to_string()]
+            vec![
+                "FPÖ".to_string(),
+                "ÖVP".to_string(),
+                "SPÖ".to_string(),
+                "NEOS".to_string()
+            ]
         );
-    
+
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
     }
     // XXVIII/UEA/161
@@ -2806,14 +2832,23 @@ mod tests {
         // pro GRÜNE
         // contra alle anderen
         assert_eq!(
-            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            res.hidden_votes_info
+                .pro_contra_parties
+                .clone()
+                .unwrap()
+                .pro,
             vec!["GRÜNE".to_string()]
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
-            vec!["FPÖ".to_string(), "ÖVP".to_string(), "SPÖ".to_string(), "NEOS".to_string()]
+            vec![
+                "FPÖ".to_string(),
+                "ÖVP".to_string(),
+                "SPÖ".to_string(),
+                "NEOS".to_string()
+            ]
         );
-    
+
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
     }
 
@@ -2826,14 +2861,18 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            res.hidden_votes_info
+                .pro_contra_parties
+                .clone()
+                .unwrap()
+                .pro,
             vec!["FPÖ".to_string(), "GRÜNE".to_string()]
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
             vec!["ÖVP".to_string(), "SPÖ".to_string(), "NEOS".to_string()]
         );
-    
+
         assert_eq!(res.accepted, Some(AcceptedState::PreDeclined));
     }
 
@@ -2846,15 +2885,18 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            res.hidden_votes_info.pro_contra_parties.clone().unwrap().pro,
+            res.hidden_votes_info
+                .pro_contra_parties
+                .clone()
+                .unwrap()
+                .pro,
             vec!["SPÖ".to_string(), "ÖVP".to_string()]
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
             vec!["FPÖ".to_string(), "L".to_string(), "GRÜNE".to_string()]
-        );      
+        );
     }
-    
 
     // XX/I/308
     #[tokio::test]
@@ -2891,4 +2933,3 @@ mod tests {
         // assert!(res.is_voteable_on);
     }
 }
-

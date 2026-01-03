@@ -1,3 +1,3 @@
 pub trait LastUpdated {
-    fn last_updated(&self) -> chrono::NaiveDateTime;
+    fn last_updated(&self) -> chrono::DateTime<chrono::Utc>;
 }

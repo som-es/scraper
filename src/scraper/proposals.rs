@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{Local, NaiveDate, NaiveDateTime};
 use common_scrapes::{Proposal, ProposalType};
 use serde_json::{json, Value};
 
 use crate::{
     caching::{disk_caching, get_disk_cache_json},
-    documents,
+    convert_vienna_datetime_to_utc, documents,
     error::ScraperError,
     legis_init::extract_topics,
     person_url_to_id, DatePayload, GeneralScrapeInfo, LastUpdated,
@@ -35,9 +35,8 @@ impl ProposalsPayload {
 }
 
 impl LastUpdated for Proposal {
-    fn last_updated(&self) -> chrono::NaiveDateTime {
-        self.updated_at
-            .unwrap_or(chrono::Local::now().naive_local())
+    fn last_updated(&self) -> chrono::DateTime<chrono::Utc> {
+        self.updated_at.unwrap_or(Local::now().to_utc())
     }
 }
 
@@ -158,12 +157,16 @@ impl ProposalScraper for AustriaScraper {
         let inr = raw_proposal_content["inr"].as_u64()?;
 
         let created_at = raw_proposal_content["einlangen"].as_str()?;
-        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?;
+        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S")
+            .ok()
+            .map(convert_vienna_datetime_to_utc)??;
 
         let updated_at = raw_proposal_content["update"].as_str();
-        let updated_at = updated_at.map(|updated_at| {
-            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
-        });
+        let updated_at = updated_at
+            .map(|updated_at| {
+                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
+            })
+            .map(convert_vienna_datetime_to_utc)?;
 
         let id = format!("{ityp}/{inr}");
 

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use common_scrapes::{Document, PlenarSpeech, Reference};
 use serde_json::{json, Value};
 
@@ -10,7 +10,7 @@ mod speeches;
 use crate::{
     caching::{disk_caching, get_disk_cache_json},
     call_to_order::CallToOrderInfo,
-    documents,
+    convert_vienna_datetime_to_utc, documents,
     error::ScraperError,
     plenar::{
         absences::extract_absences,
@@ -47,17 +47,16 @@ pub struct PlenarInfo {
     pub ityp: String,
     pub inr: u64,
     pub debates: Vec<Debate>,
-    pub date: NaiveDateTime,
-    pub updated_at: Option<NaiveDateTime>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub call_to_orders: Vec<CallToOrderInfo>,
     pub gp: String,
     pub absences: Option<Vec<String>>,
 }
 
 impl LastUpdated for PlenarInfo {
-    fn last_updated(&self) -> chrono::NaiveDateTime {
-        self.updated_at
-            .unwrap_or(chrono::Local::now().naive_local())
+    fn last_updated(&self) -> DateTime<Utc> {
+        self.updated_at.unwrap_or(chrono::Local::now().to_utc())
     }
 }
 
@@ -129,16 +128,21 @@ impl Plenar for AustriaScraper {
             .unwrap_or(&description)
             .to_string();
 
-        let date = NaiveDateTime::parse_from_str(
+        let created_at = NaiveDateTime::parse_from_str(
             plenar_content_0["einlangen"].as_str().unwrap(),
             "%Y-%m-%dT%H:%M:%S",
         )
-        .unwrap();
+        .ok()
+        .map(convert_vienna_datetime_to_utc)??;
 
         let updated_at = plenar_content_0["update"].as_str();
-        let updated_at = updated_at.map(|updated_at| {
-            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
-        });
+        let updated_at = updated_at
+            .map(|updated_at| {
+                convert_vienna_datetime_to_utc(
+                    NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                )
+            })
+            .flatten();
 
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];
@@ -195,7 +199,7 @@ impl Plenar for AustriaScraper {
             inr,
             debates,
             call_to_orders,
-            date,
+            created_at,
             updated_at,
             gp: gp_code,
             absences,
@@ -297,7 +301,7 @@ mod tests {
                 let plenar_info = scraper.get_plenar(&path).await.unwrap();
                 println!(
                     "{:?}, {}, {:?}",
-                    plenar_info.inr, plenar_info.gp, plenar_info.date
+                    plenar_info.inr, plenar_info.gp, plenar_info.created_at
                 );
 
                 if i == 2 {
@@ -359,7 +363,7 @@ mod tests {
                 let plenar_info = scraper.get_plenar(&path).await.unwrap();
                 println!(
                     "{:?}, {}, {:?}",
-                    plenar_info.inr, plenar_info.gp, plenar_info.date
+                    plenar_info.inr, plenar_info.gp, plenar_info.created_at
                 );
 
                 for debate in plenar_info.debates {
@@ -404,7 +408,7 @@ mod tests {
                 let plenar_info = scraper.get_plenar(&path).await.unwrap();
                 println!(
                     "{:?}, {}, {:?}",
-                    plenar_info.inr, plenar_info.gp, plenar_info.date
+                    plenar_info.inr, plenar_info.gp, plenar_info.created_at
                 );
 
                 if i == 2 {

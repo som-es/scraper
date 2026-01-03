@@ -26,6 +26,17 @@ pub mod serde_json {
     pub use ::serde_json::*;
 }
 
+fn convert_vienna_datetime_to_utc(
+    datetime: chrono::NaiveDateTime,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    use chrono::TimeZone;
+    let vienna = chrono_tz::Europe::Vienna;
+    vienna
+        .from_local_datetime(&datetime)
+        .earliest()
+        .map(|dt| dt.to_utc())
+}
+
 /// /person/83153 -> 83153
 fn person_url_to_id(url: &str) -> Option<u64> {
     url.split('/')

@@ -1,9 +1,12 @@
 use std::future::Future;
 
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono_tz::OffsetComponents;
+use chrono_tz::{Europe::Vienna, Tz};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::convert_vienna_datetime_to_utc;
 use crate::{error::ScraperError, AustriaScraper, Scraper};
 
 #[derive(Debug, Clone, Serialize)]
@@ -123,7 +126,7 @@ impl DateFilter {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParliamentDate {
     pub date: NaiveDate,
-    pub date_sort: Option<NaiveDateTime>,
+    pub date_sort: Option<DateTime<Utc>>,
     pub time: Option<NaiveTime>,
     pub title: String,
     pub link: Option<String>,
@@ -137,8 +140,8 @@ pub struct ParliamentDate {
     pub repeated_date: Option<NaiveDate>,
     pub month_year: Option<String>,
     pub media_relevant: bool,
-    pub start: Option<NaiveDateTime>,
-    pub end: Option<NaiveDateTime>,
+    pub start: Option<DateTime<Utc>>,
+    pub end: Option<DateTime<Utc>>,
     pub past: bool,
     pub day_with_date: Option<String>, // textual day + date
     pub tour_format: Option<String>,
@@ -152,13 +155,24 @@ impl ParliamentDate {
         let row = value;
         let parse_date = |s: &str| NaiveDate::parse_from_str(s, "%d.%m.%Y").ok();
         let parse_time = |s: &str| NaiveTime::parse_from_str(s, "%H:%M").ok();
-        let parse_datetime = |s: &str| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok();
+        let parse_datetime = |s: &str| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+                .ok()
+                .map(convert_vienna_datetime_to_utc)
+                .flatten()
+        };
 
         let date = row.get(0).and_then(|v| v.as_str()).and_then(parse_date)?;
-        let date_sort = row
+
+        let date_sort: Option<DateTime<Utc>> = row
             .get(1)
             .and_then(|v| v.as_str())
-            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y%m%d%H%M").ok());
+            .and_then(|s| {
+                NaiveDateTime::parse_from_str(s, "%Y%m%d%H%M")
+                    .ok()
+                    .map(convert_vienna_datetime_to_utc)
+            })
+            .flatten();
         let time = row.get(2).and_then(|v| v.as_str()).and_then(parse_time);
         let title = row.get(3).and_then(|v| v.as_str()).map(String::from)?;
         let link = row.get(4).and_then(|v| v.as_str()).map(String::from);
@@ -197,6 +211,7 @@ impl ParliamentDate {
             .get(16)
             .and_then(|v| v.as_str())
             .and_then(parse_datetime);
+
         let past = row
             .get(17)
             .and_then(|v| v.as_str())

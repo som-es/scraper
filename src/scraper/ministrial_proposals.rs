@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use common_scrapes::Document;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
     caching::{disk_caching, get_disk_cache_json},
-    documents,
+    convert_vienna_datetime_to_utc, documents,
     error::ScraperError,
     extract_from_gegenstand_url_text, extract_text_from_html,
     legis_init::extract_topics,
@@ -29,8 +29,8 @@ pub struct MinistrialProposal {
     pub description: String,
     pub emphasis: Option<String>,
     pub documents: Vec<Document>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: Option<NaiveDateTime>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub topics: Vec<String>,
     pub eurovoc_topics: Vec<String>,
     pub other_keyword_topics: Vec<String>,
@@ -41,9 +41,8 @@ pub struct MinistrialProposal {
 }
 
 impl LastUpdated for MinistrialProposal {
-    fn last_updated(&self) -> chrono::NaiveDateTime {
-        self.updated_at
-            .unwrap_or(chrono::Local::now().naive_local())
+    fn last_updated(&self) -> DateTime<Utc> {
+        self.updated_at.unwrap_or(chrono::Local::now().to_utc())
     }
 }
 
@@ -184,12 +183,16 @@ impl MinistrialProposalScraper for AustriaScraper {
         let inr = raw_ministrial_content["inr"].as_u64()?;
 
         let created_at = raw_ministrial_content["einlangen"].as_str()?;
-        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S").ok()?;
+        let created_at = NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S")
+            .ok()
+            .map(convert_vienna_datetime_to_utc)??;
 
         let updated_at = raw_ministrial_content["update"].as_str();
-        let updated_at = updated_at.map(|updated_at| {
-            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
-        });
+        let updated_at = updated_at
+            .map(|updated_at| {
+                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
+            })
+            .map(convert_vienna_datetime_to_utc)?;
 
         let id = inr;
 

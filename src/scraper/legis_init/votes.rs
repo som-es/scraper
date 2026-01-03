@@ -126,7 +126,8 @@ pub async fn extract_most_fitting_votes(
             || (text.contains("Nationalrates: Genehmigung")))
             || ((text.to_lowercase().contains("ausschuss") || text.to_lowercase().contains("ausschuß")) && !text.contains("Nationalrat")) // auschuß: gp XX had these a lot e.g.  XX/I/308
             || (contains_multiple_of(text, "gegenstand/") // better way would probably be to check for NRSITZ gegenstand link, if not present AND another gegenstand link is present => skip (Either zero links or a single NRSITZ link should be allowed) See: XXVII/I/604
-                && !(ityp == "UEA" && text.contains("/E"))) // AEA: what to do in the case of XXVIII/I/318?
+                && !(ityp == "UEA" && text.contains("/E")))
+        // AEA: what to do in the case of XXVIII/I/318?
         {
             continue;
         }

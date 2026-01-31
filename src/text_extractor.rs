@@ -187,6 +187,7 @@ impl TextExtractor {
         let unfitted_speech = unfitted_speech.replace('\u{a0}', " ");
         let unfitted_speech = unfitted_speech.replace("\r\n", "\n");
         let unfitted_speech = unfitted_speech.replace('\r', "\n");
+        let unfitted_speech = unfitted_speech.replace("\0", "");
         let unfitted_speech = remove_multiple_of(&unfitted_speech, '\n');
 
         let (_, name) = remove_paran_contents(name, '(', ')');

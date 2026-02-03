@@ -3,7 +3,7 @@ use reqwest::{Client, Method};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{error::ScraperError, request::request, TextExtractor};
+use crate::{TextExtractor, error::ScraperError, http_client, request::request};
 
 pub mod call_to_order;
 pub mod dates;
@@ -130,7 +130,7 @@ pub struct AustriaScraper {
 impl Default for AustriaScraper {
     fn default() -> Self {
         Self {
-            client: Default::default(),
+            client: http_client().unwrap(),
             text_extractor: TextExtractor::new(),
             scrape_info: Default::default(),
             proposal_payload: Default::default(),

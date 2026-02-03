@@ -26,6 +26,12 @@ pub mod serde_json {
     pub use ::serde_json::*;
 }
 
+pub fn http_client() -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .user_agent("somes/2026.1.0")
+        .build()
+}
+
 fn convert_vienna_datetime_to_utc(
     datetime: chrono::NaiveDateTime,
 ) -> Option<chrono::DateTime<chrono::Utc>> {

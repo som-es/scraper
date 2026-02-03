@@ -8,9 +8,7 @@ use regex::Regex;
 use scraper::Html;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache},
-    remove_page_info, remove_plenar_info, remove_steno_info, remove_titles_from_str,
-    text_utils::{remove_multiple_of, remove_paran_contents},
+    caching::{disk_caching, get_disk_cache}, http_client, remove_page_info, remove_plenar_info, remove_steno_info, remove_titles_from_str, text_utils::{remove_multiple_of, remove_paran_contents}
 };
 
 mod text_from_html;
@@ -114,7 +112,7 @@ impl TextExtractor {
         Self {
             cached_html: Default::default(),
             state: State::NoCache,
-            client: reqwest::Client::new(),
+            client: http_client().unwrap(),
             president_regex,
             president_last_regex,
             president_no_one_left,

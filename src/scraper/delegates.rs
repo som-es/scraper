@@ -199,8 +199,8 @@ impl DelegateScraper for AustriaScraper {
 
         // contains sitzplatz at "sitzplatz"
         let api_person_info = &person_info["content"]["personInfo"];
-        let prev_name = api_person_info["frueherenamen"].as_str();
-        let prev_name = extract_prev_name(prev_name);
+        let prev_name_info = api_person_info["frueherenamen"].as_str();
+        let prev_name_info = extract_prev_name(prev_name_info);
         let id = &api_person_info["pad_intern"];
         let council = &api_person_info["gremium"];
         let is_active = api_person_info["aktiv"].as_bool()?;
@@ -269,7 +269,7 @@ impl DelegateScraper for AustriaScraper {
                 phone_number,
                 social_media,
             },
-            prev_name,
+            prev_name_info,
         })
     }
 
@@ -707,7 +707,7 @@ mod tests {
         // 44127
         let scraper = AustriaScraper::default();
         let delegate = scraper.get_delegate("/person/44127".into()).await.unwrap();
-        let prev_name = delegate.prev_name.as_ref().unwrap();
+        let prev_name = delegate.prev_name_info.as_ref().unwrap();
         assert_eq!(prev_name.prev_name, "Pia Philippa Strache");
         assert_eq!(
             prev_name.till,

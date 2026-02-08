@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use common_scrapes::{
-    Contact, Delegate, Gender, Mandate, PrevNameInfo, Seat, SocialMedia, SocialMedium, SocialMediumChannel
+    Contact, Delegate, Gender, Mandate, PrevNameInfo, Seat, SocialMedia, SocialMedium,
+    SocialMediumChannel,
 };
 
 use regex::Regex;
@@ -199,6 +200,7 @@ impl DelegateScraper for AustriaScraper {
         // contains sitzplatz at "sitzplatz"
         let api_person_info = &person_info["content"]["personInfo"];
         let prev_name = api_person_info["frueherenamen"].as_str();
+        let prev_name = extract_prev_name(prev_name);
         let id = &api_person_info["pad_intern"];
         let council = &api_person_info["gremium"];
         let is_active = api_person_info["aktiv"].as_bool()?;
@@ -267,6 +269,7 @@ impl DelegateScraper for AustriaScraper {
                 phone_number,
                 social_media,
             },
+            prev_name,
         })
     }
 
@@ -287,26 +290,27 @@ pub fn extract_prev_name(prev_name_info: Option<&str>) -> Option<PrevNameInfo> {
     let prev_name_info = prev_name_info?;
     let start_of_name = prev_name_info.find(':');
     Some(match start_of_name {
-            Some(idx) => {
-                let date_start_idx = prev_name_info.find("(bis");
-                let prev_name = &prev_name_info[idx + 2..prev_name_info.len() - 1].trim_matches(char::is_whitespace);
-                let till = date_start_idx.map(|date_start_idx| {
+        Some(idx) => {
+            let date_start_idx = prev_name_info.find("(bis");
+            let prev_name = &prev_name_info[idx + 2..prev_name_info.len() - 1]
+                .trim_matches(char::is_whitespace);
+            let till = date_start_idx
+                .map(|date_start_idx| {
                     let till_date_str = &prev_name_info[date_start_idx + 5..idx];
-    
+
                     NaiveDate::parse_from_str(till_date_str, "%d.%m.%Y").ok()
-                }).flatten();
-                PrevNameInfo {
-                    prev_name: prev_name.to_string(),
-                    till,
-                }
-            },
-            None => {
-                PrevNameInfo {
-                    prev_name: prev_name_info.trim_matches(char::is_whitespace).to_string(),
-                    till: None,
-                }
-            },
-        })
+                })
+                .flatten();
+            PrevNameInfo {
+                prev_name: prev_name.to_string(),
+                till,
+            }
+        }
+        None => PrevNameInfo {
+            prev_name: prev_name_info.trim_matches(char::is_whitespace).to_string(),
+            till: None,
+        },
+    })
 }
 
 pub fn extract_mandates(raw_mandates: &Value) -> Option<Vec<Mandate>> {
@@ -696,6 +700,19 @@ mod tests {
         let scraper = AustriaScraper::default();
         let delegate = scraper.get_delegate("/person/5430".into()).await.unwrap();
         dbg!(delegate);
+    }
+
+    #[tokio::test]
+    pub async fn test_prev_name_extraction_strache() {
+        // 44127
+        let scraper = AustriaScraper::default();
+        let delegate = scraper.get_delegate("/person/44127".into()).await.unwrap();
+        let prev_name = delegate.prev_name.as_ref().unwrap();
+        assert_eq!(prev_name.prev_name, "Pia Philippa Strache");
+        assert_eq!(
+            prev_name.till,
+            Some(NaiveDate::from_ymd_opt(2023, 6, 27).unwrap())
+        )
     }
 
     #[tokio::test]

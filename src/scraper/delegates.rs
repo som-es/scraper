@@ -288,6 +288,11 @@ impl DelegateScraper for AustriaScraper {
 
 pub fn extract_prev_name(prev_name_info: Option<&str>) -> Option<PrevNameInfo> {
     let prev_name_info = prev_name_info?;
+    let prev_name_info = prev_name_info
+        .split("<br>")
+        .next()
+        .unwrap_or(prev_name_info);
+
     let start_of_name = prev_name_info.find(':');
     Some(match start_of_name {
         Some(idx) => {
@@ -712,6 +717,19 @@ mod tests {
         assert_eq!(
             prev_name.till,
             Some(NaiveDate::from_ymd_opt(2023, 6, 27).unwrap())
+        )
+    }
+
+    // 3727
+    #[tokio::test]
+    pub async fn test_prev_name_extraction_3727() {
+        let scraper = AustriaScraper::default();
+        let delegate = scraper.get_delegate("/person/3727".into()).await.unwrap();
+        let prev_name = delegate.prev_name_info.as_ref().unwrap();
+        assert_eq!(prev_name.prev_name, "Marlies Doppler");
+        assert_eq!(
+            prev_name.till,
+            Some(NaiveDate::from_ymd_opt(2025, 5, 8).unwrap())
         )
     }
 

@@ -137,12 +137,13 @@ pub fn extract_most_fitting_date(raw_stages: &Value) -> Option<&str> {
 }
 
 pub fn extract_topics(legis_content: &Value, topics_name: &str) -> Option<Vec<String>> {
+    let mut already_seen_topics = HashSet::new();
     Some(
         legis_content[topics_name]["data"]["bubbles"]
             .as_array()?
             .iter()
             .flat_map(|topic| topic["label"].as_str().map(|topic| topic.to_string()))
-            .collect::<HashSet<String>>() // some topics are duplicated ... -> e.g. XXVII/I/2451
+            .filter(|topic| already_seen_topics.insert(topic.clone())) // some topics are duplicated ... -> e.g. XXVII/I/2451
             .into_iter()
             .collect::<Vec<String>>(),
     )

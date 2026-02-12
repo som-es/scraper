@@ -1,4 +1,4 @@
-use std::{collections::HashSet};
+use std::collections::HashSet;
 
 use async_trait::async_trait;
 use common_scrapes::Party;
@@ -28,7 +28,7 @@ impl Parties for AustriaScraper {
             .await?;
 
         let legis_paths = self.legis_paths(raw)?;
-         
+
         let mut votes = HashSet::new();
         let mut added_vote_legis_inits = 0;
         for path in legis_paths.iter().rev() {

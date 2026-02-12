@@ -18,7 +18,7 @@ thiserror = "1.0"
 #common-scrapes = { path = "common-scrapes" }
 common-scrapes = { path = "../common-scrapes" }
 # common-scrapes = { git = "ssh://git@github.com/som-es/common-scrapes.git" }
-scraper = {version = "0.20" }
+scraper = {version = "0.20", features = ["atomic"] }
 once_cell = "1"
 ego-tree = "0.9"
 log = "0.4.21"

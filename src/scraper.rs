@@ -3,7 +3,7 @@ use reqwest::{Client, Method};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{TextExtractor, error::ScraperError, http_client, request::request};
+use crate::{error::ScraperError, http_client, request::request, TextExtractor};
 
 pub mod call_to_order;
 pub mod dates;

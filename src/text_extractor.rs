@@ -8,11 +8,15 @@ use regex::Regex;
 use scraper::Html;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache}, http_client, remove_page_info, remove_plenar_info, remove_steno_info, remove_titles_from_str, text_utils::{remove_multiple_of, remove_paran_contents}
+    caching::{disk_caching, get_disk_cache},
+    http_client, remove_page_info, remove_plenar_info, remove_steno_info, remove_titles_from_str,
+    text_utils::{remove_multiple_of, remove_paran_contents},
 };
 
 mod text_from_html;
 pub use text_from_html::*;
+mod fit_speech;
+pub use fit_speech::*;
 
 pub trait HasHTMLUrl {
     fn html_url(&self) -> &str;
@@ -159,102 +163,55 @@ impl TextExtractor {
         if let Some(key) = key {
             self.state = State::Cached(Some(key.to_string()));
 
-            let html = Html::parse_document(&html);
+            let url = url.to_string();
+            let steno_info_regex = self.steno_info_regex.clone();
+            let (html, text) = tokio::task::spawn_blocking(move || {
+                let html = Html::parse_document(&html);
 
-            let text = attribute_extraction_fn
-                .unwrap_or(extract_text_from_html_via_name_attribute_finding_optimal_solution)(
-                &html,
-                url.split('#').nth(1).unwrap(),
-            )
-            // .inspect(|x| println!("--------------------- {x}\n --------------"))
-            .map(|text| self.remove_steno_info(&text));
+                let text =
+                    attribute_extraction_fn.unwrap_or(
+                        extract_text_from_html_via_name_attribute_finding_optimal_solution,
+                    )(&html, url.split('#').nth(1).unwrap())
+                    // .inspect(|x| println!("--------------------- {x}\n --------------"))
+                    .map(|text| remove_steno_info(&text, &steno_info_regex));
+                (html, text)
+            })
+            .await
+            .unwrap();
 
             self.cached_html = Arc::new(RwLock::new(Some(html)));
             return text;
         }
         let text = if only_text {
-            self.remove_steno_info(&extract_text_from_html(&html))
+            let steno_info_regex = self.steno_info_regex.clone();
+            tokio::task::spawn_blocking(move || {
+                remove_steno_info(&extract_text_from_html(&html), &steno_info_regex)
+            })
+            .await
+            .ok()?
         } else {
             html
         };
         Some(text)
     }
 
-    pub fn fit_speech(&mut self, unfitted_speech: String, name: &str) -> Option<String> {
-        let unfitted_speech = unfitted_speech.replace('\u{ad}', "");
-        let unfitted_speech = unfitted_speech.replace('\u{a0}', " ");
-        let unfitted_speech = unfitted_speech.replace("\r\n", "\n");
-        let unfitted_speech = unfitted_speech.replace('\r', "\n");
-        let unfitted_speech = unfitted_speech.replace("\0", "");
-        let unfitted_speech = remove_multiple_of(&unfitted_speech, '\n');
+    pub async fn fit_speech(&mut self, unfitted_speech: String, name: &str) -> Option<String> {
+        let president_regex = self.president_regex.clone();
+        let president_last_regex = self.president_last_regex.clone();
+        let president_no_one_left = self.president_no_one_left.clone();
+        let only_president = self.only_president.clone();
+        let name = name.to_string();
+        tokio::task::spawn_blocking(move || {
 
-        let (_, name) = remove_paran_contents(name, '(', ')');
-        let name = name.trim_matches(char::is_whitespace);
-        let name = remove_titles_from_str(name);
-        // BK Werner Faymann (S) remove the BK, BM etc
-        let name_regex = name
-            .split_whitespace()
-            .filter(|x| !(*x == "BM" || *x == "RM" || *x == "BK"))
-            .fold(String::new(), |mut output, split| {
-                use std::fmt::Write;
-                let _ = write!(output, r"{split}\s*");
-                output
-            });
-        let name_regex = Regex::new(&name_regex).unwrap();
-
-        // dbg!(&name);
-        // let start_at_delegate_speech_idx = unfitted_speech.find(name);
-        let start_at_delegate_speech_idx = name_regex.find(&unfitted_speech).map(|x| x.start());
-
-        // dbg!(start_at_delegate_speech_idx);
-
-        let speech_text = match start_at_delegate_speech_idx {
-            Some(start_at_delegate_speech_idx) => {
-                let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
-
-                let mut end_speech_idx = self
-                    .president_regex
-                    .find(start_at_delegate_speech)
-                    .map(|x| x.start())
-                    .unwrap_or(start_at_delegate_speech.len())
-                    .min(
-                        self.president_last_regex
-                            .find(start_at_delegate_speech)
-                            .map(|x| x.start())
-                            .unwrap_or(start_at_delegate_speech.len()),
-                    )
-                    .min(
-                        self.president_no_one_left
-                            .find(start_at_delegate_speech)
-                            .map(|x| x.start())
-                            .unwrap_or(start_at_delegate_speech.len()),
-                    );
-
-                if end_speech_idx == start_at_delegate_speech.len() {
-                    // last "greedy" try - this is not always correct
-                    end_speech_idx = self
-                        .only_president
-                        .find_iter(start_at_delegate_speech)
-                        .last()
-                        .map(|x| x.start())
-                        .unwrap_or(start_at_delegate_speech.len());
-                    if end_speech_idx <= 150 {
-                        // nummer sicher
-                        end_speech_idx = start_at_delegate_speech.len();
-                    }
-                }
-                let fitted_speech = start_at_delegate_speech[..end_speech_idx].to_string();
-                Some(fitted_speech)
-            }
-            None => Some(unfitted_speech),
-        };
-
-        if let Some(speech_text) = &speech_text {
-            if speech_text.len() >= UNREALISTIC_SPEECH_LENGTH {
-                return None;
-            }
-        }
-        speech_text
+        fit_speech(
+            unfitted_speech,
+            &name,
+            &president_regex,
+            &president_last_regex,
+            &president_no_one_left,
+            &only_president,
+        )
+        }).await.ok().flatten()
     }
 
     pub async fn speech_extraction_with_fit(
@@ -263,7 +220,7 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
-        self.fit_speech(unfitted_speech, name)
+        self.fit_speech(unfitted_speech, name).await
     }
 
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
@@ -782,7 +739,7 @@ mod tests {
         let name = "Norbert Totschnig, MSc (ÖVP)";
 
         let mut text_extractor = TextExtractor::new();
-        let fitted_speech = text_extractor.fit_speech(speech.to_string(), name);
+        let fitted_speech = text_extractor.fit_speech(speech.to_string(), name).await;
         let truth_fitted_speech = "Norbert Totschnig, MSc: Vielen Dank, sehr geehrter Herr Präsident! Geschätzte Damen und Herren Nationalrätinnen und Nationalräte! Hohes Haus! Ich möchte mein Statement erstens in die UG 42: Landwirtschaft, Forstwirtschaft und Wasserwirtschaft, und zweitens in die UG 43: Umwelt, Klimawandelanpassung und Kreislaufwirtschaft, unterteilen.\n        Zur Landwirtschaft: Mit dem Budget für die Land- und Forstwirtschaft, Wasserwirtschaft und Regionen setzen wir ein klares Zeichen für unsere bäuerlichen Familienbetriebe, für intakte Regionen, für eine nachhaltige Ressourcennutzung. Das ist ein klares Statement für eine ökosoziale Verantwortung, die wir seit vielen Jahren in diesem Land leben. Es stehen rund 3 Milliarden Euro zur Verfügung, genau sind es 2,84 Milliarden Euro für 2025 und 2,88 Milliarden Euro für 2026. Damit sichern wir die Versorgung im Land, damit sichern wir die Lebensqualität im ländlichen Raum.\n        Herr Kollege Schmiedlechner, ich weiß nicht, über welches Budget du geredet hast, es waren jedenfalls nicht das Budget 2025 und das Budget 2026. (Abg. Reiter [ÖVP]: Wahrscheinlich hat er es nicht gelesen!) Natürlich sparen wir auch im Bereich der Landwirtschaft ein. Wir sparen in der Verwaltung ein. Das führt dazu, dass wir in Zukunft auch mehr an Effizienz brauchen. Wir müssen KI einsetzen, es werden da und dort auch keine Posten nachbesetzt. Da sparen wir insgesamt 16 Millionen Euro ein. Wenn wir alles zusammenrechnen, inklusive der Mittel für die Förderungen, technische Anpassungen im Bereich der Gemeinsamen Agrarpolitik, in der Landwirtschaft, Forstwirtschaft und beim Wald – vorhin schon angesprochen –, dann reden wir von 125 Millionen Euro in beiden Jahren, bei einem Budget von insgesamt fast 6 Milliarden Euro. Also wir sparen, aber es ist noch genügend Geld da, vor allem in den Bereichen, in denen wir Wert darauf legen, dass die Finanzierung auch weiterhin gesichert ist. (Beifall bei der ÖVP.)";
 
         assert_eq!(truth_fitted_speech, fitted_speech.unwrap());

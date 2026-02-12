@@ -1,4 +1,5 @@
 mod extracting;
+use async_trait::async_trait;
 pub use extracting::*;
 mod votes;
 
@@ -31,7 +32,7 @@ impl LastUpdated for LegislativeInitiative {
     }
 }
 
-
+#[async_trait]
 pub trait LegislativeInitiatives: Scraper + Sync {
     const FILTER_PATH: &'static str;
 
@@ -53,25 +54,24 @@ pub trait LegislativeInitiatives: Scraper + Sync {
             .await
     }
 
-    fn raw_legis_into_legis(
+    async fn raw_legis_into_legis(
         &self,
         raw_legis: Value,
-    ) -> impl Future<Output = Option<LegislativeInitiative>> + Send;
+    ) -> Option<LegislativeInitiative>;
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError>;
 
-    fn get_legis_init(
+    async fn get_legis_init(
         &self,
         proposal_path: &str,
-    ) -> impl Future<Output = Result<LegislativeInitiative, ScraperError>>  {
-        async  {
+    ) -> Result<LegislativeInitiative, ScraperError>  {
         let proposal_path = proposal_path.to_string();
             for ityp in LEGIS_IGNORE_ITYPS {
                 if proposal_path.contains(&format!("{ityp}/")) {
                     return Err(ScraperError::NoVoteFound);
                 }
             }
-            match get_disk_cache_parsed::<_>(&proposal_path, 60 * 60 * 24 * 190, async |raw| {
+            match get_disk_cache_parsed::<_, _>(&proposal_path, 60 * 60 * 24 * 190, |raw| async {
                 let legis_init = self.raw_legis_into_legis(raw).await;
                 let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
                     let dur = chrono::Local::now().to_utc() - legis_init.created_at;
@@ -101,7 +101,6 @@ pub trait LegislativeInitiatives: Scraper + Sync {
                         .await
                         .ok_or(ScraperError::LegisInitParseError)
                 }
-            }
         }
     }
 }
@@ -116,7 +115,7 @@ pub const LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES: [&str; 22] = [
     "RVVB", "USVL", "BUA", "UEAM", "RVS", "BRH", "BRG", "PET", "BI",
 ]; // MIND: there seems to be SOME, or at least a single AUB that has an actual plenary vote result XXIV/I/2455
 
-// #[async_trait]
+#[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
     const FILTER_PATH: &'static str =
         "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";

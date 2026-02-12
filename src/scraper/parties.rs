@@ -1,5 +1,6 @@
-use std::{collections::HashSet, future::Future};
+use std::{collections::HashSet};
 
+use async_trait::async_trait;
 use common_scrapes::Party;
 
 use crate::{
@@ -8,12 +9,12 @@ use crate::{
     AustriaScraper, Scraper,
 };
 
-// #[async_trait]
+#[async_trait]
 pub trait Parties: Scraper + Send {
-    fn get_parties(&self) -> impl Future<Output = Result<Vec<Party>, ScraperError>>;
+    async fn get_parties(&self) -> Result<Vec<Party>, ScraperError>;
 }
 
-// #[async_trait]
+#[async_trait]
 impl Parties for AustriaScraper {
     async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
         /*let raw_enactment_paths = self.post_enactment_payload().await?;

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::SystemTime};
+use std::{future::Future, path::PathBuf, time::SystemTime};
 
 use serde_json::Value;
 
@@ -12,10 +12,10 @@ fn ignore_cache_xxvii() -> bool {
     std::env::var("SCRAPER_IGNORE_CACHE_XXVII").unwrap_or("true".into()) == "true"
 }
 
-pub async fn get_disk_cache_parsed<T>(
+pub async fn get_disk_cache_parsed<T, O: Future<Output = (Option<T>, Option<u64>)>>(
     entry: &str,
     redo_secs: u64,
-    redo_secs_cb: impl AsyncFn(Value) -> (Option<T>, Option<u64>),
+    redo_secs_cb: impl Fn(Value) -> O,
 ) -> Option<T> {
     if entry.contains("XXVIII/") && ignore_cache_xxvii() {
         //     // ignores cache

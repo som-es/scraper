@@ -25,7 +25,9 @@ impl Parties for AustriaScraper {
         let raw = self
             .post_legis_payload(Some(LEGIS_LAW_DETERMINATORS.as_slice()))
             .await?;
+
         let legis_paths = self.legis_paths(raw)?;
+         
         let mut votes = HashSet::new();
         let mut added_vote_legis_inits = 0;
         for path in legis_paths.iter().rev() {
@@ -50,6 +52,7 @@ impl Parties for AustriaScraper {
                 break;
             }
         }
+        /*
 
         added_vote_legis_inits = 0;
         for path in legis_paths.iter() {
@@ -68,7 +71,8 @@ impl Parties for AustriaScraper {
             }
         }
 
-        Ok(votes.into_iter().collect())
+        Ok(votes.into_iter().collect())*/
+        Ok(vec![])
     }
 }
 

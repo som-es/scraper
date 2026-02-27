@@ -5,10 +5,9 @@ mod votes;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use common_scrapes::{
-    AcceptedState, FileType, LegislativeInitiative, RelatedDelegate, Speech, VoteType, Voting,
+    AcceptedState, LegislativeInitiative, RelatedDelegate, Speech, VoteType, Voting,
 };
 use serde_json::{json, Value};
-use std::future::Future;
 use votes::extract_hidden_votes;
 
 use crate::{

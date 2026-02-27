@@ -1,8 +1,9 @@
 use async_trait::async_trait;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use scraper::{Html, Selector};
 use serde_json::Value;
 
-use crate::{AustriaScraper, Scraper};
+use crate::{convert_vienna_datetime_to_utc, AustriaScraper, Scraper};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct CallToOrderInfo {
@@ -11,6 +12,8 @@ pub struct CallToOrderInfo {
     pub inr: u64,
     pub receiver: String,
     pub receiver_id: u64,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
     // pub issuer: String, ??
     pub links_to: Option<String>,
 }
@@ -41,6 +44,24 @@ impl CallToOrder for AustriaScraper {
             .to_string();
 
         let call_to_order_content = &raw_call_to_order["content"];
+
+        let created_at = raw_call_to_order["einlangen"]
+            .as_str()
+            .ok_or(CallToOrderError::EinlangenNotAString)?;
+        let created_at = convert_vienna_datetime_to_utc(
+            NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S")
+                .map_err(|_e| CallToOrderError::InvalidTimestamp)?,
+        )
+        .ok_or(CallToOrderError::InvalidTimestamp)?;
+
+        let updated_at = raw_call_to_order["update"].as_str();
+        let updated_at = updated_at
+            .map(|updated_at| {
+                convert_vienna_datetime_to_utc(
+                    NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
+                )
+            })
+            .flatten();
 
         let ityp = call_to_order_content["ityp"]
             .as_str()
@@ -98,6 +119,8 @@ impl CallToOrder for AustriaScraper {
             receiver,
             receiver_id: receiver_id.parse::<u64>().unwrap(),
             links_to,
+            created_at: Some(created_at),
+            updated_at
         })
     }
 }
@@ -130,6 +153,10 @@ pub enum CallToOrderError {
     ZitationNotAString,
     #[error("The received 'zitation' from the remote API probably has a defunct format.")]
     ZitationWrongFormat,
+    #[error("The received 'einlangen' is not a string.")]
+    EinlangenNotAString,
+    #[error("Invalid timestamp")]
+    InvalidTimestamp,
 }
 
 pub fn extract_call_to_order_paths_from_stages(

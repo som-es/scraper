@@ -202,16 +202,18 @@ impl TextExtractor {
         let only_president = self.only_president.clone();
         let name = name.to_string();
         tokio::task::spawn_blocking(move || {
-
-        fit_speech(
-            unfitted_speech,
-            &name,
-            &president_regex,
-            &president_last_regex,
-            &president_no_one_left,
-            &only_president,
-        )
-        }).await.ok().flatten()
+            fit_speech(
+                unfitted_speech,
+                &name,
+                &president_regex,
+                &president_last_regex,
+                &president_no_one_left,
+                &only_president,
+            )
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
     pub async fn speech_extraction_with_fit(

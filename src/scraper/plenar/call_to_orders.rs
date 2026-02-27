@@ -28,6 +28,8 @@ pub(super) fn extract_call_to_order_info_from_stages(
             receiver: person_name,
             receiver_id,
             links_to: Some(format!("{ityp}/{inr}")),
+            created_at: None,
+            updated_at: None,
         });
     }
     call_to_orders

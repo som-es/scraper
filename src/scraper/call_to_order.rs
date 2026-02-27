@@ -120,7 +120,7 @@ impl CallToOrder for AustriaScraper {
             receiver_id: receiver_id.parse::<u64>().unwrap(),
             links_to,
             created_at: Some(created_at),
-            updated_at
+            updated_at,
         })
     }
 }

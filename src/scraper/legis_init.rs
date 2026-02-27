@@ -571,6 +571,56 @@ mod tests {
         assert_eq!(voted_at_date, NaiveDate::from_ymd_opt(2024, 7, 3).unwrap());
     }
 
+    // test if named vote contains "HomeGesamtes ProtokollVorherig"
+    #[tokio::test]
+    async fn test_look_for_named_vote_contains_home_gesamtes() {
+        return;
+        let mut scraper = AustriaScraper::default();
+        for gp in [
+            "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+        ]
+        .iter()
+        .rev()
+        {
+            println!("checking gp {gp}");
+            scraper.scrape_info.gp = vec![gp.to_string()];
+
+            let initiatives = scraper.post_legis_payload(Some(&LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES)).await.unwrap();
+            for path in scraper.legis_paths(initiatives).unwrap() {
+                // println!();
+                // println!("path: {path:?}");
+                let Ok(init) = scraper.get_legis_init(&path).await else {
+                    // println!("error {}{path}", AustriaScraper::BASE_URL);
+                    continue;
+                };
+
+                let Some(voted_by_name_data) = init.hidden_votes_info.voted_by_name_data else {
+                    continue
+                };
+
+                let Some(delegates_pro_contra) = voted_by_name_data.delegates_pro_contra else {
+                    continue
+                };
+
+                delegates_pro_contra
+                    .pro
+                    .iter()
+                    .chain(delegates_pro_contra.contra.iter())
+                    .for_each(|delegate| {
+                        if delegate.contains("HomeGesamtes ProtokollVorherig") {
+                            println!("(HomeGesamtes ProtokollVorherig) found one in {path}");
+                        }
+                        if delegate.contains("Gesamtes ProtokollVorherig") {
+                            println!("(Gesamtes ProtokollVorherig) found one in {path}");
+                        }
+                        if delegate.contains("Home") {
+                            println!("(home) found one in {path}");
+                        }
+                    });
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_get_legis_init_with_accepted_and_status_5() {
         let mut scraper = AustriaScraper::default();
@@ -2927,4 +2977,6 @@ mod tests {
             .unwrap();
         // assert!(res.is_voteable_on);
     }
+
+    
 }

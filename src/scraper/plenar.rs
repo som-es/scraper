@@ -613,7 +613,7 @@ mod tests {
         assert_eq!(
             plenar.debates[0].speeches[0].speech.spoken_text_html_urls[0].document_url,
             // "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html"
-            "/dokument/XXVII/NRSITZ/211/fnameorig_1598890.html#RU_295752"
+            "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/211/fnameorig_1598890.html#RU_295752"
         );
         assert_eq!(plenar.debates[0].speeches[0].duration_in_seconds, 831);
         assert_eq!(
@@ -626,7 +626,7 @@ mod tests {
                 .spoken_text_html_urls[0]
                 .document_url,
             // "/dokument/XXVII/NRSITZ/211/A_-_15_24_25_00295995.html"
-            "/dokument/XXVII/NRSITZ/211/fnameorig_1598890.html#R_295995_4"
+            "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/211/fnameorig_1598890.html#R_295995_4"
         );
 
         let cto = &plenar.call_to_orders[0];
@@ -1017,7 +1017,7 @@ mod tests {
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(96),
                 site_end: None,
-                document_url: "/dokument/XXIV/NRSITZ/55/fnameorig_185240.html#RU_68072".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/55/fnameorig_185240.html#RU_68072".into(),
             }],
         };
 
@@ -1134,7 +1134,7 @@ mod tests {
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: None,
                 site_end: None,
-                document_url: "/dokument/XXVIII/NRSITZ/3/fnameorig_1688660.html#86".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/3/fnameorig_1688660.html#86".into(),
             }],
         };
 
@@ -1169,7 +1169,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: None,
                 site_end: None,
-                document_url: "/dokument/XXVIII/NRSITZ/35/A_-_23_40_42_00818253.html#211".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/35/A_-_23_40_42_00818253.html#211".into(),
             }],
         };
 
@@ -1233,7 +1233,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(15),
                 site_end: Some(19),
-                document_url: "/dokument/XXII/NRSITZ/117/SEITE_0015.html".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0015.html".into(),
             }],
         };
 
@@ -1503,7 +1503,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(29),
                 site_end: Some(31),
-                document_url: "/dokument/XXII/NRSITZ/117/SEITE_0029.html".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0029.html".into(),
             }],
         };
 
@@ -1565,7 +1565,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(46),
                 site_end: Some(48),
-                document_url: "/dokument/XXII/NRSITZ/117/SEITE_0046.html".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0046.html".into(),
             }],
         };
 
@@ -1618,7 +1618,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(48),
                 site_end: Some(49),
-                document_url: "/dokument/XXII/NRSITZ/117/SEITE_0048.html".into(),
+                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0048.html".into(),
             }],
         };
 
@@ -1630,6 +1630,8 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             )
             .await
             .unwrap();
+
+        dbg!(&speech_text);
 
         let truth = "Beate Schasching (SPÖ): Frau Präsidentin! Frau Bundesministerin! Herr Staatssekretär! (Abg. Scheibner – auf die Tafel am Boden weisend –: Jetzt ist es umgefallen!) – Mein Taferl ist umgefallen? – Danke schön. (Abg. Scheibner: Man hätte vielleicht dem Kollegen Neugebauer mehr Redezeit geben sollen!)
 

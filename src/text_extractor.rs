@@ -222,6 +222,7 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
+        dbg!(&unfitted_speech);
         self.fit_speech(unfitted_speech, name).await
     }
 
@@ -337,6 +338,9 @@ impl TextExtractor {
                 }
                 None => break,
             }
+        }
+        if text_acc.is_empty() {
+            return None;
         }
         Some(remove_plenar_info(&remove_page_info(&text_acc)))
     }

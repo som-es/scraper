@@ -1692,5 +1692,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .get_plenar("/gegenstand/XXVIII/NRSITZ/57")
             .await
             .unwrap();
+
+        dbg!(&plenar);
     }
 }

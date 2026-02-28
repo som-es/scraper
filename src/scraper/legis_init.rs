@@ -838,18 +838,6 @@ mod tests {
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
         );
     }
-    #[tokio::test]
-    async fn test_get_legis_init_xxi_a_412() {
-        let scraper = AustriaScraper::default();
-
-        let init = scraper
-            .get_legis_init("/gegenstand/XXI/A/412")
-            .await
-            .unwrap();
-
-        assert!(init.hidden_votes_info.voted_by_name);
-        assert_eq!(init.accepted, Some(AcceptedState::Accepted));
-    }
 
     // https://www.parlament.gv.at/gegenstand/XXII/I/451
     #[tokio::test]
@@ -2978,5 +2966,970 @@ mod tests {
         // assert!(res.is_voteable_on);
     }
 
+    // /gegenstand/XXVI/UEA/144
+
+    #[tokio::test]
+    async fn test_named_vote_xxvi_uea_144() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/UEA/144")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES: &[&str] = &[
+            "Androsch", "Antoni", 
+            "Bacher Walter", "Bayr", "Becher Ruth", "Bernhard", "Bißmann", "Bures", 
+            "Cox", 
+            "Doppelbauer", "Drozda Thomas", "Duzdar Muna", 
+            "Ecker", "Einwallner", "Erasim", 
+            "Feichtinger Elisabeth", "Feichtinger Klaus Uwe", "Friedl", 
+            "Gamon Claudia", "Greiner Karin", "Griss Irmgard", "Gruber", 
+            "Hammerschmid", "Heinisch-Hosek", "Hochstetter-Lackner", "Holzinger-Vogtenhuber", "Holzleitner", "Hoyos-Trauttmansdorff", 
+            "Jarolim", 
+            "Keck", "Knes", "Kollross", "Kovacevic", "Krainer Kai Jan", "Krist Hermann", "Kucharowits Katharina", "Kucher Philip", "Kuntzl", 
+            "Laimer", "Leichtfried", "Lindner Mario", "Loacker", 
+            "Margreiter", "Meinl-Reisinger", "Muchitsch", 
+            "Noll", "Nussbaum", 
+            "Pilz", "Plessl", "Preiner Erwin", 
+            "Rendi-Wagner", "Rossmann", 
+            "Sandler", "Schatz", "Schellhorn", "Scherak", "Schieder", "Stöger Alois", 
+            "Troch", 
+            "Unterrainer", 
+            "Vogl", 
+            "Wimmer Petra", "Wimmer Rainer", "Wittmann", 
+            "Yildirim", "Yılmaz", 
+            "Zinggl"
+        ];
+
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Amesbauer", "Angerer", 
+            "Baumgartner", "Belakowitsch Dagmar", "Berger", "Berlakovich Nikolaus", "Bösch", "Brückl", 
+            "Deimek", "Diesner-Wais", 
+            "Engelberg", "Eßl", 
+            "Fichtinger Angela", "Fürlinger", "Fürst", 
+            "Gahr", "Gerstl", "Gerstner", "Gödl", "Graf Martin", "Graf Tanja", "Großbauer", "Grünberg", "Gudenus", 
+            "Hafenecker", "Haider", "Hanger Andreas", "Haubner", "Hauser", "Herbert", "Himmelbauer", "Höbart", "Höfinger Johann", "Hofinger Manfred", "Hörl", 
+            "Jachs", "Jeitler-Cincelli", 
+            "Kainz", "Kaniak", "Kassegger", "Kaufmann", "Kirchbaumer", "Kitzmüller", "Klinger Wolfgang", "Kopf", "Krenn", "Kugler", "Kühberger Andreas", "Kumpitsch", "Kuss-Bergner Angelika", 
+            "Lasar", "Lausch", "Lettenbichler", "Linder Maximilian", "Lindinger", "Lintl", "Lopatka", "Lugar Robert", 
+            "Mahrer", "Marchetti", "Mölzer", "Mühlberghuber", 
+            "Nehammer", "Neubauer", "Niss Maria Theresia", 
+            "Obernosterer", "Ofenauer", "Ottenschläger", 
+            "Pewny", "Pfurtscheller", "Plakolm", "Povysil", "Prinz", 
+            "Rädler", "Ragger", "Rauch", "Reifenberger", "Riemer", "Ries Christian", "Rosenberger", "Rosenkranz", 
+            "Salzmann", "Schandor", "Schartel", "Schimanek", "Schmiedlechner", "Schmuckenschlager", "Schrangl", "Schwarz", "Sieber Norbert", "Singer Johann", "Smodics-Neumann", "Smolle", "Sobotka", "Stark", "Stefan", "Steger Petra", "Steinacker", "Strasser", 
+            "Taschner", "Tschank", 
+            "Wagner", "Wassermann", "Weidinger", "Winzig", "Wöginger", "Wurm", 
+            "Zanger Wolfgang", "Zarits Christoph"
+        ];
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
+        assert_eq!(res.plenary_session, Some(60));
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+
+        assert_eq!(
+            named_vote.contra_count,
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
+        );
+        assert_eq!(
+            named_vote.pro_count,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .pro
+                .contains(&pro_checks.to_string()));
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .contains(&contra_checks.to_string()));
+        }
+    }
+
+    // /gegenstand/XXV/UEA/414
+
+    #[tokio::test]
+    async fn test_named_vote_xxv_uea_414() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXV/UEA/414")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES: [&str; 43] = [
+            // Exakt 43 Einträge
+            "Angerer", 
+            "Bösch", 
+            "Darmann", "Deimek", "Dietrich", "Doppler", 
+            "Ertlschweiger", 
+            "Fuchs", 
+            "Hackl Heinz-Peter", "Hafenecker", "Hagen", "Haider", "Hauser", "Höbart", "Hübner", 
+            "Jannach", 
+            "Karlsböck", "Kassegger", "Kitzmüller", 
+            "Lausch", "Lintl", "Lugar Robert", 
+            "Mölzer", "Mühlberghuber", 
+            "Nachbaur Kathrin", "Neubauer Werner", 
+            "Podgorschek", 
+            "Rauch Walter", "Riemer", "Rosenkranz Barbara", "Rosenkranz Walter", 
+            "Schellenbacher", "Schenk", "Schimanek", "Schmid Gerhard", "Steger", "Steinbichler", "Strache", 
+            "Themessl", 
+            "Weigerstorfer", "Winter", "Wurm Peter", 
+            "Zanger"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            // Exakt 120 Einträge
+            "Alm", "Amon", "Aslan", "Aubauer", "Auer", 
+            "Bacher Walter", "Becher Ruth", "Berlakovich", "Brosz", "Brunner", "Buchmayr", "Bures", 
+            "Cap", 
+            "Diesner-Wais", "Durchschlag", 
+            "Ecker", "Ehmann", "Eßl", 
+            "Feichtinger Klaus Uwe", "Fekter", "Fichtinger Angela", 
+            "Gahr", "Gerstl", "Gessl-Ranftl", "Glawischnig-Piesczek", "Greiner Karin", "Grillitsch", "Groiß", "Grossmann", "Gusenbauer-Jäger", 
+            "Hable", "Hakel Elisabeth", "Hammer Michael", "Hanger Andreas", "Haubner", "Hechtl", "Heinzl", "Hell", "Himmelbauer", "Hofinger Manfred", "Höfinger Johann", "Holzinger", "Huainigg", 
+            "Jank", "Jarolim", 
+            "Karl", "Katzian", "Keck", "Kirchgatterer", "Knes", "Köchl", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Krainer Kai Jan", "Kucharowits", "Kucher", "Kuzdas", 
+            "Lichtenecker", "Lipitsch", "Loacker", "Lopatka", "Lueger Angela", 
+            "Matznetter", "Maurer", "Mayer", "Meinl-Reisinger", "Moser", "Muchitsch", "Mückstein", "Musiol", "Muttonen", 
+            "Obernosterer", "Ottenschläger", 
+            "Pendl", "Pfurtscheller", "Pirklhuber", "Plessl", "Pock", "Preiner", "Prinz", 
+            "Rädler", "Rasinger", "Rauch Johannes", "Rossmann", 
+            "Schellhorn", "Scherak", "Schieder", "Schittenhelm", "Schmid Julian", "Schmuckenschlager", "Schönegger", "Schopf", "Schultes", "Schwentner", "Sieber Norbert", 
+            "Singer Johann", "Steinacker", "Steinhauser", "Strasser", "Strolz", 
+            "Tamandl", "Töchterle", "Troch", 
+            "Unterrainer", 
+            "Vavrik", "Vogl", 
+            "Walser", "Weninger", "Willi", "Wimmer", "Windbüchler-Souschill", "Winzig", "Wittmann", "Wöginger", "Wurm Gisela", 
+            "Yilmaz", 
+            "Zakostelsky", "Zinggl"
+        ];
+
+        println!("res: {res:?}");
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
+        assert_eq!(res.plenary_session, Some(73));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        // wrong counts sadly from parlament.gv.at
+        // assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        // assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        // assert_eq!(
+        //     named_vote.pro_count as usize,
+        //     named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        // );
+        // assert_eq!(
+        //     named_vote.contra_count as usize,
+        //     named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        // );
+
+        for pro_checks in PRO_VOTES {
+            assert!(named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .pro
+                .contains(&pro_checks.to_string()), "Missing Pro: {}", pro_checks);
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .contains(&contra_checks.to_string()), "Missing Contra: {}", contra_checks);
+        }
+    }
+
+
+    // XXI/I/1183
+    #[tokio::test]
+    async fn test_named_vote_xxi_i_1183() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXI/I/1183")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES: [&str; 95] =[
+            "Achatz", "Amon", "Auer",
+            "Bauer Gerhard", "Baumgartner-Gabitzer", "Blasisker", "Böhacker", "Brinek", "Bruckmann", "Brugger", "Burket",
+            "Dolinschek", "Donabauer", "Donnerbauer",
+            "Egghart", "Ellmauer",
+            "Fallent", "Fasslabend", "Fekter", "Fink", "Firlinger", "Freigaßner", "Freund", "Frieser",
+            "Gahr", "Gatterer", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck",
+            "Hakl", "Haller", "Hartinger", "Haubner", "Hetzl", "Hofmann", "Hornegger", "Hornek",
+            "Jung",
+            "Kampichler", "Khol", "Kiss", "Knerzl", "Kößl", "Krüger", "Kukacka", "Kurzbauer", "Kurzmann",
+            "Langreiter", "Lentsch", "Lexer", "Loos",
+            "Mainoni", "Miedl", "Mikl-Leitner", "Mitterlehner", "Mühlbachler", "Müller", "Murauer",
+            "Neudeck",
+            "Ofner",
+            "Papházy", "Partik-Pablé", "Pecher", "Povysil", "Prinz", "Pumberger",
+            "Rasinger", "Rauch-Kallat", "Reindl",
+            "Schender", "Schultes", "Schwarzenberger", "Schweisgut", "Schweitzer", "Sevignani", "Sodian", "Stadler", "Staffaneller", "Steibl", "Stummvoll",
+            "Tancsits", "Trettenbrein", "Trinkl",
+            "Wattaul", "Weinmeier", "Wenitsch", "Westenthaler", "Wittauer", "Wochesländer", "Wolfmayr",
+            "Zellot", "Zernatto", "Zierler", "Zweytick"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Abraham",
+            "Bauer Hannes", "Bauer Sophie", "Binder", "Brosz", "Bures",
+            "Cap", "Csörgits",
+            "Dietachmayr",
+            "Eder", "Edler", "Edlinger",
+            "Faul", "Feurstein", "Fischer",
+            "Gaál", "Gartlehner", "Gaßner", "Glawischnig", "Gradwohl", "Grünewald", "Gusenbauer",
+            "Hagenhofer", "Haidlmayr", "Heindl", "Heinisch-Hosek", "Heinzl", "Hlavac", "Horn", "Huber",
+            "Jäger", "Jarolim",
+            "Kaipel", "Kiermaier", "Kopf", "Kubitschek", "Kummerer", "Kuntzl",
+            "Lackner", "Lapp", "Lichtenberger", "Lunacek",
+            "Maier", "Marizzi", "Mertel", "Moser", "Muttonen",
+            "Niederwieser", "Nürnberger",
+            "Oberhaidinger", "Öllinger",
+            "Parfuss", "Parnigoni", "Pendl", "Petrovic", "Pirklhuber", "Posch", "Prähauser", "Prammer",
+            "Rada", "Reheis", "Riepl",
+            "Schasching", "Schieder", "Schwemlein", "Silhavy", "Sima", "Stoisits",
+            "Van der Bellen", "Verzetnitsch",
+            "Wimmer", "Wittmann"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::Third
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(111));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
     
+    // XXI/I/624
+
+
+    #[tokio::test]
+    async fn test_named_vote_xxi_i_624() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXI/I/624")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES:[&str; 100] =[
+            "Achatz", "Amon", "Auer",
+            "Baumgartner-Gabitzer", "Böhacker", "Bösch", "Brinek", "Bruckmann", "Brugger", "Burket",
+            "Dolinschek", "Donabauer Karl", "Donnerbauer Heribert",
+            "Egghart", "Ellmauer",
+            "Fallent", "Fasslabend", "Fekter", "Feurstein", "Fink", "Firlinger", "Freigaßner", "Freund", "Frieser",
+            "Gahr Hermann", "Gatterer", "Gaugg", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck",
+            "Haigermoser", "Hakl", "Haller", "Hartinger", "Hetzl Gerhard", "Hofmann", "Hornegger Franz", "Hornek Erwin",
+            "Jung",
+            "Kampichler", "Khol", "Kiss", "Knerzl", "Kopf", "Kößl", "Krüger", "Kukacka", "Kurzbauer", "Kurzmann",
+            "Leiner", "Lentsch", "Lexer", "Loos",
+            "Mainoni", "Miedl", "Mitterlehner", "Mühlbachler", "Müller", "Murauer",
+            "Neudeck",
+            "Ofner", "Ortlieb",
+            "Papházy", "Partik-Pablé", "Pecher", "Pistotnig", "Povysil", "Prinz", "Pumberger", "Puttinger",
+            "Rasinger", "Rauch-Kallat", "Reindl Hermann",
+            "Schender", "Scheuch", "Schultes", "Schwarzenberger", "Schweisgut", "Schweitzer", "Sevignani", "Sodian", "Spindelegger", "Stadler", "Staffaneller", "Steibl", "Stummvoll",
+            "Tancsits", "Trattner", "Trinkl",
+            "Wattaul", "Weinmeier", "Wenitsch", "Westenthaler", "Wochesländer", "Wolfmayr",
+            "Zellot", "Zernatto", "Zierler", "Zweytick"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Antoni",
+            "Bauer Hannes", "Bauer Sophie", "Binder", "Brosz", "Bures",
+            "Cap", "Csörgits",
+            "Dietachmayr", "Dobnigg",
+            "Eder Kurt", "Edler Josef", "Edlinger", "Einem",
+            "Faul", "Fischer",
+            "Gaál Anton", "Gartlehner", "Gaßner", "Glawischnig", "Grabner", "Gradwohl", "Grünewald", "Gusenbauer",
+            "Hagenhofer", "Haidlmayr", "Heindl Kurt", "Heinisch-Hosek", "Heinzl Anton", "Hlavac", "Huber",
+            "Jäger", "Jarolim",
+            "Kaipel", "Keppelmüller", "Kiermaier", "Kogler", "Kräuter", "Kubitschek", "Kummerer", "Kuntzl",
+            "Lackner", "Lapp", "Leikam", "Lichtenberger", "Lunacek",
+            "Maier", "Mertel", "Moser", "Muttonen",
+            "Niederwieser", "Nürnberger",
+            "Oberhaidinger", "Öllinger",
+            "Parfuss", "Parnigoni", "Pendl", "Petrovic", "Pfeffer", "Pilz", "Pirklhuber", "Plank", "Posch", "Prähauser", "Prammer",
+            "Rada", "Reheis", "Riepl",
+            "Schasching", "Schieder", "Schwemlein", "Silhavy", "Sima", "Stoisits",
+            "Van der Bellen", "Verzetnitsch",
+            "Wimmer", "Wittmann", "Wurm"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::Third
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(76));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
+
+    // XXI/A/412
+    #[tokio::test]
+    async fn test_named_vote_xxi_a_412() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXI/A/412")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES:[&str; 99] =[
+            "Achatz", "Auer",
+            "Bauer Rosemarie", "Baumgartner-Gabitzer", "Böhacker", "Bösch", "Brinek", "Bruckmann", "Brugger", "Burket",
+            "Dolinschek", "Donabauer",
+            "Egghart", "Ellmauer",
+            "Fallent", "Fasslabend", "Fekter", "Feurstein", "Fink", "Firlinger", "Freigaßner", "Freund", "Frieser",
+            "Gahr", "Gatterer", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck",
+            "Haigermoser", "Hakl", "Haller", "Hartinger", "Hetzl", "Hofmann", "Hornegger", "Hornek",
+            "Jung",
+            "Kampichler", "Khol", "Kiss", "Knerzl", "Kopf", "Kößl", "Krüger", "Kukacka", "Kurzbauer", "Kurzmann",
+            "Leiner", "Lentsch", "Lexer", "Loos",
+            "Maderthaner", "Mainoni", "Miedl", "Mikl-Leitner", "Mitterlehner", "Mühlbachler", "Müller", "Murauer",
+            "Neudeck",
+            "Ofner",
+            "Papházy", "Partik-Pablé", "Pecher", "Pistotnig", "Prinz", "Prinzhorn", "Pumberger", "Puttinger",
+            "Rasinger", "Reindl",
+            "Schender", "Scheuch", "Schoettel-Delacher", "Schultes", "Schwarzenberger", "Schweisgut", "Schweitzer", "Sevignani", "Sodian", "Spindelegger", "Stadler", "Staffaneller", "Steibl", "Stummvoll",
+            "Tancsits", "Trattner", "Trinkl",
+            "Wattaul", "Weinmeier", "Wenitsch", "Westenthaler", "Wochesländer", "Wolfmayr",
+            "Zellot", "Zernatto", "Zierler", "Zweytick"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Antoni",
+            "Bauer Hannes", "Bauer Sophie", "Binder", "Brix", "Brosz", "Bures",
+            "Cap",
+            "Dietachmayr", "Dobnigg",
+            "Eder Kurt", "Edler Josef", "Edlinger", "Einem",
+            "Faul", "Fischer",
+            "Gaál", "Gartlehner", "Gaßner", "Grabner", "Gradwohl", "Grünewald", "Gusenbauer",
+            "Hagenhofer", "Haidlmayr", "Heindl", "Heinisch-Hosek", "Heinzl", "Hlavac", "Huber",
+            "Jäger", "Jarolim",
+            "Kaipel", "Keppelmüller", "Kiermaier", "Kogler", "Kostelka", "Kräuter", "Kubitschek", "Kummerer", "Kuntzl",
+            "Lackner", "Leikam", "Lichtenberger", "Lunacek",
+            "Maier", "Mertel", "Moser", "Muttonen",
+            "Niederwieser", "Nürnberger",
+            "Oberhaidinger", "Öllinger",
+            "Parfuss", "Parnigoni", "Pendl", "Petrovic", "Pfeffer", "Pirklhuber", "Plank", "Posch", "Prähauser", "Prammer",
+            "Rada", "Reheis", "Riepl",
+            "Schasching", "Schwemlein", "Silhavy", "Sima", "Stoisits",
+            "Van der Bellen", "Verzetnitsch",
+            "Wimmer", "Wittmann", "Wurm"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::Third
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(65));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
+
+    // XXI/I/311
+    #[tokio::test]
+    async fn test_named_vote_xxi_i_311() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXI/I/311")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES:[&str; 93] =[
+            "Amon", "Auer",
+            "Bauer Rosemarie", "Baumgartner-Gabitzer", "Böhacker", "Bösch", "Brinek", "Brugger", "Burket",
+            "Dolinschek", "Donabauer",
+            "Egghart", "Ellmauer",
+            "Fallent", "Fekter", "Fink", "Firlinger", "Freund", "Frieser",
+            "Gahr", "Gatterer", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck",
+            "Hakl", "Haller", "Hartinger", "Hetzl", "Hofmann", "Hornegger", "Hornek",
+            "Jung",
+            "Kampichler", "Khol", "Kiss", "Knerzl", "Kopf", "Kößl", "Krüger", "Kukacka", "Kurzbauer", "Kurzmann",
+            "Leiner", "Lentsch", "Loos",
+            "Maderthaner", "Mainoni", "Miedl", "Mikl-Leitner", "Mitterlehner", "Mühlbachler", "Müller", "Murauer",
+            "Neudeck",
+            "Ortlieb",
+            "Papházy", "Partik-Pablé", "Pecher", "Pistotnig", "Povysil", "Prinz", "Pumberger", "Puttinger",
+            "Rasinger", "Reindl",
+            "Schender", "Scheuch", "Schoettel-Delacher", "Schultes", "Schwarzenberger", "Schweisgut", "Schweitzer", "Sevignani", "Sodian", "Spindelegger", "Stadler", "Staffaneller", "Steibl", "Stummvoll",
+            "Tancsits", "Trattner", "Trinkl",
+            "Wattaul", "Weinmeier", "Wenitsch", "Westenthaler", "Wochesländer", "Wolfmayr",
+            "Zellot", "Zernatto", "Zierler", "Zweytick"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Antoni",
+            "Bauer Hannes", "Bauer Sophie", "Binder", "Brix", "Brosz", "Bures",
+            "Cap",
+            "Dietachmayr", "Dobnigg",
+            "Eder", "Edler", "Edlinger", "Einem",
+            "Faul", "Fischer",
+            "Gartlehner", "Gaßner", "Gradwohl", "Grünewald", "Gusenbauer",
+            "Hagenhofer", "Haidlmayr", "Heindl", "Heinisch-Hosek", "Heinzl", "Huber",
+            "Jäger", "Jarolim",
+            "Kaipel", "Keppelmüller", "Kiermaier", "Kogler", "Kostelka", "Kräuter", "Kubitschek", "Kummerer", "Kuntzl",
+            "Lackner", "Leikam", "Lichtenberger",
+            "Maier", "Mertel", "Moser", "Muttonen",
+            "Niederwieser",
+            "Oberhaidinger", "Öllinger",
+            "Parnigoni", "Pendl", "Petrovic", "Pfeffer", "Pirklhuber", "Pittermann", "Plank", "Posch", "Prammer",
+            "Rada", "Reheis", "Reitsamer", "Riepl",
+            "Schasching", "Schieder", "Schwemlein", "Silhavy", "Stoisits",
+            "Van der Bellen",
+            "Wimmer", "Wittmann", "Wurm"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::Third
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(45));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_xxi_i_181() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXI/I/181")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES:[&str; 100] =[
+            "Amon", "Auer", "Aumayr",
+            "Bauer Rosemarie", "Baumgartner-Gabitzer", "Böhacker", "Bösch", "Brinek", "Bruckmann", "Brugger", "Burket",
+            "Dolinschek", "Donabauer",
+            "Egghart", "Ellmauer",
+            "Fallent", "Fasslabend", "Fekter", "Feurstein", "Fink", "Firlinger", "Fischl", "Freund", "Frieser",
+            "Gahr", "Gatterer", "Gaugg", "Graf Herbert L", "Graf Martin", "Grollitsch", "Großruck",
+            "Haigermoser", "Hakl", "Haller", "Hartinger", "Haupt", "Hofmann", "Hornegger Franz", "Hornek Erwin",
+            "Jung",
+            "Kampichler", "Khol", "Kiss", "Knerzl", "Kopf", "Kößl", "Krüger", "Kukacka", "Kurzbauer", "Kurzmann",
+            "Leiner", "Lentsch", "Lexer", "Loos",
+            "Maderthaner", "Mainoni", "Miedl", "Mikl-Leitner", "Mitterlehner", "Mühlbachler", "Müller", "Murauer",
+            "Neudeck",
+            "Ofner", "Ortlieb",
+            "Papházy", "Partik-Pablé", "Pecher", "Pistotnig", "Prinz", "Prinzhorn", "Pumberger", "Puttinger",
+            "Rasinger", "Reindl",
+            "Schender", "Schoettel-Delacher", "Schöggl", "Schwarzböck", "Schwarzenberger", "Schweisgut", "Schweitzer", "Sevignani", "Sodian", "Spindelegger", "Staffaneller", "Steibl", "Stummvoll",
+            "Tancsits", "Trattner", "Trinkl",
+            "Wattaul", "Weinmeier", "Wenitsch", "Westenthaler", "Wolfmayr",
+            "Zellot", "Zernatto", "Zierler", "Zweytick"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Antoni",
+            "Bauer Sophie", "Binder", "Brix", "Brosz", "Bures",
+            "Cap",
+            "Dietachmayr", "Dobnigg",
+            "Eder Kurt", "Edler Josef", "Edlinger", "Einem",
+            "Faul", "Fischer",
+            "Gaál", "Gartlehner", "Gaßner", "Glawischnig", "Grabner", "Gradwohl", "Grünewald", "Gusenbauer",
+            "Hagenhofer", "Haidlmayr", "Heindl", "Heinisch-Hosek", "Heinzl", "Huber",
+            "Jäger", "Jarolim",
+            "Kaipel", "Keppelmüller", "Kiermaier", "Kogler", "Kostelka", "Kräuter", "Kubitschek", "Kummerer", "Kuntzl",
+            "Lackner", "Leikam", "Lichtenberger",
+            "Maier", "Mertel", "Moser", "Muttonen",
+            "Niederwieser", "Nürnberger",
+            "Oberhaidinger", "Öllinger",
+            "Parfuss", "Parnigoni", "Pendl", "Petrovic", "Pfeffer", "Pilz", "Pirklhuber", "Pittermann", "Plank", "Posch", "Prammer",
+            "Rada", "Reheis", "Reitsamer", "Riepl",
+            "Schasching", "Schlögl", "Schwemlein", "Silhavy", "Sima",
+            "Van der Bellen", "Verzetnitsch",
+            "Wimmer", "Wittmann", "Wurm"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::Third
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(32));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_xxiii_uea_288() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXIII/UEA/288")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES:[&str; 27] =[
+            "Aspöck",
+            "Belakowitsch-Jenewein", "Bösch", "Bucher",
+            "Darmann", "Dolinschek",
+            "Fichtenbauer",
+            "Gradauer", "Graf",
+            "Haidlmayr", "Haimbuchner", "Haubner Ursula", "Hauser", "Hofer",
+            "Kickl", "Klement",
+            "Mayerhofer",
+            "Neubauer Werner",
+            "Rosenkranz",
+            "Schalle", "Scheibner", "Strache",
+            "Themessl",
+            "Vilimsky",
+            "Weinzinger Lutz", "Westenthaler",
+            "Zanger"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Ablinger", "Amon", "Aubauer", "Auer Jakob", "Auer Klaus Hubert",
+            "Bauer", "Bayr", "Becher", "Binder-Maier", "Brinek", "Broukal",
+            "Cap", "Csörgits",
+            "Dobnigg", "Donabauer Karl", "Donnerbauer Heribert", "Durchschlag",
+            "Eder Sebastian", "Eder-Gitschthaler", "Ehmann", "Einwallner", "Eisenschenk", "Eßl",
+            "Faul", "Fleckl", "Franz", "Freund", "Fuhrmann", "Füller", "Fürntrath",
+            "Gahr Hermann", "Gartlehner", "Gaßner", "Glaser", "Glawischnig-Piesczek", "Grander", "Grillitsch", "Grossmann", "Großruck", "Grünewald",
+            "Hagenhofer", "Hakl", "Haubner Peter", "Heinisch-Hosek", "Heinzl", "Hlavac", "Höfinger", "Höllerer", "Hörl", "Hornek", "Hradecsni", "Huainigg", "Hursky",
+            "Jarolim",
+            "Kainz", "Kaipel", "Kapeller", "Karl", "Keck", "Kirchgatterer", "Knoll", "Kogler", "Königsberger-Ludwig", "Kopf", "Kößl", "Krainer", "Krist", "Kukacka", "Kuntzl", "Kuzdas",
+            "Lapp", "Lentsch", "Lichtenecker", "Lohfeyer", "Lueger", "Lunacek",
+            "Maier Ferdinand", "Mandak", "Marizzi", "Mayer Elmar", "Moser", "Muchitsch", "Murauer", "Muttonen",
+            "Neugebauer Fritz", "Niederwieser",
+            "Oberhauser", "Obernosterer", "Öllinger",
+            "Pack", "Pendl", "Pfeffer", "Pilz", "Pirklhuber", "Prähauser", "Praßl", "Prinz",
+            "Rada Robert", "Rasinger", "Rauch-Kallat", "Reheis", "Riener Barbara", "Riepl", "Rinner Sylvia", "Rossmann", "Rudas",
+            "Sburny", "Schasching", "Schatz", "Schelling", "Schieder Andreas", "Schittenhelm", "Schönpass", "Schopf", "Schultes", "Schüssel", "Sieber Norbert", "Sonnberger", "Spindelberger Erwin", "Spindelegger Michael", "Stadlbauer", "Stadler Astrid", "Stauber", "Steibl Ridi", "Steier", "Steindl Konrad", "Steinhauser", "Stummvoll",
+            "Tamandl", "Trunk",
+            "Van der Bellen",
+            "Weinzinger Brigid", "Wöginger", "Wurm",
+            "Zach", "Zinggl", "Zwerschitz", "Zweytick"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(46));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_xxiii_uea_26() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXIII/UEA/26")
+            .await
+            .unwrap();
+
+        #[rustfmt::skip]
+        pub const PRO_VOTES:[&str; 35] =[
+            "Belakowitsch-Jenewein", "Bösch", "Brosz",
+            "Fichtenbauer",
+            "Gradauer", "Graf", "Grünewald",
+            "Haidlmayr", "Haimbuchner", "Hauser", "Hradecsni",
+            "Kickl", "Kogler", "Kurzmann",
+            "Lichtenecker", "Lunacek",
+            "Mayerhofer", "Moser",
+            "Neubauer Werner",
+            "Öllinger",
+            "Pirklhuber",
+            "Rosenkranz", "Rossmann",
+            "Sburny", "Schatz", "Stadler Ewald", "Stoisits", "Strache",
+            "Themessl",
+            "Van der Bellen",
+            "Weinzinger Brigid",
+            "Zach", "Zanger", "Zinggl", "Zwerschitz"
+        ];
+
+        #[rustfmt::skip]
+        pub const CONTRA_VOTES: &[&str] = &[
+            "Ablinger", "Amon", "Aubauer", "Auer Jakob", "Auer Klaus Hubert",
+            "Bauer", "Bayr", "Becher", "Binder-Maier", "Brinek", "Broukal",
+            "Cap", "Csörgits",
+            "Darmann", "Dobnigg", "Dolinschek", "Donabauer Karl", "Donnerbauer Heribert",
+            "Eder Kurt", "Eder Sebastian", "Eder-Gitschthaler", "Ehmann", "Einem", "Einwallner", "Eisenschenk", "Eßl",
+            "Fasslabend", "Faul", "Fazekas", "Fekter", "Fleckl", "Freund", "Fuhrmann", "Füller", "Fürntrath",
+            "Gaál Anton", "Gahr Hermann", "Gartlehner", "Gaßner", "Glaser", "Grander", "Grillitsch", "Grossmann", "Großruck",
+            "Haberzettl", "Hagenhofer", "Hakl", "Haubner Peter", "Haubner Ursula", "Heinisch-Hosek", "Heinzl", "Hlavac", "Höfinger", "Höllerer", "Hörl", "Hornek",
+            "Ikrath",
+            "Jarolim",
+            "Kaipel", "Kapeller", "Karl", "Keck", "Kirchgatterer", "Königsberger-Ludwig", "Kößl", "Krainer", "Kräuter", "Krist", "Kukacka",
+            "Lapp", "Lentsch",
+            "Maier Ferdinand", "Maier Johann", "Marizzi", "Mayer Elmar", "Mikesch", "Missethon", "Mitterlehner", "Morak", "Muchitsch", "Murauer", "Muttonen",
+            "Neugebauer Fritz", "Niederwieser",
+            "Oberhauser", "Obernosterer",
+            "Pack", "Parnigoni", "Pendl", "Pfeffer", "Prähauser", "Prammer", "Praßl", "Prinz",
+            "Rada Robert", "Rasinger", "Rauch-Kallat", "Rädler", "Riener Barbara", "Riepl", "Rinner Sylvia",
+            "Schalle", "Scharer", "Schasching", "Scheibner", "Schieder Andreas", "Schönpass", "Schopf", "Schultes", "Schüssel", "Sieber Norbert", "Sonnberger", "Spindelberger Erwin", "Spindelegger Michael", "Stadlbauer", "Stadler Astrid", "Steier", "Steindl Konrad", "Stummvoll",
+            "Tamandl", "Trunk",
+            "Westenthaler", "Wimmer", "Wittmann", "Wöginger", "Wurm"
+        ];
+
+        println!("res: {res:?}");
+        
+        assert_eq!(res.accepted, Some(AcceptedState::Declined));
+        
+        assert_eq!(
+            res.hidden_votes_info.vote_stage.unwrap(),
+            VoteStage {
+                vote_type: VoteType::AnyNamedVote,
+                stage: Stage::None
+            }
+        );
+        
+        assert_eq!(res.plenary_session, Some(9));
+        
+        let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
+        
+        assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
+        assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
+
+        assert_eq!(
+            named_vote.pro_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().pro.len()
+        );
+        assert_eq!(
+            named_vote.contra_count as usize,
+            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+        );
+
+        for pro_checks in PRO_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
+        }
+        for contra_checks in CONTRA_VOTES {
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
+        }
+    }
 }

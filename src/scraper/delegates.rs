@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use common_scrapes::{
-    Contact, Delegate, Gender, Mandate, PrevNameInfo, Seat, SocialMedia, SocialMedium,
+    Contact, Delegate, Gender, Image, Mandate, PrevNameInfo, Seat, SocialMedia, SocialMedium,
     SocialMediumChannel,
 };
 
@@ -193,12 +193,22 @@ impl DelegateScraper for AustriaScraper {
         // let gender_indicator = mandate[0]["mandat"].as_str();
 
         let name = &person_info["meta"]["description"];
-        let image_url = person_info["meta"]["openGraph"]["image"]
-            .as_str()
-            .map(|path| path.to_string());
-
         // contains sitzplatz at "sitzplatz"
         let api_person_info = &person_info["content"]["personInfo"];
+        let portrait = &person_info["content"]["banner"]["portrait"];
+
+        let image_url = portrait["src"]
+            .as_str()
+            .map(|src| format!("{}{src}", Self::BASE_URL));
+        let image_copyright = portrait["copyright"]
+            .as_str()
+            .map(|copyright| copyright.to_string());
+
+        let image = image_url.map(|url| Image {
+            url,
+            copyright: image_copyright,
+        });
+
         let prev_name_info = api_person_info["frueherenamen"].as_str();
         let prev_name_info = extract_prev_name(prev_name_info);
         let id = &api_person_info["pad_intern"];
@@ -253,7 +263,7 @@ impl DelegateScraper for AustriaScraper {
 
         Some(Delegate {
             is_active,
-            image_url,
+            image,
             id: id.as_u64()?,
             name: name.as_str()?.to_string(),
             party,
@@ -698,6 +708,22 @@ mod tests {
             "delegate: {}",
             serde_json::to_string_pretty(&delegate).unwrap()
         );
+    }
+
+    #[tokio::test]
+    pub async fn test_delegate_8242() {
+        let scraper = AustriaScraper::default();
+
+        let delegate = scraper.get_delegate("/person/8242".into()).await.unwrap();
+        assert_eq!(Gender::Male, delegate.gender);
+
+        let image = delegate.image.unwrap();
+
+        assert_eq!(
+            image.url,
+            "https://www.parlament.gv.at/dokument/bild/201461/20146199_384.jpg"
+        );
+        assert_eq!(image.copyright.unwrap(), "Parlamentsdirektion/Thomas Topf");
     }
 
     #[tokio::test]

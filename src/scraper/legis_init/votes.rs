@@ -287,8 +287,8 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
         Regex::new(r"(?m)Mit\s+.*?Nein[\s\S]*?stimmten\s*die\s*Abgeordneten\s*[()\sa-zA-Z]*\s*:")
             .unwrap();
 
-    let pro_match = pro_regex.find(from_html_text).unwrap();
-    let contra_match: regex::Match<'_> = contra_regex.find(from_html_text).unwrap();
+    let pro_match = pro_regex.find(from_html_text)?;
+    let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;
 
     // dbg!(from_html_text[pro_match.start()..pro_match.end()]
     //     .chars()

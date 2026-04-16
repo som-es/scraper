@@ -329,4 +329,19 @@ mod tests {
         let emphasis = ministerial_prop.emphasis.unwrap();
         dbg!(emphasis);
     }
+
+    // /gegenstand/XXV/ME/209
+    #[tokio::test]
+    async fn test_ministrial_prop_me_xxv_209() {
+        let scraper = AustriaScraper::default();
+
+        let geg_info = GegenstandInfo {
+            path: "/gegenstand/XXV/ME/209".into(),
+            ressort: "".into(),
+            ressort_shortform: "".into(),
+            due_to: today(),
+        };
+        let ministerial_prop = scraper.get_ministrial_proposal(geg_info).await.unwrap();
+        dbg!(ministerial_prop.delegate_ids);
+    }
 }

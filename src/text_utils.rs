@@ -14,7 +14,7 @@ pub fn remove_multiple_of(text: &str, of: char) -> String {
 pub fn remove_paran_contents(
     text: &str,
     opening_paran: char,
-    closening_paran: char,
+    closing_paran: char,
 ) -> (Vec<String>, String) {
     let mut stack: Vec<(char, usize)> = Vec::new();
     let mut paran_infos: Vec<(usize, usize)> = Vec::new();
@@ -24,8 +24,7 @@ pub fn remove_paran_contents(
         if char as char == opening_paran {
             stack.push((opening_paran, idx));
         }
-        if char as char == closening_paran && stack.last().is_some_and(|&(c, _)| c == opening_paran)
-        {
+        if char as char == closing_paran && stack.last().is_some_and(|&(c, _)| c == opening_paran) {
             let paran_start_idx = stack.pop().unwrap().1;
             if stack.is_empty() {
                 paran_infos.push((paran_start_idx, idx));

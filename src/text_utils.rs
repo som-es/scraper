@@ -35,7 +35,7 @@ pub fn remove_paran_contents(
     let mut out_text = String::with_capacity(text.len());
     let mut outer_start = 0;
     for &(start, end) in &paran_infos {
-        paran_contents_string_components.push(text[start..end].to_string());
+        paran_contents_string_components.push(text[start + 1..end].to_string());
         out_text.push_str(&text[outer_start..start]);
         outer_start = end + 1;
     }
@@ -65,23 +65,38 @@ mod tests {
 
     #[test]
     fn test_remove_paran_contents() {
-        let (_, text) = remove_paran_contents(
+        let (paran_contents, text) = remove_paran_contents(
             "Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)",
             '(',
             ')',
         );
         assert_eq!(text, "Tim mit kleinen  Geräten ");
+        assert_eq!(
+            paran_contents,
+            vec![
+                "sehr kleinen".to_string(),
+                "sehr, (sehr) sehr wahr".to_string()
+            ]
+        );
         println!("text: {text}");
     }
 
     #[test]
     fn test_remove_paran_contents_at_beginning() {
-        let (_, text) = remove_paran_contents(
+        let (paran_contents, text) = remove_paran_contents(
             "(yesyes)Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)",
             '(',
             ')',
         );
         assert_eq!(text, "Tim mit kleinen  Geräten ");
+        assert_eq!(
+            paran_contents,
+            vec![
+                "yesyes".to_string(),
+                "sehr kleinen".to_string(),
+                "sehr, (sehr) sehr wahr".to_string()
+            ]
+        );
         println!("text: {text}");
     }
 

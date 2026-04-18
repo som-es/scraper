@@ -18,7 +18,7 @@ pub fn remove_paran_contents(
 ) -> (Vec<String>, String) {
     let mut stack: Vec<(char, usize)> = Vec::new();
     let mut paran_infos: Vec<(usize, usize)> = Vec::new();
-    let paran_contents_string_components: Vec<String> = Vec::new();
+    let mut paran_contents_string_components: Vec<String> = Vec::new();
 
     for (idx, char) in text.bytes().enumerate() {
         if char as char == opening_paran {
@@ -35,6 +35,7 @@ pub fn remove_paran_contents(
     let mut out_text = String::with_capacity(text.len());
     let mut outer_start = 0;
     for &(start, end) in &paran_infos {
+        paran_contents_string_components.push(text[start..end].to_string());
         out_text.push_str(&text[outer_start..start]);
         outer_start = end + 1;
     }

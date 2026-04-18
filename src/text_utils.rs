@@ -11,14 +11,21 @@ pub fn remove_multiple_of(text: &str, of: char) -> String {
         .collect::<String>()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ParanContent {
+    pub start_idx: usize,
+    pub end_idx: usize,
+    pub content: String,
+}
+
 pub fn remove_paran_contents(
     text: &str,
     opening_paran: char,
     closing_paran: char,
-) -> (Vec<String>, String) {
+) -> (Vec<ParanContent>, String) {
     let mut stack: Vec<(char, usize)> = Vec::new();
     let mut paran_infos: Vec<(usize, usize)> = Vec::new();
-    let mut paran_contents_string_components: Vec<String> = Vec::new();
+    let mut paran_contents_string_components: Vec<ParanContent> = Vec::new();
 
     for (idx, char) in text.bytes().enumerate() {
         if char as char == opening_paran {
@@ -35,7 +42,11 @@ pub fn remove_paran_contents(
     let mut out_text = String::with_capacity(text.len());
     let mut outer_start = 0;
     for &(start, end) in &paran_infos {
-        paran_contents_string_components.push(text[start + 1..end].to_string());
+        paran_contents_string_components.push(ParanContent {
+            start_idx: start + 1,
+            end_idx: end,
+            content: text[start + 1..end].to_string(),
+        });
         out_text.push_str(&text[outer_start..start]);
         outer_start = end + 1;
     }

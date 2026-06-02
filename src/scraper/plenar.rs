@@ -1134,7 +1134,9 @@ mod tests {
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: None,
                 site_end: None,
-                document_url: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/3/fnameorig_1688660.html#86".into(),
+                document_url:
+                    "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/3/fnameorig_1688660.html#86"
+                        .into(),
             }],
         };
 
@@ -1233,7 +1235,8 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(15),
                 site_end: Some(19),
-                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0015.html".into(),
+                document_url:
+                    "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0015.html".into(),
             }],
         };
 
@@ -1503,7 +1506,8 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(29),
                 site_end: Some(31),
-                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0029.html".into(),
+                document_url:
+                    "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0029.html".into(),
             }],
         };
 
@@ -1565,7 +1569,8 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(46),
                 site_end: Some(48),
-                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0046.html".into(),
+                document_url:
+                    "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0046.html".into(),
             }],
         };
 
@@ -1618,7 +1623,8 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(48),
                 site_end: Some(49),
-                document_url: "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0048.html".into(),
+                document_url:
+                    "https://www.parlament.gv.at/dokument/XXII/NRSITZ/117/SEITE_0048.html".into(),
             }],
         };
 

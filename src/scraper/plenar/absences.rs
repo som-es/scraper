@@ -222,7 +222,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_absences_extraction_from_doc() {
-        let link = "https://www.parlament.gv.at/dokument/XXIII/NRSITZ/72/fnameorig_144783.html".to_string();
+        let link = "https://www.parlament.gv.at/dokument/XXIII/NRSITZ/72/fnameorig_144783.html"
+            .to_string();
         let doc = Document {
             title: "nix".into(),
             link,
@@ -237,7 +238,8 @@ mod tests {
     //
     #[tokio::test]
     async fn test_absences_extraction_from_doc2() {
-        let link = "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/1/fnameorig_144815.html".to_string();
+        let link =
+            "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/1/fnameorig_144815.html".to_string();
         let doc = Document {
             title: "nix".into(),
             link,

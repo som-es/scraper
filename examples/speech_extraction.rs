@@ -8,7 +8,9 @@ async fn main() {
     let speech_info = SpeechTextInfo {
         site_start: None,
         site_end: None,
-        document_url: "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/125/fnameorig_1426372.html#RU_253528".into(),
+        document_url:
+            "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/125/fnameorig_1426372.html#RU_253528"
+                .into(),
     };
     let text = extractor
         .speech_extraction_with_fit(&speech_info, "Mag. Christian Drobits (S)")

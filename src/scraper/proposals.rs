@@ -45,9 +45,23 @@ pub trait ProposalScraper: Scraper {
     const FILTER_PATH: &'static str;
     const TO_DELEGATES_IDX: &'static str;
 
-    fn proposals_payload(&self) -> Self::Payload;
-
     async fn post_proposals_payload(
+        &self,
+        searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
+        let payload = self.payload(searched_doktyps);
+        self.post_payload(
+            payload,
+            format!(
+                "{base_url}{filter}",
+                base_url = Self::BASE_URL,
+                filter = Self::FILTER_PATH
+            ),
+        )
+        .await
+    }
+
+    async fn post_proposals_payload_by_di(
         &self,
         proposal_payload: ProposalsPayload,
     ) -> Result<Value, ScraperError> {
@@ -66,30 +80,27 @@ pub trait ProposalScraper: Scraper {
 
     fn proposal_paths(&self, proposals: Value) -> Result<GegenstandPaths, ScraperError>;
 
-    async fn get_proposal(&self, proposal_path: &str) -> Result<Proposal, ScraperError> {
-        let raw = match get_disk_cache_json(proposal_path).await {
-            Some(raw) => raw,
-            None => {
-                let raw_proposal = self.get_gegenstand_info(proposal_path).await?;
-                if let Err(e) = disk_caching(proposal_path, raw_proposal.to_string()).await {
-                    log::warn!("could cache raw {proposal_path}: {e:?}")
-                }
-                raw_proposal
-            }
-        };
+    fn payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload;
 
+    async fn get_proposal(&self, proposal_path: &str) -> Result<Proposal, ScraperError> {
+        let raw = self.cache(proposal_path).await?;
         Self::raw_proposal_into_proposal(raw).ok_or(ScraperError::InvalidProposalInfoError)
     }
 }
 
 impl ProposalScraper for AustriaScraper {
     const FILTER_PATH: &'static str = "/Filter/api/filter/data/101?js=eval&showAll=true";
-    // TODO
-    // const FILTER_PATH: &'static str = "/Filter/api/filter/data/101?js=eval";
     const TO_DELEGATES_IDX: &'static str = "rows";
 
-    fn proposals_payload(&self) -> Self::Payload {
-        json!({"NRBR": [self.scrape_info.council_type], "GP_CODE": self.scrape_info.gp})
+    fn payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload {
+        json!({
+            "GP": self.scrape_info.gp,
+            "NRBR": self.scrape_info.council_type,
+            "DOKTYP": searched_doktyps,
+            "DATUM_VON": [
+                self.scrape_info.date_start, self.scrape_info.date_end
+            ],
+        })
     }
 
     fn proposal_paths(&self, proposals: Value) -> Result<GegenstandPaths, ScraperError> {
@@ -99,12 +110,7 @@ impl ProposalScraper for AustriaScraper {
 
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
         let raw_proposal_content = &raw_proposal["content"];
-        // if raw_proposal_content["names"].as_array().is_none() {
-        // }
-
-        // let json = serde_json::to_string_pretty(raw_proposal_content).unwrap();
-        // println!("{json}");
-        let ityp = raw_proposal_content["ityp"].as_str().unwrap().to_string();
+        let ityp = raw_proposal_content["ityp"].as_str()?.to_string();
 
         // weird AB: ityp AB inr 13696 gp XXVII, has no delegates associated with AB, no fitting title
         // https://www.parlament.gv.at/gegenstand/XXVII/AB/13696
@@ -115,7 +121,8 @@ impl ProposalScraper for AustriaScraper {
             issuer_ids = names
                 .iter()
                 .filter(|name| name["funktext"] == "Eingebracht von")
-                .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
+                .flat_map(|name| name["url"].as_str().map(|url| person_url_to_id(url)))
+                .flatten()
                 .collect::<Vec<u64>>();
 
             let receiver_text = if ityp == "AB" {
@@ -181,6 +188,7 @@ impl ProposalScraper for AustriaScraper {
 
         Some(Proposal {
             id,
+            inr,
             ityp,
             gp,
             title,
@@ -213,7 +221,7 @@ mod tests {
 
         let proposal_payload = ProposalsPayload::default();
         let proposals = scraper
-            .post_proposals_payload(proposal_payload)
+            .post_proposals_payload_by_di(proposal_payload)
             .await
             .unwrap();
 
@@ -236,7 +244,9 @@ mod tests {
             Err(e) => {
                 println!("e: {e:?}");
                 let proposal_payload = ProposalsPayload::default();
-                let proposals = scraper.post_proposals_payload(proposal_payload).await?;
+                let proposals = scraper
+                    .post_proposals_payload_by_di(proposal_payload)
+                    .await?;
 
                 scraper.proposal_paths(proposals).unwrap()
             }

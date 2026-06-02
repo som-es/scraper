@@ -32,25 +32,13 @@ impl LastUpdated for LegislativeInitiative {
 }
 
 #[async_trait]
-pub trait LegislativeInitiatives: Scraper + Sync {
-    const FILTER_PATH: &'static str;
-
-    fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload;
-
+pub trait LegislativeInitiatives: ProposalScraper + Sync {
+    #[inline]
     async fn post_legis_payload(
         &self,
         searched_doktyps: Option<&[&str]>,
     ) -> Result<Value, ScraperError> {
-        let payload = self.legis_payload(searched_doktyps);
-        self.post_payload(
-            payload,
-            format!(
-                "{base_url}{filter}",
-                base_url = Self::BASE_URL,
-                filter = Self::FILTER_PATH
-            ),
-        )
-        .await
+        self.post_proposals_payload(searched_doktyps).await
     }
 
     async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative>;
@@ -113,21 +101,10 @@ pub const LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES: [&str; 22] = [
 
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
-    const FILTER_PATH: &'static str =
-        "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
+    // const FILTER_PATH: &'static str =
+    //     "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
     // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
     // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
-
-    fn legis_payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload {
-        json!({
-            "GP": self.scrape_info.gp,
-            "NRBR": self.scrape_info.council_type,
-            "DOKTYP": searched_doktyps,
-            "DATUM_VON": [
-                self.scrape_info.date_start, self.scrape_info.date_end
-            ],
-        })
-    }
 
     async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative> {
         let description = raw_legis["meta"]["description"].as_str()?.to_string();
@@ -585,7 +562,10 @@ mod tests {
             println!("checking gp {gp}");
             scraper.scrape_info.gp = vec![gp.to_string()];
 
-            let initiatives = scraper.post_legis_payload(Some(&LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES)).await.unwrap();
+            let initiatives = scraper
+                .post_legis_payload(Some(&LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES))
+                .await
+                .unwrap();
             for path in scraper.legis_paths(initiatives).unwrap() {
                 // println!();
                 // println!("path: {path:?}");
@@ -595,11 +575,11 @@ mod tests {
                 };
 
                 let Some(voted_by_name_data) = init.hidden_votes_info.voted_by_name_data else {
-                    continue
+                    continue;
                 };
 
                 let Some(delegates_pro_contra) = voted_by_name_data.delegates_pro_contra else {
-                    continue
+                    continue;
                 };
 
                 delegates_pro_contra
@@ -2978,51 +2958,50 @@ mod tests {
 
         #[rustfmt::skip]
         pub const PRO_VOTES: &[&str] = &[
-            "Androsch", "Antoni", 
-            "Bacher Walter", "Bayr", "Becher Ruth", "Bernhard", "Bißmann", "Bures", 
-            "Cox", 
-            "Doppelbauer", "Drozda Thomas", "Duzdar Muna", 
-            "Ecker", "Einwallner", "Erasim", 
-            "Feichtinger Elisabeth", "Feichtinger Klaus Uwe", "Friedl", 
-            "Gamon Claudia", "Greiner Karin", "Griss Irmgard", "Gruber", 
-            "Hammerschmid", "Heinisch-Hosek", "Hochstetter-Lackner", "Holzinger-Vogtenhuber", "Holzleitner", "Hoyos-Trauttmansdorff", 
-            "Jarolim", 
-            "Keck", "Knes", "Kollross", "Kovacevic", "Krainer Kai Jan", "Krist Hermann", "Kucharowits Katharina", "Kucher Philip", "Kuntzl", 
-            "Laimer", "Leichtfried", "Lindner Mario", "Loacker", 
-            "Margreiter", "Meinl-Reisinger", "Muchitsch", 
-            "Noll", "Nussbaum", 
-            "Pilz", "Plessl", "Preiner Erwin", 
-            "Rendi-Wagner", "Rossmann", 
-            "Sandler", "Schatz", "Schellhorn", "Scherak", "Schieder", "Stöger Alois", 
-            "Troch", 
-            "Unterrainer", 
-            "Vogl", 
-            "Wimmer Petra", "Wimmer Rainer", "Wittmann", 
-            "Yildirim", "Yılmaz", 
+            "Androsch", "Antoni",
+            "Bacher Walter", "Bayr", "Becher Ruth", "Bernhard", "Bißmann", "Bures",
+            "Cox",
+            "Doppelbauer", "Drozda Thomas", "Duzdar Muna",
+            "Ecker", "Einwallner", "Erasim",
+            "Feichtinger Elisabeth", "Feichtinger Klaus Uwe", "Friedl",
+            "Gamon Claudia", "Greiner Karin", "Griss Irmgard", "Gruber",
+            "Hammerschmid", "Heinisch-Hosek", "Hochstetter-Lackner", "Holzinger-Vogtenhuber", "Holzleitner", "Hoyos-Trauttmansdorff",
+            "Jarolim",
+            "Keck", "Knes", "Kollross", "Kovacevic", "Krainer Kai Jan", "Krist Hermann", "Kucharowits Katharina", "Kucher Philip", "Kuntzl",
+            "Laimer", "Leichtfried", "Lindner Mario", "Loacker",
+            "Margreiter", "Meinl-Reisinger", "Muchitsch",
+            "Noll", "Nussbaum",
+            "Pilz", "Plessl", "Preiner Erwin",
+            "Rendi-Wagner", "Rossmann",
+            "Sandler", "Schatz", "Schellhorn", "Scherak", "Schieder", "Stöger Alois",
+            "Troch",
+            "Unterrainer",
+            "Vogl",
+            "Wimmer Petra", "Wimmer Rainer", "Wittmann",
+            "Yildirim", "Yılmaz",
             "Zinggl"
         ];
 
-
         #[rustfmt::skip]
         pub const CONTRA_VOTES: &[&str] = &[
-            "Amesbauer", "Angerer", 
-            "Baumgartner", "Belakowitsch Dagmar", "Berger", "Berlakovich Nikolaus", "Bösch", "Brückl", 
-            "Deimek", "Diesner-Wais", 
-            "Engelberg", "Eßl", 
-            "Fichtinger Angela", "Fürlinger", "Fürst", 
-            "Gahr", "Gerstl", "Gerstner", "Gödl", "Graf Martin", "Graf Tanja", "Großbauer", "Grünberg", "Gudenus", 
-            "Hafenecker", "Haider", "Hanger Andreas", "Haubner", "Hauser", "Herbert", "Himmelbauer", "Höbart", "Höfinger Johann", "Hofinger Manfred", "Hörl", 
-            "Jachs", "Jeitler-Cincelli", 
-            "Kainz", "Kaniak", "Kassegger", "Kaufmann", "Kirchbaumer", "Kitzmüller", "Klinger Wolfgang", "Kopf", "Krenn", "Kugler", "Kühberger Andreas", "Kumpitsch", "Kuss-Bergner Angelika", 
-            "Lasar", "Lausch", "Lettenbichler", "Linder Maximilian", "Lindinger", "Lintl", "Lopatka", "Lugar Robert", 
-            "Mahrer", "Marchetti", "Mölzer", "Mühlberghuber", 
-            "Nehammer", "Neubauer", "Niss Maria Theresia", 
-            "Obernosterer", "Ofenauer", "Ottenschläger", 
-            "Pewny", "Pfurtscheller", "Plakolm", "Povysil", "Prinz", 
-            "Rädler", "Ragger", "Rauch", "Reifenberger", "Riemer", "Ries Christian", "Rosenberger", "Rosenkranz", 
-            "Salzmann", "Schandor", "Schartel", "Schimanek", "Schmiedlechner", "Schmuckenschlager", "Schrangl", "Schwarz", "Sieber Norbert", "Singer Johann", "Smodics-Neumann", "Smolle", "Sobotka", "Stark", "Stefan", "Steger Petra", "Steinacker", "Strasser", 
-            "Taschner", "Tschank", 
-            "Wagner", "Wassermann", "Weidinger", "Winzig", "Wöginger", "Wurm", 
+            "Amesbauer", "Angerer",
+            "Baumgartner", "Belakowitsch Dagmar", "Berger", "Berlakovich Nikolaus", "Bösch", "Brückl",
+            "Deimek", "Diesner-Wais",
+            "Engelberg", "Eßl",
+            "Fichtinger Angela", "Fürlinger", "Fürst",
+            "Gahr", "Gerstl", "Gerstner", "Gödl", "Graf Martin", "Graf Tanja", "Großbauer", "Grünberg", "Gudenus",
+            "Hafenecker", "Haider", "Hanger Andreas", "Haubner", "Hauser", "Herbert", "Himmelbauer", "Höbart", "Höfinger Johann", "Hofinger Manfred", "Hörl",
+            "Jachs", "Jeitler-Cincelli",
+            "Kainz", "Kaniak", "Kassegger", "Kaufmann", "Kirchbaumer", "Kitzmüller", "Klinger Wolfgang", "Kopf", "Krenn", "Kugler", "Kühberger Andreas", "Kumpitsch", "Kuss-Bergner Angelika",
+            "Lasar", "Lausch", "Lettenbichler", "Linder Maximilian", "Lindinger", "Lintl", "Lopatka", "Lugar Robert",
+            "Mahrer", "Marchetti", "Mölzer", "Mühlberghuber",
+            "Nehammer", "Neubauer", "Niss Maria Theresia",
+            "Obernosterer", "Ofenauer", "Ottenschläger",
+            "Pewny", "Pfurtscheller", "Plakolm", "Povysil", "Prinz",
+            "Rädler", "Ragger", "Rauch", "Reifenberger", "Riemer", "Ries Christian", "Rosenberger", "Rosenkranz",
+            "Salzmann", "Schandor", "Schartel", "Schimanek", "Schmiedlechner", "Schmuckenschlager", "Schrangl", "Schwarz", "Sieber Norbert", "Singer Johann", "Smodics-Neumann", "Smolle", "Sobotka", "Stark", "Stefan", "Steger Petra", "Steinacker", "Strasser",
+            "Taschner", "Tschank",
+            "Wagner", "Wassermann", "Weidinger", "Winzig", "Wöginger", "Wurm",
             "Zanger Wolfgang", "Zarits Christoph"
         ];
 
@@ -3083,50 +3062,50 @@ mod tests {
         #[rustfmt::skip]
         pub const PRO_VOTES: [&str; 43] = [
             // Exakt 43 Einträge
-            "Angerer", 
-            "Bösch", 
-            "Darmann", "Deimek", "Dietrich", "Doppler", 
-            "Ertlschweiger", 
-            "Fuchs", 
-            "Hackl Heinz-Peter", "Hafenecker", "Hagen", "Haider", "Hauser", "Höbart", "Hübner", 
-            "Jannach", 
-            "Karlsböck", "Kassegger", "Kitzmüller", 
-            "Lausch", "Lintl", "Lugar Robert", 
-            "Mölzer", "Mühlberghuber", 
-            "Nachbaur Kathrin", "Neubauer Werner", 
-            "Podgorschek", 
-            "Rauch Walter", "Riemer", "Rosenkranz Barbara", "Rosenkranz Walter", 
-            "Schellenbacher", "Schenk", "Schimanek", "Schmid Gerhard", "Steger", "Steinbichler", "Strache", 
-            "Themessl", 
-            "Weigerstorfer", "Winter", "Wurm Peter", 
+            "Angerer",
+            "Bösch",
+            "Darmann", "Deimek", "Dietrich", "Doppler",
+            "Ertlschweiger",
+            "Fuchs",
+            "Hackl Heinz-Peter", "Hafenecker", "Hagen", "Haider", "Hauser", "Höbart", "Hübner",
+            "Jannach",
+            "Karlsböck", "Kassegger", "Kitzmüller",
+            "Lausch", "Lintl", "Lugar Robert",
+            "Mölzer", "Mühlberghuber",
+            "Nachbaur Kathrin", "Neubauer Werner",
+            "Podgorschek",
+            "Rauch Walter", "Riemer", "Rosenkranz Barbara", "Rosenkranz Walter",
+            "Schellenbacher", "Schenk", "Schimanek", "Schmid Gerhard", "Steger", "Steinbichler", "Strache",
+            "Themessl",
+            "Weigerstorfer", "Winter", "Wurm Peter",
             "Zanger"
         ];
 
         #[rustfmt::skip]
         pub const CONTRA_VOTES: &[&str] = &[
             // Exakt 120 Einträge
-            "Alm", "Amon", "Aslan", "Aubauer", "Auer", 
-            "Bacher Walter", "Becher Ruth", "Berlakovich", "Brosz", "Brunner", "Buchmayr", "Bures", 
-            "Cap", 
-            "Diesner-Wais", "Durchschlag", 
-            "Ecker", "Ehmann", "Eßl", 
-            "Feichtinger Klaus Uwe", "Fekter", "Fichtinger Angela", 
-            "Gahr", "Gerstl", "Gessl-Ranftl", "Glawischnig-Piesczek", "Greiner Karin", "Grillitsch", "Groiß", "Grossmann", "Gusenbauer-Jäger", 
-            "Hable", "Hakel Elisabeth", "Hammer Michael", "Hanger Andreas", "Haubner", "Hechtl", "Heinzl", "Hell", "Himmelbauer", "Hofinger Manfred", "Höfinger Johann", "Holzinger", "Huainigg", 
-            "Jank", "Jarolim", 
-            "Karl", "Katzian", "Keck", "Kirchgatterer", "Knes", "Köchl", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Krainer Kai Jan", "Kucharowits", "Kucher", "Kuzdas", 
-            "Lichtenecker", "Lipitsch", "Loacker", "Lopatka", "Lueger Angela", 
-            "Matznetter", "Maurer", "Mayer", "Meinl-Reisinger", "Moser", "Muchitsch", "Mückstein", "Musiol", "Muttonen", 
-            "Obernosterer", "Ottenschläger", 
-            "Pendl", "Pfurtscheller", "Pirklhuber", "Plessl", "Pock", "Preiner", "Prinz", 
-            "Rädler", "Rasinger", "Rauch Johannes", "Rossmann", 
-            "Schellhorn", "Scherak", "Schieder", "Schittenhelm", "Schmid Julian", "Schmuckenschlager", "Schönegger", "Schopf", "Schultes", "Schwentner", "Sieber Norbert", 
-            "Singer Johann", "Steinacker", "Steinhauser", "Strasser", "Strolz", 
-            "Tamandl", "Töchterle", "Troch", 
-            "Unterrainer", 
-            "Vavrik", "Vogl", 
-            "Walser", "Weninger", "Willi", "Wimmer", "Windbüchler-Souschill", "Winzig", "Wittmann", "Wöginger", "Wurm Gisela", 
-            "Yilmaz", 
+            "Alm", "Amon", "Aslan", "Aubauer", "Auer",
+            "Bacher Walter", "Becher Ruth", "Berlakovich", "Brosz", "Brunner", "Buchmayr", "Bures",
+            "Cap",
+            "Diesner-Wais", "Durchschlag",
+            "Ecker", "Ehmann", "Eßl",
+            "Feichtinger Klaus Uwe", "Fekter", "Fichtinger Angela",
+            "Gahr", "Gerstl", "Gessl-Ranftl", "Glawischnig-Piesczek", "Greiner Karin", "Grillitsch", "Groiß", "Grossmann", "Gusenbauer-Jäger",
+            "Hable", "Hakel Elisabeth", "Hammer Michael", "Hanger Andreas", "Haubner", "Hechtl", "Heinzl", "Hell", "Himmelbauer", "Hofinger Manfred", "Höfinger Johann", "Holzinger", "Huainigg",
+            "Jank", "Jarolim",
+            "Karl", "Katzian", "Keck", "Kirchgatterer", "Knes", "Köchl", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Krainer Kai Jan", "Kucharowits", "Kucher", "Kuzdas",
+            "Lichtenecker", "Lipitsch", "Loacker", "Lopatka", "Lueger Angela",
+            "Matznetter", "Maurer", "Mayer", "Meinl-Reisinger", "Moser", "Muchitsch", "Mückstein", "Musiol", "Muttonen",
+            "Obernosterer", "Ottenschläger",
+            "Pendl", "Pfurtscheller", "Pirklhuber", "Plessl", "Pock", "Preiner", "Prinz",
+            "Rädler", "Rasinger", "Rauch Johannes", "Rossmann",
+            "Schellhorn", "Scherak", "Schieder", "Schittenhelm", "Schmid Julian", "Schmuckenschlager", "Schönegger", "Schopf", "Schultes", "Schwentner", "Sieber Norbert",
+            "Singer Johann", "Steinacker", "Steinhauser", "Strasser", "Strolz",
+            "Tamandl", "Töchterle", "Troch",
+            "Unterrainer",
+            "Vavrik", "Vogl",
+            "Walser", "Weninger", "Willi", "Wimmer", "Windbüchler-Souschill", "Winzig", "Wittmann", "Wöginger", "Wurm Gisela",
+            "Yilmaz",
             "Zakostelsky", "Zinggl"
         ];
 
@@ -3140,9 +3119,9 @@ mod tests {
             }
         );
         assert_eq!(res.plenary_session, Some(73));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         // wrong counts sadly from parlament.gv.at
         // assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         // assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
@@ -3157,23 +3136,30 @@ mod tests {
         // );
 
         for pro_checks in PRO_VOTES {
-            assert!(named_vote
-                .delegates_pro_contra
-                .as_ref()
-                .unwrap()
-                .pro
-                .contains(&pro_checks.to_string()), "Missing Pro: {}", pro_checks);
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .pro
+                    .contains(&pro_checks.to_string()),
+                "Missing Pro: {}",
+                pro_checks
+            );
         }
         for contra_checks in CONTRA_VOTES {
-            assert!(named_vote
-                .delegates_pro_contra
-                .as_ref()
-                .unwrap()
-                .contra
-                .contains(&contra_checks.to_string()), "Missing Contra: {}", contra_checks);
+            assert!(
+                named_vote
+                    .delegates_pro_contra
+                    .as_ref()
+                    .unwrap()
+                    .contra
+                    .contains(&contra_checks.to_string()),
+                "Missing Contra: {}",
+                contra_checks
+            );
         }
     }
-
 
     // XXI/I/1183
     #[tokio::test]
@@ -3231,9 +3217,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3241,11 +3227,11 @@ mod tests {
                 stage: Stage::Third
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(111));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3255,7 +3241,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3283,9 +3274,8 @@ mod tests {
             );
         }
     }
-    
-    // XXI/I/624
 
+    // XXI/I/624
 
     #[tokio::test]
     async fn test_named_vote_xxi_i_624() {
@@ -3342,9 +3332,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3352,11 +3342,11 @@ mod tests {
                 stage: Stage::Third
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(76));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3366,7 +3356,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3451,9 +3446,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3461,11 +3456,11 @@ mod tests {
                 stage: Stage::Third
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(65));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3475,7 +3470,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3560,9 +3560,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3570,11 +3570,11 @@ mod tests {
                 stage: Stage::Third
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(45));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3584,7 +3584,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3668,9 +3673,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3678,11 +3683,11 @@ mod tests {
                 stage: Stage::Third
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(32));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3692,7 +3697,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3774,9 +3784,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3784,11 +3794,11 @@ mod tests {
                 stage: Stage::None
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(46));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3798,7 +3808,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3880,9 +3895,9 @@ mod tests {
         ];
 
         println!("res: {res:?}");
-        
+
         assert_eq!(res.accepted, Some(AcceptedState::Declined));
-        
+
         assert_eq!(
             res.hidden_votes_info.vote_stage.unwrap(),
             VoteStage {
@@ -3890,11 +3905,11 @@ mod tests {
                 stage: Stage::None
             }
         );
-        
+
         assert_eq!(res.plenary_session, Some(9));
-        
+
         let named_vote = res.hidden_votes_info.voted_by_name_data.unwrap();
-        
+
         assert_eq!(named_vote.pro_count as usize, PRO_VOTES.len());
         assert_eq!(named_vote.contra_count as usize, CONTRA_VOTES.len());
 
@@ -3904,7 +3919,12 @@ mod tests {
         );
         assert_eq!(
             named_vote.contra_count as usize,
-            named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
+            named_vote
+                .delegates_pro_contra
+                .as_ref()
+                .unwrap()
+                .contra
+                .len()
         );
 
         for pro_checks in PRO_VOTES {
@@ -3931,5 +3951,15 @@ mod tests {
                 contra_checks
             );
         }
+    }
+    // XXIV/I/1516
+    #[tokio::test]
+    async fn test_xxiv_i_1516() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXIV/I/1516")
+            .await
+            .unwrap();
+        dbg!(res);
     }
 }

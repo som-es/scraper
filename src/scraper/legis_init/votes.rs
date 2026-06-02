@@ -198,7 +198,8 @@ pub async fn extract_most_fitting_votes(
 
                     let site_end = protocol_link_obj["fund_bis"]
                         .as_u64()
-                        .unwrap_or(site_start + 1) + 1;
+                        .unwrap_or(site_start + 1)
+                        + 1;
                     // let Some(site_end) = protocol_link_obj["fund_bis"].as_u64() else {
                     //     continue;
                     // };

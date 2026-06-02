@@ -3,7 +3,13 @@ use reqwest::{Client, Method};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{error::ScraperError, http_client, request::request, TextExtractor};
+use crate::{
+    caching::{disk_caching, get_disk_cache_json},
+    error::ScraperError,
+    http_client,
+    request::request,
+    TextExtractor,
+};
 
 pub mod call_to_order;
 pub mod dates;
@@ -13,6 +19,7 @@ pub mod enactment;
 pub mod gov_officials;
 pub mod legis_init;
 pub mod ministrial_proposals;
+pub mod parliamentary_questions;
 pub mod parties;
 pub mod plenar;
 pub mod proposals;
@@ -66,6 +73,19 @@ pub trait Scraper {
 
         request(Method::GET, self.client(), (), full_url).await
         // reqwest::get(full_url).await?.json::<serde_json::Value>().await
+    }
+
+    async fn cache(&self, path: &str) -> Result<Value, ScraperError> {
+        Ok(match get_disk_cache_json(path).await {
+            Some(raw) => raw,
+            None => {
+                let raw_value = self.get_gegenstand_info(path).await?;
+                if let Err(e) = disk_caching(path, raw_value.to_string()).await {
+                    log::warn!("could cache raw {path}: {e:?}")
+                }
+                raw_value
+            }
+        })
     }
 }
 

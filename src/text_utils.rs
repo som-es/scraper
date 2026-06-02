@@ -72,22 +72,33 @@ pub fn compare_words(src: &str, dst: &str) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    use crate::text_utils::ParanContent;
+
     use super::{remove_multiple_of, remove_paran_contents};
 
     #[test]
     fn test_remove_paran_contents() {
-        let (paran_contents, text) = remove_paran_contents(
-            "Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)",
-            '(',
-            ')',
-        );
+        let org_text = "Tim mit kleinen (sehr kleinen) Geräten (sehr, (sehr) sehr wahr)";
+        let (paran_contents, text) = remove_paran_contents(org_text, '(', ')');
         assert_eq!(text, "Tim mit kleinen  Geräten ");
         assert_eq!(
             paran_contents,
             vec![
-                "sehr kleinen".to_string(),
-                "sehr, (sehr) sehr wahr".to_string()
+                ParanContent {
+                    start_idx: 17,
+                    end_idx: 29,
+                    content: "sehr kleinen".into()
+                },
+                ParanContent {
+                    start_idx: 41,
+                    end_idx: 63,
+                    content: "sehr, (sehr) sehr wahr".into()
+                }
             ]
+        );
+        assert_eq!(
+            "sehr kleinen",
+            &org_text[paran_contents[0].start_idx..paran_contents[0].end_idx]
         );
         println!("text: {text}");
     }
@@ -103,9 +114,21 @@ mod tests {
         assert_eq!(
             paran_contents,
             vec![
-                "yesyes".to_string(),
-                "sehr kleinen".to_string(),
-                "sehr, (sehr) sehr wahr".to_string()
+                ParanContent {
+                    start_idx: 1,
+                    end_idx: 7,
+                    content: "yesyes".into()
+                },
+                ParanContent {
+                    start_idx: 25,
+                    end_idx: 37,
+                    content: "sehr kleinen".into()
+                },
+                ParanContent {
+                    start_idx: 49,
+                    end_idx: 71,
+                    content: "sehr, (sehr) sehr wahr".into()
+                },
             ]
         );
         println!("text: {text}");

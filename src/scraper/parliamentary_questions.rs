@@ -5,8 +5,8 @@ use common_scrapes::{ParliamentaryQAEntity, Proposal, QaReference, QaType};
 use serde_json::Value;
 
 use crate::{
-    error::ScraperError, extract_reference_from_gegenstand_url, proposals::ProposalScraper,
-    LastUpdated,
+    error::ScraperError, extract_reference_from_gegenstand_url,
+    extract_reference_from_gegenstand_url_text, proposals::ProposalScraper, LastUpdated,
 };
 
 use super::AustriaScraper;
@@ -56,12 +56,8 @@ impl ParliamentaryQAScraper for AustriaScraper {
         let references = references
             .iter()
             .flat_map(|reference| {
-                dbg!(reference);
-                let reference = extract_reference_from_gegenstand_url(
-                    reference.get("url").unwrap().as_str().unwrap(),
-                )
-                .unwrap();
-                dbg!(&reference);
+                let reference =
+                    extract_reference_from_gegenstand_url(reference.get("url")?.as_str()?)?;
                 let qa_type = extract_qa_type_from_ityp(&reference.ityp)?;
                 Some(QaReference { qa_type, reference })
             })
@@ -95,10 +91,37 @@ fn extract_qa_type_from_ityp(ityp: &str) -> Option<QaType> {
 mod tests {
     use common_scrapes::{QaReference, QaType, Reference};
 
-    use crate::{parliamentary_questions::ParliamentaryQAScraper, AustriaScraper};
+    use crate::{
+        parliamentary_questions::ParliamentaryQAScraper, proposals::ProposalScraper, AustriaScraper,
+    };
 
     #[tokio::test]
-    async fn test_check_for_references_lengths() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_get_parliament_qa_reference_counts() -> Result<(), Box<dyn std::error::Error>> {
+        let mut scraper = AustriaScraper::default();
+
+        // return Ok(());
+
+        for gp in [
+            "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+        ] {
+            println!("gp: {gp}");
+            scraper.scrape_info.gp = vec![gp.to_string()];
+
+            let entries = scraper.post_parliamentary_qa_payload().await?;
+            for path in scraper.proposal_paths(entries)? {
+                let qa_entity = scraper.get_parliamentary_qa(&path).await?;
+                if qa_entity.references.len() >= 2 {
+                    dbg!(path);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_proposal_from_path_with_issuer_and_receiver(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
         let qa_entity = scraper
@@ -123,16 +146,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_proposal_from_path_with_issuer_and_receiver(
+    async fn test_multiple_answerd_questions_xxviii_ab_2565(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let scraper = AustriaScraper::default();
 
         let qa_entity = scraper
-            .get_parliamentary_qa("/gegenstand/XXVII/J/14815")
+            .get_parliamentary_qa("/gegenstand/XXVIII/AB/2565")
             .await?;
-        assert_eq!(qa_entity.receiver_ids, [20445]);
-        assert_eq!(qa_entity.issuer_ids, [2344]);
-        assert_eq!(qa_entity.qa_type, QaType::Question);
+        assert_eq!(qa_entity.qa_type, QaType::Answer);
+        assert_eq!(
+            qa_entity.references[0],
+            QaReference {
+                qa_type: QaType::Question,
+                reference: Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "J".into(),
+                    inr: 3019,
+                },
+            }
+        );
+
+        assert_eq!(
+            qa_entity.references[1],
+            QaReference {
+                qa_type: QaType::Question,
+                reference: Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "J".into(),
+                    inr: 3020,
+                },
+            }
+        );
+
+        assert_eq!(
+            qa_entity.references[2],
+            QaReference {
+                qa_type: QaType::Question,
+                reference: Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "J".into(),
+                    inr: 3021,
+                },
+            }
+        );
+
+        assert_eq!(
+            qa_entity.references[3],
+            QaReference {
+                qa_type: QaType::Question,
+                reference: Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "J".into(),
+                    inr: 3022,
+                },
+            }
+        );
+
+        assert_eq!(
+            qa_entity.references[4],
+            QaReference {
+                qa_type: QaType::Question,
+                reference: Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "J".into(),
+                    inr: 3023,
+                },
+            }
+        );
 
         Ok(())
     }

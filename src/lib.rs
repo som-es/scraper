@@ -176,12 +176,13 @@ pub type DeclineUrlGegenstand = (String, String, Option<u32>);
 
 pub fn extract_reference_from_gegenstand_url(url: &str) -> Option<Reference> {
     let mut gegenstand_url = url.split('/');
+    if url.chars().next() == Some('/') {
+        gegenstand_url.next();
+    }
     gegenstand_url.next();
     let gp = gegenstand_url.next()?.to_string();
     let ityp = gegenstand_url.next()?.to_string();
     let inr = gegenstand_url.next()?.to_string();
-
-    dbg!(&inr);
     Some(Reference {
         gp,
         ityp,
@@ -189,7 +190,7 @@ pub fn extract_reference_from_gegenstand_url(url: &str) -> Option<Reference> {
     })
 }
 
-pub fn extract_from_gegenstand_url_text(text: &str) -> Option<Reference> {
+pub fn extract_reference_from_gegenstand_url_text(text: &str) -> Option<Reference> {
     let start = text.find('"')?;
     let (end, _) = text.char_indices().rev().find(|(_, x)| x == &'"')?;
     let gegenstand_url = &text[start + 2..end];

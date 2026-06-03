@@ -9,7 +9,7 @@ use crate::{
     caching::{disk_caching, get_disk_cache_json},
     convert_vienna_datetime_to_utc, documents,
     error::ScraperError,
-    extract_from_gegenstand_url_text, extract_text_from_html,
+    extract_reference_from_gegenstand_url_text, extract_text_from_html,
     legis_init::extract_topics,
     person_url_to_id,
     proposals::ProposalsPayload,
@@ -223,7 +223,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         {
             let text = entry["text"].as_str().unwrap_or_default();
             if text.contains("Regierungsvorlage") {
-                extract_from_gegenstand_url_text(text)
+                extract_reference_from_gegenstand_url_text(text)
             } else {
                 None
             }
@@ -339,5 +339,7 @@ mod tests {
         };
         let ministerial_prop = scraper.get_ministrial_proposal(geg_info).await.unwrap();
         dbg!(ministerial_prop.delegate_ids);
+        let legis_ref = ministerial_prop.legis_reference.unwrap();
+        assert_eq!(legis_ref.inr, 1188);
     }
 }

@@ -204,6 +204,8 @@ pub async fn extract_most_fitting_votes(
                     //     continue;
                     // };
 
+                    dbg!(site_start);
+                    dbg!(site_end);
                     match extractor
                         .text_accumulation(
                             &url[..last_idx + 1],

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
-use common_scrapes::Document;
+use common_scrapes::{Document, Reference};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -35,9 +35,7 @@ pub struct MinistrialProposal {
     pub eurovoc_topics: Vec<String>,
     pub other_keyword_topics: Vec<String>,
     pub gegenstand_info: GegenstandInfo,
-    pub legis_gp: Option<String>,
-    pub legis_init_inr: Option<u32>,
-    pub legis_init_ityp: Option<String>,
+    pub legis_reference: Option<Reference>,
 }
 
 impl LastUpdated for MinistrialProposal {
@@ -217,8 +215,7 @@ impl MinistrialProposalScraper for AustriaScraper {
             .flat_map(|name| person_url_to_id(name["url"].as_str()?))
             .collect::<Vec<u64>>();
 
-        let (mut legis_gp, mut legis_init_inr, mut legis_init_ityp) = (None, None, None);
-        if let Some(entry) = raw_ministrial_content["stages"]
+        let legis_reference = if let Some(entry) = raw_ministrial_content["stages"]
             .as_array()
             .cloned()
             .unwrap_or_default()
@@ -226,12 +223,13 @@ impl MinistrialProposalScraper for AustriaScraper {
         {
             let text = entry["text"].as_str().unwrap_or_default();
             if text.contains("Regierungsvorlage") {
-                let rv = extract_from_gegenstand_url_text(text).unwrap();
-                legis_gp = Some(rv.0);
-                legis_init_ityp = Some(rv.1);
-                legis_init_inr = Some(rv.2.unwrap());
+                extract_from_gegenstand_url_text(text)
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
         Some(MinistrialProposal {
             id,
@@ -249,9 +247,7 @@ impl MinistrialProposalScraper for AustriaScraper {
             eurovoc_topics,
             other_keyword_topics,
             gegenstand_info,
-            legis_gp,
-            legis_init_inr,
-            legis_init_ityp,
+            legis_reference,
         })
     }
 }

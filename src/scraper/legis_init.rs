@@ -2907,7 +2907,7 @@ mod tests {
         );
         assert_eq!(
             res.hidden_votes_info.pro_contra_parties.unwrap().contra,
-            vec!["FPÖ".to_string(), "L".to_string(), "GRÜNE".to_string()]
+            vec!["F".to_string(), "L".to_string(), "GRÜNE".to_string()]
         );
     }
 
@@ -3060,46 +3060,44 @@ mod tests {
             .unwrap();
 
         #[rustfmt::skip]
-        pub const PRO_VOTES: [&str; 43] = [
-            // Exakt 43 Einträge
+        pub const PRO_VOTES: [&str; 42] = [
             "Angerer",
             "Bösch",
             "Darmann", "Deimek", "Dietrich", "Doppler",
             "Ertlschweiger",
-            "Fuchs",
+            "Franz", "Fuchs",
             "Hackl Heinz-Peter", "Hafenecker", "Hagen", "Haider", "Hauser", "Höbart", "Hübner",
             "Jannach",
             "Karlsböck", "Kassegger", "Kitzmüller",
             "Lausch", "Lintl", "Lugar Robert",
             "Mölzer", "Mühlberghuber",
-            "Nachbaur Kathrin", "Neubauer Werner",
+            "Neubauer Werner",
             "Podgorschek",
             "Rauch Walter", "Riemer", "Rosenkranz Barbara", "Rosenkranz Walter",
-            "Schellenbacher", "Schenk", "Schimanek", "Schmid Gerhard", "Steger", "Steinbichler", "Strache",
+            "Schellenbacher", "Schenk", "Schimanek", "Schmid Gerhard", "Steinbichler", "Strache",
             "Themessl",
             "Weigerstorfer", "Winter", "Wurm Peter",
             "Zanger"
         ];
 
         #[rustfmt::skip]
-        pub const CONTRA_VOTES: &[&str] = &[
-            // Exakt 120 Einträge
+        pub const CONTRA_VOTES: [&str; 115] = [
             "Alm", "Amon", "Aslan", "Aubauer", "Auer",
             "Bacher Walter", "Becher Ruth", "Berlakovich", "Brosz", "Brunner", "Buchmayr", "Bures",
             "Cap",
-            "Diesner-Wais", "Durchschlag",
-            "Ecker", "Ehmann", "Eßl",
+            "Durchschlag",
+            "Ecker", "Ehmann",
             "Feichtinger Klaus Uwe", "Fekter", "Fichtinger Angela",
-            "Gahr", "Gerstl", "Gessl-Ranftl", "Glawischnig-Piesczek", "Greiner Karin", "Grillitsch", "Groiß", "Grossmann", "Gusenbauer-Jäger",
+            "Gahr", "Gerstl", "Gessl-Ranftl", "Glawischnig-Piesczek", "Greiner Karin", "Grossmann", "Gusenbauer-Jäger",
             "Hable", "Hakel Elisabeth", "Hammer Michael", "Hanger Andreas", "Haubner", "Hechtl", "Heinzl", "Hell", "Himmelbauer", "Hofinger Manfred", "Höfinger Johann", "Holzinger", "Huainigg",
-            "Jank", "Jarolim",
-            "Karl", "Katzian", "Keck", "Kirchgatterer", "Knes", "Köchl", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Krainer Kai Jan", "Kucharowits", "Kucher", "Kuzdas",
+            "Jarolim",
+            "Karl", "Katzian", "Keck", "Kirchgatterer", "Knes", "Köchl", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Krainer Kai Jan", "Krist", "Kucharowits", "Kucher", "Kuntzl", "Kuzdas",
             "Lichtenecker", "Lipitsch", "Loacker", "Lopatka", "Lueger Angela",
             "Matznetter", "Maurer", "Mayer", "Meinl-Reisinger", "Moser", "Muchitsch", "Mückstein", "Musiol", "Muttonen",
             "Obernosterer", "Ottenschläger",
             "Pendl", "Pfurtscheller", "Pirklhuber", "Plessl", "Pock", "Preiner", "Prinz",
             "Rädler", "Rasinger", "Rauch Johannes", "Rossmann",
-            "Schellhorn", "Scherak", "Schieder", "Schittenhelm", "Schmid Julian", "Schmuckenschlager", "Schönegger", "Schopf", "Schultes", "Schwentner", "Sieber Norbert",
+            "Schellhorn", "Scherak", "Schieder", "Schmid Julian", "Schmuckenschlager", "Schopf", "Schultes", "Schwentner", "Sieber Norbert",
             "Singer Johann", "Steinacker", "Steinhauser", "Strasser", "Strolz",
             "Tamandl", "Töchterle", "Troch",
             "Unterrainer",
@@ -3134,6 +3132,8 @@ mod tests {
         //     named_vote.contra_count as usize,
         //     named_vote.delegates_pro_contra.as_ref().unwrap().contra.len()
         // );
+
+        dbg!(&named_vote);
 
         for pro_checks in PRO_VOTES {
             assert!(

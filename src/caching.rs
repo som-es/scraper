@@ -1,5 +1,6 @@
 use std::{future::Future, path::PathBuf, time::SystemTime};
 
+use rand::distr::{weighted::WeightedIndex, Distribution};
 use serde_json::Value;
 
 #[inline]
@@ -82,8 +83,22 @@ pub async fn disk_caching(entry: &str, data: impl AsRef<[u8]>) -> std::io::Resul
     Ok(())
 }
 
+fn weighted_rand(min: u64, max: u64, pow: f64) -> u64 {
+    let values: Vec<u64> = (min..=max).collect();
+
+    let weights: Vec<f64> = values
+        .iter()
+        .map(|&x| (1.0 + 3.0 * (x - min) as f64 / (max - min) as f64).powf(pow))
+        .collect();
+    let dist = WeightedIndex::new(weights).unwrap();
+    let mut rng = rand::rng();
+
+    values[dist.sample(&mut rng)]
+}
+
 pub async fn get_disk_cache_json(entry: &str) -> Option<Value> {
-    get_disk_cache(entry, 60 * 60 * 24 * 190)
+    let days = weighted_rand(1, 25, 1.7);
+    get_disk_cache(entry, 60 * 60 * 24 * days)
         .await
         .map(|x| serde_json::from_str(&x).ok())?
 }

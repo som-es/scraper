@@ -4,8 +4,8 @@ use common_scrapes::{AcceptedState, Party, Reference, Vote};
 use serde_json::Value;
 
 use crate::{
-    extract_from_gegenstand_url, extract_from_gegenstand_url_text, filter::filter_name_extraction,
-    DeclineUrlGegenstand,
+    extract_from_gegenstand_url_text, extract_reference_from_gegenstand_url,
+    filter::filter_name_extraction, DeclineUrlGegenstand,
 };
 
 pub fn extract_references(legis_content: &Value) -> Option<Vec<Reference>> {
@@ -13,14 +13,7 @@ pub fn extract_references(legis_content: &Value) -> Option<Vec<Reference>> {
         legis_content["reference"]
             .as_array()?
             .iter()
-            .flat_map(|v| {
-                let (gp, ityp, inr) = extract_from_gegenstand_url(&v["url"].as_str()?[2..])?;
-                Some(Reference {
-                    gp,
-                    ityp,
-                    inr: inr?,
-                })
-            })
+            .flat_map(|v| extract_reference_from_gegenstand_url(&v["url"].as_str()?[2..]))
             .collect::<Vec<_>>(),
     )
 }
@@ -40,9 +33,7 @@ pub fn is_accepted_based_on_votes(
     }
 }
 
-pub fn extract_invisibly_declined_from_text(
-    text: &str,
-) -> (Option<bool>, Option<DeclineUrlGegenstand>) {
+pub fn extract_invisibly_declined_from_text(text: &str) -> (Option<bool>, Option<Reference>) {
     let url = extract_from_gegenstand_url_text(text);
     if text.contains("abgelehnt") {
         return (Some(true), url);
@@ -55,9 +46,7 @@ pub fn extract_invisibly_declined_from_text(
     (None, None)
 }
 
-pub fn extract_invisibly_declined(
-    legis_content: &Value,
-) -> (Option<bool>, Option<DeclineUrlGegenstand>) {
+pub fn extract_invisibly_declined(legis_content: &Value) -> (Option<bool>, Option<Reference>) {
     let status_description = legis_content["status"]["description"].as_str();
 
     let Some(status_description) = status_description else {

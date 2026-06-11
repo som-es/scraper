@@ -100,7 +100,24 @@ mod tests {
         let mut scraper = AustriaScraper::default();
 
         // return Ok(());
+        /*
+        *
+        * gp: XXVII
+        could not extract: /gegenstand/XXVII/AB/13696
+        could not extract: /gegenstand/XXVII/J/16514
+        gp: XXVI
+        gp: XXV
+        gp: XXIV
+        could not extract: /gegenstand/XXIV/J/904
+        gp: XXIII
+        gp: XXII
+        could not extract: /gegenstand/XXII/AB/3412
+        could not extract: /gegenstand/XXII/J/2427
+        gp: XXI
+        gp: XX
+        */
 
+        let mut entry_count = 0;
         for gp in [
             "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
         ] {
@@ -108,13 +125,20 @@ mod tests {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let entries = scraper.post_parliamentary_qa_payload().await?;
-            for path in scraper.proposal_paths(entries)? {
-                let qa_entity = scraper.get_parliamentary_qa(&path).await?;
-                if qa_entity.references.len() >= 2 {
-                    dbg!(path);
-                }
+            let paths = scraper.proposal_paths(entries)?;
+            entry_count += paths.len();
+            for path in paths {
+                // let Ok(_qa_entity) = scraper.get_parliamentary_qa(&path).await else {
+                //     println!("could not extract: {path}");
+                //     continue;
+                // };
+                // if qa_entity.references.len() >= 2 {
+                //     dbg!(path);
+                // }
             }
         }
+
+        dbg!(entry_count);
 
         Ok(())
     }

@@ -5,10 +5,7 @@ use common_scrapes::{Proposal, ProposalType};
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
-    convert_vienna_datetime_to_utc, documents,
-    error::ScraperError,
-    legis_init::extract_topics,
+    convert_vienna_datetime_to_utc, documents, error::ScraperError, legis_init::extract_topics,
     person_url_to_id, DatePayload, GeneralScrapeInfo, LastUpdated,
 };
 

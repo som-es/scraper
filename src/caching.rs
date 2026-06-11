@@ -97,7 +97,7 @@ fn weighted_rand(min: u64, max: u64, pow: f64) -> u64 {
 }
 
 pub async fn get_disk_cache_json(entry: &str) -> Option<Value> {
-    let days = weighted_rand(1, 25, 1.7);
+    let days = weighted_rand(12, 90, 1.7);
     get_disk_cache(entry, 60 * 60 * 24 * days)
         .await
         .map(|x| serde_json::from_str(&x).ok())?

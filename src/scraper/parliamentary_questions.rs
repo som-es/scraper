@@ -5,8 +5,8 @@ use common_scrapes::{ParliamentaryQAEntity, Proposal, QaReference, QaType};
 use serde_json::Value;
 
 use crate::{
-    error::ScraperError, extract_reference_from_gegenstand_url,
-    extract_reference_from_gegenstand_url_text, proposals::ProposalScraper, LastUpdated,
+    error::ScraperError, extract_reference_from_gegenstand_url, proposals::ProposalScraper,
+    LastUpdated,
 };
 
 use super::AustriaScraper;
@@ -19,8 +19,16 @@ impl LastUpdated for ParliamentaryQAEntity {
 
 #[async_trait]
 pub trait ParliamentaryQAScraper: ProposalScraper {
-    async fn post_parliamentary_qa_payload(&self) -> Result<Value, ScraperError> {
-        self.post_proposals_payload(Some(&["AB", "J"])).await
+    async fn post_parliamentary_qa_payload(
+        &self,
+        only_questions: bool,
+    ) -> Result<Value, ScraperError> {
+        let doktyps = if only_questions {
+            ["J"].as_slice()
+        } else {
+            &["AB", "J"]
+        };
+        self.post_proposals_payload(Some(doktyps)).await
     }
     fn raw_value_into_parliamentary_qa(
         raw_value: Value,
@@ -124,7 +132,7 @@ mod tests {
             println!("gp: {gp}");
             scraper.scrape_info.gp = vec![gp.to_string()];
 
-            let entries = scraper.post_parliamentary_qa_payload().await?;
+            let entries = scraper.post_parliamentary_qa_payload(false).await?;
             let paths = scraper.proposal_paths(entries)?;
             entry_count += paths.len();
             for path in paths {

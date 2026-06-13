@@ -19,6 +19,7 @@ pub mod enactment;
 pub mod gov_officials;
 pub mod legis_init;
 pub mod ministrial_proposals;
+pub mod oral_inquiries;
 pub mod parliamentary_questions;
 pub mod parties;
 pub mod plenar;

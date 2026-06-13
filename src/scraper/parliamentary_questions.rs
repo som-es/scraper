@@ -24,9 +24,9 @@ pub trait ParliamentaryQAScraper: ProposalScraper {
         only_questions: bool,
     ) -> Result<Value, ScraperError> {
         let doktyps = if only_questions {
-            ["J"].as_slice()
+            ["J", "JPR", "JEU"].as_slice()
         } else {
-            &["AB", "J"]
+            &["AB", "J", "JPR", "ABPR", "ABEU"]
         };
         self.post_proposals_payload(Some(doktyps)).await
     }
@@ -85,9 +85,9 @@ impl ParliamentaryQAScraper for AustriaScraper {
 }
 
 fn extract_qa_type_from_ityp(ityp: &str) -> Option<QaType> {
-    let qa_type = if ityp == "J" {
+    let qa_type = if ityp.starts_with('J') {
         QaType::Question
-    } else if ityp == "AB" {
+    } else if ityp.starts_with("AB") {
         QaType::Answer
     } else {
         return None;
@@ -132,17 +132,17 @@ mod tests {
             println!("gp: {gp}");
             scraper.scrape_info.gp = vec![gp.to_string()];
 
-            let entries = scraper.post_parliamentary_qa_payload(false).await?;
+            let entries = scraper.post_parliamentary_qa_payload(true).await?;
             let paths = scraper.proposal_paths(entries)?;
             entry_count += paths.len();
             for path in paths {
-                // let Ok(_qa_entity) = scraper.get_parliamentary_qa(&path).await else {
-                //     println!("could not extract: {path}");
-                //     continue;
-                // };
-                // if qa_entity.references.len() >= 2 {
-                //     dbg!(path);
-                // }
+                let Ok(qa_entity) = scraper.get_parliamentary_qa(&path).await else {
+                    println!("could not extract: {path}");
+                    continue;
+                };
+                if qa_entity.references.len() >= 2 {
+                    dbg!(path);
+                }
             }
         }
 

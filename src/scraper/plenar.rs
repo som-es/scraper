@@ -56,8 +56,8 @@ pub struct PlenarInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Absences {
-    absences: Vec<String>,
-    source_document: Document,
+    pub absences: Vec<String>,
+    pub source_document: Document,
 }
 
 impl LastUpdated for PlenarInfo {

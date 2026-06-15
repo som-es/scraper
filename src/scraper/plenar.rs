@@ -51,7 +51,13 @@ pub struct PlenarInfo {
     pub updated_at: Option<DateTime<Utc>>,
     pub call_to_orders: Vec<CallToOrderInfo>,
     pub gp: String,
-    pub absences: Option<Vec<String>>,
+    pub absences: Option<Absences>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Absences {
+    absences: Vec<String>,
+    source_document: Document,
 }
 
 impl LastUpdated for PlenarInfo {
@@ -165,13 +171,13 @@ impl Plenar for AustriaScraper {
             .cloned()
             .unwrap_or_default();
 
-        let mut documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
+        let mut praesidium_documents = vec![];
 
         if let Some(content_2) = raw_plenar["content"].as_array()?.get(2) {
             if let Some(raw_praesidiums) = extract_praesidium_from_progress(&content_2["progress"])
             {
                 for raw_praesidium in raw_praesidiums {
-                    documents.extend(
+                    praesidium_documents.extend(
                         extract_praesidium_documents(raw_praesidium)
                             .unwrap_or_default()
                             .into_iter()
@@ -183,8 +189,14 @@ impl Plenar for AustriaScraper {
                 }
             }
         }
+        let documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
+        let absences_documents = praesidium_documents
+            .iter()
+            .chain(&documents)
+            .cloned()
+            .collect::<Vec<_>>();
 
-        let absences = extract_absences(&documents).await;
+        let absences = extract_absences(&absences_documents).await;
         log::info!("!!!!!!! absences: {absences:?}");
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
@@ -451,7 +463,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            [
+            &[
                 "Martin Engelberg",
                 "Reinhold Lopatka",
                 "Petra Bayr",
@@ -469,8 +481,9 @@ mod tests {
                 "Karin Doppelbauer",
                 "Fiona Fiedler",
                 "Julia Seidl"
-            ],
-            *plenar_info.absences.unwrap().clone()
+            ]
+            .as_slice(),
+            &plenar_info.absences.unwrap().clone().absences
         );
     }
 
@@ -488,6 +501,8 @@ mod tests {
             plenar
                 .absences
                 .unwrap()
+                .clone()
+                .absences
                 .iter()
                 .map(|x| x.as_str())
                 .collect::<Vec<_>>(),
@@ -513,6 +528,7 @@ mod tests {
             plenar
                 .absences
                 .unwrap()
+                .absences
                 .iter()
                 .map(|x| x.as_str())
                 .collect::<Vec<_>>(),
@@ -543,16 +559,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            plenar.absences,
-            Some(vec![
+            plenar.absences.clone().unwrap().absences,
+            vec![
                 "Giuliani-Sterrer".to_string(),
                 "Herbert".to_string(),
                 "Gmeinbauer".to_string(),
                 "Voglauer".to_string(),
                 "Zadić".to_string()
-            ])
+            ]
         );
-        println!("plenar: {plenar:?}");
+        println!("{:?}", plenar.absences);
+        assert_eq!(
+            plenar.absences.unwrap().source_document.link,
+            "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/5/A_-_09_09_06_00597342.html"
+        );
+        // println!("plenar: {plenar:?}");
     }
 
     #[tokio::test]
@@ -566,16 +587,323 @@ mod tests {
 
         dbg!(&plenar);
         assert_eq!(
-            plenar.absences,
-            Some(vec![
+            plenar.absences.clone().unwrap().absences,
+            vec![
                 "Marie-Christine Giuliani-Sterrer".to_string(),
                 "Werner Herbert".to_string(),
                 "Daniela Gmeinbauer".to_string(),
                 "Olga Voglauer".to_string(),
                 "Alma Zadić".to_string()
-            ])
+            ]
         );
         println!("plenar: {plenar:?}");
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxv_nrsitz_12_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXV/NRSITZ/12")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Moser".to_string(),
+                "Schenk".to_string(),
+                "Heinzl".to_string(),
+                "Wimmer".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxv_nrsitz_14_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXV/NRSITZ/14")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Heinzl".to_string(),
+                "Stefan".to_string(),
+                "Barbara Rosenkranz".to_string(),
+                "Moser".to_string(),
+                "Musiol".to_string(),
+                "Schenk".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxv_nrsitz_30_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXV/NRSITZ/30")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Bayr".to_string(),
+                "Auer".to_string(),
+                "Bösch".to_string(),
+                "Kunasek".to_string(),
+                "Schellenbacher".to_string(),
+                "Schrangl".to_string(),
+                "Vilimsky".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxiv_nrsitz_30_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXIV/NRSITZ/30")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Faul".to_string(),
+                "Praßl".to_string(),
+                "Pilz".to_string(),
+                "Lunacek".to_string(),
+                "Glawischnig-Piesczek".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxiii_nrsitz_30_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXIII/NRSITZ/30")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Hagenhofer".to_string(),
+                "Kräuter".to_string(),
+                "Schopf".to_string(),
+                "Stauber".to_string(),
+                "Großruck".to_string(),
+                "Peter Haubner".to_string(),
+                "Mandak".to_string(),
+                "Öllinger".to_string(),
+                "Fichtenbauer".to_string(),
+                "Kickl".to_string(),
+                "Kurzmann".to_string(),
+                "Lutz Weinzinger".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxii_nrsitz_30_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXII/NRSITZ/30")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Gabriela Moser".to_string(),
+                "Kurt Grünewald".to_string(),
+                "Klaus Hubert Auer".to_string(),
+                "Manfred Lackner".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxi_nrsitz_30_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXI/NRSITZ/30")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Fasslabend".to_string(),
+                "Amon".to_string(),
+                "Gerhard Bauer".to_string(),
+                "Lunacek".to_string(),
+                "Platter".to_string(),
+                "Parnigoni".to_string(),
+                "Prammer".to_string(),
+                "Nürnberger".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xx_nrsitz_30_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XX/NRSITZ/30")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Brinek".to_string(),
+                "Frieser".to_string(),
+                "Gatterer".to_string(),
+                "Gusenbauer".to_string(),
+                "Kukacka".to_string(),
+                "Elmecker".to_string(),
+                "Meischberger".to_string(),
+                "Hans Helmut Moser".to_string(),
+                "Mock".to_string(),
+                "Rauch-Kallat".to_string(),
+            ]
+        );
+    }
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xx_nrsitz_110_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XX/NRSITZ/110")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Aumayr".to_string(),
+                "Schaffenrath".to_string(),
+                "Mertel".to_string(),
+                "Silhavy".to_string(),
+                "Löschnak".to_string(),
+                "Fuhrmann".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxii_nrsitz_110_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXII/NRSITZ/110")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Großruck".to_string(),
+                "Wimmer".to_string(),
+                "Öllinger".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxiv_nrsitz_110_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXIV/NRSITZ/110")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Keck".to_string(),
+                "Schüssel".to_string(),
+                "Jarmer".to_string(),
+                "Bellen".to_string(), // 3 char words are removed: "Van der" Bellen
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxvi_nrsitz_69_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVI/NRSITZ/69")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Barbara Krenn".to_string(),
+                "Nico Marchetti".to_string(),
+                "Josef Muchitsch".to_string(),
+                "Dagmar Belakowitsch".to_string(),
+                "Petra Steger".to_string(),
+                "Beate Meinl-Reisinger".to_string(),
+                "Alfred Noll".to_string(),
+            ]
+        );
+    }
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxviii_nrsitz_69_absences() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/69")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Manuel Litzke".to_string(),
+                "Reinhold Maier".to_string(),
+                "Volker Reifenberger".to_string(),
+                "Christoph Steiner".to_string(),
+                "Wolfgang Zanger".to_string(),
+                "Gudrun Kugler".to_string(),
+                "Carmen Jeitler-Cincelli".to_string(),
+                "Christoph Stark".to_string(),
+                "Petra Bayr".to_string(),
+                "Elke Hanel-Torsch".to_string(),
+                "Veit Valentin Dengler".to_string(),
+                "Fiona Fiedler".to_string(),
+            ]
+        );
     }
 
     #[tokio::test]
@@ -588,11 +916,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            plenar.absences,
-            Some(vec![
-                "Elisabeth Heiß".to_string(),
-                "Reinhold Binder".to_string(),
-            ])
+            plenar.absences.clone().unwrap().absences,
+            vec!["Elisabeth Heiß".to_string(), "Reinhold Binder".to_string(),]
         );
         println!("plenar: {plenar:?}");
     }

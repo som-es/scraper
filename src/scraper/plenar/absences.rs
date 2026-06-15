@@ -3,11 +3,9 @@ use std::collections::HashSet;
 use common_scrapes::{Document, FileType};
 use regex::Regex;
 
-use crate::{
-    filter::filter_name_extraction, unique_titles, AustriaScraper, Scraper, TextExtractor,
-};
+use crate::{filter::filter_name_extraction, plenar::Absences, unique_titles, TextExtractor};
 
-pub(super) async fn extract_absences(documents: &[Document]) -> Option<Vec<String>> {
+pub(super) async fn extract_absences(documents: &[Document]) -> Option<Absences> {
     for document in documents {
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
@@ -15,7 +13,10 @@ pub(super) async fn extract_absences(documents: &[Document]) -> Option<Vec<Strin
             let Some(extracted_absences) = extract_absences_from_document(document).await else {
                 continue;
             };
-            return Some(extracted_absences);
+            return Some(Absences {
+                absences: extracted_absences,
+                source_document: document.clone(),
+            });
         }
     }
     None
@@ -41,8 +42,9 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     let titles = unique_titles();
 
     let text = text
-        .split_inclusive(' ')
+        .split_inclusive(char::is_whitespace)
         .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
+        .filter(|x| !(x.contains(".") && x.len() <= 3))
         .collect::<String>();
 
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
@@ -65,7 +67,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 
     // open_ended_absence.replace(&["Hi", "Bi"], " ");
 
-    // println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
+    println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
     let info = &open_ended_absence[..open_ended_absence
         .find(".\n")
         .unwrap_or(usize::MAX)
@@ -99,7 +101,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     info: {info:?}"
     );
 
-    let skip_words = [
+    let mut skip_words = [
         "dass",
         "MMSc",
         "diplômé",
@@ -123,6 +125,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "heute",
         "Abgeordneter",
         "Abgeordnete",
+        "Dritte",
         "Herr",
         "Nationalrates",
         "Präsident",
@@ -186,6 +189,14 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     ]
     .into_iter()
     .collect::<HashSet<_>>();
+
+    skip_words.extend(
+        unique_titles()
+            .iter()
+            .map(|title| title.split('.'))
+            .flatten()
+            .map(|title| title.trim_matches(char::is_whitespace)),
+    );
 
     let info = info
         .split(',')

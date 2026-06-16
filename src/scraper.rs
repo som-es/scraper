@@ -187,7 +187,7 @@ impl AustriaScraper {
 
 impl Scraper for AustriaScraper {
     const BASE_URL: &'static str = "https://www.parlament.gv.at";
-    const JSON_SUFFIX: &'static str = "?json=True";
+    const JSON_SUFFIX: &'static str = "?json=true";
     const LIST_ENTRIES: &'static str = "rows";
 
     type Payload = Value;

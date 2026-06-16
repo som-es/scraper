@@ -75,7 +75,9 @@ pub trait LegislativeInitiatives: ProposalScraper + Sync {
             None => {
                 log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
 
+                println!("HI");
                 let raw_proposal = self.get_gegenstand_info(&proposal_path).await?;
+                dbg!(&raw_proposal);
 
                 if let Err(e) = disk_caching(&proposal_path, raw_proposal.to_string()).await {
                     log::warn!("could cache raw {proposal_path}: {e:?}")

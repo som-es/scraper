@@ -248,11 +248,13 @@ pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Optio
 #[cfg(test)]
 mod tests {
     use scraper::Html;
+    use serde_json::Value;
 
     use crate::{
         extract_pro_contra_party_codes_from_string,
         extract_text_from_html_till_next_name_attribute,
-        extract_text_from_html_via_name_attribute_parent_parent, remove_titles_from_str,
+        extract_text_from_html_via_name_attribute_parent_parent, http_client,
+        remove_titles_from_str,
     };
 
     #[test]
@@ -322,5 +324,17 @@ Dafür: V, G. Dagegen: S, F, N (Gesetzentwurf findet nicht die erforderliche 2/3
 
         let name = remove_titles_from_str(name);
         assert_eq!("Dieter Brosz", name);
+    }
+
+    #[tokio::test]
+    async fn test_request() {
+        let client = http_client().unwrap();
+        let res = client
+            .get("https://parlament.gv.at/gegenstand/XXVIII/AB/2565?json=true")
+            .send()
+            .await
+            .unwrap();
+        let res: Value = res.json().await.unwrap();
+        dbg!(res);
     }
 }

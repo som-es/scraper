@@ -67,7 +67,6 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 
     // open_ended_absence.replace(&["Hi", "Bi"], " ");
 
-    println!("open_ended_absence: {:?}", &open_ended_absence[..1001]);
     let info = &open_ended_absence[..open_ended_absence
         .find(".\n")
         .unwrap_or(usize::MAX)

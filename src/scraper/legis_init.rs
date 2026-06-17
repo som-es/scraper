@@ -2329,7 +2329,99 @@ mod tests {
             br_hidden_votes.voted_at_date.unwrap(),
             NaiveDate::from_ymd_opt(2018, 11, 8).unwrap()
         );
+
         assert!(br_hidden_votes.voted_by_name);
+        let expected_pro = vec![
+            "Aschenbrenner",
+            "Bader",
+            "Bernard",
+            "Brunner",
+            "Buchmann",
+            "Ecker",
+            "Eder-Gitschthaler",
+            "Ess",
+            "Forstner",
+            "Froschauer",
+            "Gfrerer",
+            "Hackl",
+            "Kern",
+            "Köck",
+            "Krusche",
+            "Längle",
+            "Mattersberger",
+            "Mühlwerth",
+            "Neurauter",
+            "Ofner",
+            "Pisec",
+            "Preineder",
+            "Raggl",
+            "Raml",
+            "Rösch",
+            "Samt",
+            "Schererbauer",
+            "Schuster",
+            "Seeber",
+            "Spanring",
+            "Sperl",
+            "Steiner",
+            "Steiner-Wieser",
+            "Tiefnig",
+            "Wagner",
+            "Zeidler-Beck",
+            "Zwazl",
+        ];
+
+        let expected_contra = vec![
+            "Appé",
+            "Beer",
+            "Dziedzic",
+            "Grimling",
+            "Grossmann",
+            "Gruber-Pruner",
+            "Hahn",
+            "Kahofer",
+            "Koller",
+            "Leitner",
+            "Lindinger",
+            "Novak",
+            "Posch-Gruska",
+            "Prischl",
+            "Reisinger",
+            "Schabhüttl",
+            "Schennach",
+            "Schumann",
+            "Stögmüller",
+            "Todt",
+            "Wanner",
+            "Weber",
+            "Zaggl",
+        ];
+
+        let actual_pro: Vec<&str> = br_hidden_votes
+            .voted_by_name_data
+            .as_ref()
+            .unwrap()
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .pro
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+
+        let actual_contra: Vec<&str> = br_hidden_votes
+            .voted_by_name_data
+            .as_ref()
+            .unwrap()
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .contra
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+        assert_eq!(actual_pro, expected_pro);
+        assert_eq!(actual_contra, expected_contra);
     }
 
     // XXVII/I/604

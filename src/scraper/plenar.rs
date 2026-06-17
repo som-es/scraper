@@ -548,6 +548,35 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_get_plenar_gegenstand_xxviii_nrsitz_78_absences() {
+        let scraper = AustriaScraper::default();
+
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/78")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Marie-Christine Giuliani-Sterrer".to_string(),
+                "Martin Graf".to_string(),
+                "Christian Ragger".to_string(),
+                "Michael Schilchegger".to_string(),
+                "Johannes Schmuckenschlager".to_string(),
+                "Petra Bayr".to_string(),
+                "Douglas Hoyos-Trauttmansdorff".to_string(),
+            ]
+        );
+        println!("{:?}", plenar.absences);
+        assert_eq!(
+            plenar.absences.unwrap().source_document.link,
+            "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/78/A_-_17_49_11_00962921.html"
+        );
+        // println!("plenar: {plenar:?}");
+    }
+
     // /gegenstand/XXVIII/NRSITZ/6
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {

@@ -132,7 +132,9 @@ impl LegislativeInitiatives for AustriaScraper {
                 None
             };
         }
-        let mut documents = documents(raw_documents?, AustriaScraper::BASE_URL)?;
+        let mut documents = raw_documents
+            .map(|raw_documents| documents(raw_documents, AustriaScraper::BASE_URL))
+            .unwrap_or_else(|| Some(vec![]))?;
 
         let plenar_stage_documents = extract_plenar_documents(legis_content).unwrap_or_default();
         let new_law_text_files = plenar_stage_documents
@@ -3960,6 +3962,16 @@ mod tests {
             .get_legis_init("/gegenstand/XXIV/I/1516")
             .await
             .unwrap();
+        dbg!(res);
+    }
+    #[tokio::test]
+    async fn test_xxviii_rger_7() {
+        let scraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/RGER/7")
+            .await
+            .unwrap();
+        assert_eq!(res.description, "Erklärung des Bundesministers für Finanzen  betreffend  Bundesfinanzgesetze für die Jahre 2027 und 2028 (7/RGER)");
         dbg!(res);
     }
 }

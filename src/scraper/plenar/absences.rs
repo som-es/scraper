@@ -107,6 +107,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "verhindert",
         "gemeldet",
         "gemeldet:",
+        "Bundesrates",
         "für",
         "die",
         "heutige",
@@ -185,6 +186,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         "nämlich",
         "Dipl",
         "heute",
+        "und",
+        "sowie",
     ]
     .into_iter()
     .collect::<HashSet<_>>();
@@ -199,22 +202,31 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 
     let info = info
         .split(',')
-        .flat_map(|x| x.split("und"))
-        .flat_map(|x| x.split("sowie"))
-        .map(|x| {
-            x.split_inclusive(char::is_whitespace).filter(|split| {
-                !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
-                    || split.contains('.')
-                    || {
-                        let mut ret = false;
-                        if skip_words.contains(split.trim_matches(char::is_whitespace)) {
-                            ret = true;
-                        }
-                        ret
-                    })
-            })
+        .flat_map(|chunk| {
+            let words: Vec<&str> = chunk.split_whitespace().collect();
+            words
+                .split(|w: &&str| *w == "und" || *w == "sowie")
+                .map(|group| group.join(" "))
+                .collect::<Vec<_>>()
         })
-        .map(|x| x.collect::<String>())
+        .filter(|s| !s.is_empty())
+        .map(|x| {
+            x.split_inclusive(char::is_whitespace)
+                .filter(|split| {
+                    !(split.chars().filter(|x| x.is_alphabetic()).count() <= 3
+                        || split.contains('.')
+                        || {
+                            let mut ret = false;
+
+                            if skip_words.contains(split.trim_matches(char::is_whitespace)) {
+                                ret = true;
+                            }
+                            ret
+                        })
+                })
+                .collect::<String>()
+        })
+        // .map(|x| x.collect::<String>())
         .collect::<Vec<_>>();
 
     Some(

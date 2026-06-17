@@ -322,13 +322,15 @@ mod tests {
     #[tokio::test]
     async fn test_dates_filtering() {
         let now: NaiveDateTime = Utc::now().naive_utc();
+        let end: NaiveDateTime = Utc::now().naive_utc();
+        let end = end.checked_add_days(chrono::Days::new(10)).unwrap();
         // today();
         let scraper = AustriaScraper::default();
         let res = scraper
             .post_dates_payload(&DateFilter {
                 daterange: Some(DateRange {
                     from: Some(now),
-                    to: None,
+                    to: Some(end),
                 }),
                 terminart: vec![Terminart::Plenarsitzung],
                 ..Default::default()

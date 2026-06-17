@@ -45,6 +45,7 @@ pub struct PlenarInfo {
     pub title: String,
     pub description: String,
     pub ityp: String,
+    pub council: String,
     pub inr: u64,
     pub debates: Vec<Debate>,
     pub created_at: DateTime<Utc>,
@@ -213,6 +214,11 @@ impl Plenar for AustriaScraper {
             call_to_orders,
             created_at,
             updated_at,
+            council: if gp_code == "BR" {
+                "BR".into()
+            } else {
+                "NR".into()
+            },
             gp: gp_code,
             absences,
         })
@@ -462,6 +468,7 @@ mod tests {
             .await
             .unwrap();
 
+        assert_eq!(plenar_info.council, "NR");
         assert_eq!(
             &[
                 "Martin Engelberg",
@@ -1200,6 +1207,33 @@ mod tests {
         }
 
         // assert_eq!(&required_lenghts, lengths.as_slice());
+    }
+
+    #[tokio::test]
+    async fn test_get_plenar_bundesrat() {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXV".into()];
+        scraper.scrape_info.council_type = vec!["BR".into()];
+
+        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+
+        let paths = scraper
+            .plenar_paths(plenar_infos)
+            .expect("Failed to get paths");
+
+        for path in paths {
+            println!("path: {path} ---");
+            let plenar = scraper.get_plenar(&path).await.unwrap();
+
+            let Some(debates) = plenar.debates.first() else {
+                println!("empty speeches");
+                continue;
+            };
+
+            if debates.speeches.is_empty() {
+                println!("empty speeches")
+            }
+        }
     }
 
     #[tokio::test]
@@ -2054,5 +2088,28 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .unwrap();
 
         dbg!(&plenar);
+    }
+
+    #[tokio::test]
+    async fn test_plenar_absences_br_brsitz_827() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/BR/BRSITZ/827")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.absences.clone().unwrap().absences,
+            vec![
+                "Efgani Dönmez".to_string(),
+                "Adelheid Ebner".to_string(),
+                "Bernhard Ebner".to_string(),
+                "Stefan Schennach".to_string(),
+            ]
+        );
+        assert_eq!(plenar.council, "BR");
+        dbg!(plenar);
     }
 }

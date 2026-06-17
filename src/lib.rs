@@ -68,8 +68,18 @@ pub fn remove_plenar_info(haystack: &str) -> String {
     haystack.replace("Parlamentarische Materialien", "")
 }
 
+/*
+* 71. Sitzung des Nationalrates: Gesetzesvorschlag in dritter Lesung angenommen
+Namentliche Abstimmung (abgegebene Stimmen: 177; davon Ja-Stimmen: 123, Nein-Stimmen: 54)
+*/
 pub fn yes_no_votes_regex() -> Regex {
     Regex::new(r"(?i)abg.*ne\s*St.*me.[:\s]*\s*(\d+)[^\d]*.*Ja.*-Sti.me.[:\s]*\s*(\d+)[^\d]*.*Nein.*-St.m.e.[:\s]*\s*(\d+)\s*(?:ung..+tig\s*(\d+))?")
+        .unwrap()
+}
+// 885. Sitzung: Antrag, keinen Einspruch zu erheben, angenommen
+// Namentliche Abstimmung (60 abgegebene Stimmen, 37 Ja-Stimmen, 23 Nein-Stimmen)
+pub fn yes_no_votes_prefixed_regex() -> Regex {
+    Regex::new(r"(?i)(\d+)\s*abg.*ne\s*St.*me.[^\d]*(\d+)\s*Ja.*-Sti.me.[^\d]*(\d+)\s*Nein.*-St.m.e.(?:[^\d]*(\d+)\s*ung..+tig)?")
         .unwrap()
 }
 

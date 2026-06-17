@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use crate::{
     add_base_url_to_url, extract_pro_contra_party_codes_from_string, find_optimal_votes_by_name,
-    legis_init::group_names_from_vote_section, yes_no_votes_inside_regex, yes_no_votes_regex,
-    AustriaScraper, Scraper, TextExtractor,
+    legis_init::group_names_from_vote_section, yes_no_votes_inside_regex,
+    yes_no_votes_prefixed_regex, yes_no_votes_regex, AustriaScraper, Scraper, TextExtractor,
 };
 
 use super::extract_invisibly_declined_from_text;
@@ -267,12 +267,19 @@ pub async fn extract_most_fitting_votes(
 
 pub fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     let vote_counts_regex = yes_no_votes_regex();
+    let prefixed_vote_counts_regex = yes_no_votes_prefixed_regex();
 
-    let captures = vote_counts_regex.captures(text)?;
+    let captures = match vote_counts_regex.captures(text) {
+        Some(captures) => captures,
+        None => match prefixed_vote_counts_regex.captures(text) {
+            Some(captures) => captures,
+            None => return None,
+        },
+    };
     Some((
-        captures.get(1).unwrap().as_str().parse().unwrap(),
-        captures.get(2).unwrap().as_str().parse().unwrap(),
-        captures.get(3).unwrap().as_str().parse().unwrap(),
+        captures.get(1)?.as_str().parse().unwrap(),
+        captures.get(2)?.as_str().parse().unwrap(),
+        captures.get(3)?.as_str().parse().unwrap(),
         captures
             .get(4)
             .map(|cap| cap.as_str().parse::<usize>().unwrap_or_default())

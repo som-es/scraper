@@ -410,6 +410,7 @@ mod tests {
         AcceptedState, Document, FileType, Opinion, Party, ProContra, Reference, Stage, Vote,
         VoteStage, VoteType, Voting,
     };
+    use simple_logger::SimpleLogger;
 
     use crate::{
         extract_text_from_html, find_optimal_votes_by_name,
@@ -2301,6 +2302,7 @@ mod tests {
     // gegenstand/XXVI/I/275 => named br
     #[tokio::test]
     async fn test_xxvi_i_275() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
         let scraper = AustriaScraper::default();
 
         let res = scraper

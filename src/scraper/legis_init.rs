@@ -119,6 +119,23 @@ impl LegislativeInitiatives for AustriaScraper {
         if LEGIS_IGNORE_ITYPS.contains(&ityp.as_str()) {
             return None;
         }
+        let mut voting = None;
+
+        let is_law = LEGIS_LAW_DETERMINATORS.contains(&doktyp.as_str());
+        if is_law {
+            voting = Some(Voting::Law);
+        }
+        let is_resolution = LEGIS_RESOLUTION_DETERMINATORS.contains(&doktyp.as_str());
+        if is_resolution {
+            voting = Some(Voting::Resolution);
+        }
+        if doktyp.as_str() == "AA" {
+            voting = Some(Voting::Amendment);
+        }
+
+        if ityp.as_str() == "III" {
+            voting = Some(Voting::Report);
+        }
 
         let inr = legis_content["inr"].as_u64()?;
         let gp = legis_content["gp_code"].as_str()?.to_string();
@@ -173,9 +190,14 @@ impl LegislativeInitiatives for AustriaScraper {
             .any(|x| x.contains("Dringliche"));
 
         let mut speeches: Vec<Speech> = extract_speeches(legis_content, true).unwrap_or_default();
-        let date = extract_nr_plenary_date(legis_content)?;
+        let date = extract_plenary_date(legis_content, "NR")?;
+        let br_plenary_date = extract_plenary_date(legis_content, "BR");
 
         let nr_plenary_activity_date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
+
+        let br_plenary_activity_date = br_plenary_date
+            .map(|br_plenary_date| NaiveDate::parse_from_str(br_plenary_date, "%d.%m.%Y ").ok())
+            .flatten();
 
         let vote_infavor = legis_content["vote"]["infavor"].as_bool();
 
@@ -217,13 +239,26 @@ impl LegislativeInitiatives for AustriaScraper {
             extract_majority_on_indicators(legis_content).unwrap_or(true);
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content);
 
-        let (plenary_session, hidden_votes) = extract_hidden_votes(legis_content, &ityp).await;
+        let (plenary_session, hidden_votes) =
+            extract_hidden_votes(legis_content, &ityp, "Plenarberatungen NR").await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
+
+        let (br_plenary_session, br_hidden_votes) = match voting {
+            Some(Voting::Law) => {
+                extract_hidden_votes(legis_content, &ityp, "Plenarberatungen BR").await
+            }
+            _ => (None, None),
+        };
 
         let references = extract_references(legis_content);
 
         // sometimes, the info is missing
-        if hidden_votes.voted_by_name && !eurovoc_topics.contains(&"namentliche Abstimmung".into())
+        if (br_hidden_votes
+            .as_ref()
+            .map(|hv| hv.voted_by_name)
+            .unwrap_or_default()
+            || hidden_votes.voted_by_name)
+            && !eurovoc_topics.contains(&"namentliche Abstimmung".into())
         {
             eurovoc_topics.push("namentliche Abstimmung".into());
         }
@@ -285,24 +320,6 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let proposal = <Self as ProposalScraper>::raw_proposal_into_proposal(raw_legis)?;
 
-        let mut voting = None;
-
-        let is_law = LEGIS_LAW_DETERMINATORS.contains(&doktyp.as_str());
-        if is_law {
-            voting = Some(Voting::Law);
-        }
-        let is_resolution = LEGIS_RESOLUTION_DETERMINATORS.contains(&doktyp.as_str());
-        if is_resolution {
-            voting = Some(Voting::Resolution);
-        }
-        if doktyp.as_str() == "AA" {
-            voting = Some(Voting::Amendment);
-        }
-
-        if ityp.as_str() == "III" {
-            voting = Some(Voting::Report);
-        }
-
         let mut is_voteable_on = is_law;
 
         if LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.contains(&doktyp.as_str()) {
@@ -330,6 +347,7 @@ impl LegislativeInitiatives for AustriaScraper {
             related_delegates,
             accepted,
             nr_plenary_activity_date,
+            br_plenary_activity_date,
             vote_date: hidden_votes.voted_at_date,
             speeches,
             topics,
@@ -340,6 +358,8 @@ impl LegislativeInitiatives for AustriaScraper {
             requires_simple_majority,
             proposal,
             hidden_votes_info: hidden_votes,
+            br_hidden_votes_info: br_hidden_votes,
+            br_plenary_session,
             plenary_session,
             references,
             status,
@@ -387,8 +407,8 @@ mod tests {
 
     use chrono::{Days, NaiveDate};
     use common_scrapes::{
-        AcceptedState, Document, FileType, Opinion, Party, ProContra, Stage, Vote, VoteStage,
-        VoteType, Voting,
+        AcceptedState, Document, FileType, Opinion, Party, ProContra, Reference, Stage, Vote,
+        VoteStage, VoteType, Voting,
     };
 
     use crate::{
@@ -818,6 +838,25 @@ mod tests {
         assert_eq!(
             init.description,
             "Strompreiskosten-Ausgleichsgesetz 2022, SAG 2022 (1774 d.B.)"
+        );
+
+        assert_eq!(
+            init.br_hidden_votes_info
+                .as_ref()
+                .unwrap()
+                .was_declined
+                .unwrap(),
+            false
+        );
+        assert_eq!(
+            init.br_hidden_votes_info
+                .as_ref()
+                .unwrap()
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .contra,
+            vec!["SPÖ"]
         );
     }
 
@@ -2152,6 +2191,8 @@ mod tests {
         assert_eq!(named_vote.contra_count, 109);
         let pro_contra = named_vote.delegates_pro_contra.unwrap();
         assert!(pro_contra.contra.contains(&"Zanger Wolfgang".to_string()));
+
+        assert_eq!(res.br_hidden_votes_info, None);
     }
 
     #[tokio::test]
@@ -2164,6 +2205,7 @@ mod tests {
             .unwrap();
 
         println!("res: {res:?}");
+        assert!(!res.is_voteable_on); // AUB (Auschussbericht)
         assert_eq!(res.accepted, None);
     }
 
@@ -2215,6 +2257,8 @@ mod tests {
         assert_eq!(named_vote.contra_count, 83);
         assert_eq!(named_vote.pro_count, 52);
         assert_eq!(named_vote.vote_sum, 135);
+
+        assert_eq!(res.br_hidden_votes_info, None);
     }
 
     #[tokio::test]
@@ -2254,6 +2298,51 @@ mod tests {
         assert_eq!(named_vote.vote_sum, 161);
     }
 
+    // gegenstand/XXVI/I/275 => named br
+    #[tokio::test]
+    async fn test_xxvi_i_275() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/I/275")
+            .await
+            .unwrap();
+
+        assert_eq!(res.br_plenary_session.unwrap(), 885);
+
+        assert!(res.is_voteable_on);
+        assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+        assert_eq!(
+            res.references.unwrap_or_default(),
+            vec![Reference {
+                gp: "XXVI".into(),
+                ityp: "ME".into(),
+                inr: 59
+            }]
+        );
+
+        let br_hidden_votes = res.br_hidden_votes_info.unwrap();
+        println!("res: {br_hidden_votes:?}");
+        assert_eq!(
+            br_hidden_votes.voted_at_date.unwrap(),
+            NaiveDate::from_ymd_opt(2018, 11, 8).unwrap()
+        );
+        assert!(br_hidden_votes.voted_by_name);
+    }
+
+    // XXVII/I/604
+    #[tokio::test]
+    async fn test_xxvii_i_604() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/604")
+            .await
+            .unwrap();
+
+        assert_eq!(res.accepted, None);
+    }
+
     // gegenstand/XXVII/I/2704
     #[tokio::test]
     async fn test_xxvii_i_2704() {
@@ -2266,6 +2355,33 @@ mod tests {
 
         println!("res: {res:?}");
         assert_eq!(res.accepted, None);
+    }
+    #[tokio::test]
+    async fn test_xxiii_i_204() {
+        let scraper = AustriaScraper::default();
+
+        let res = scraper
+            .get_legis_init("/gegenstand/XXIII/I/204")
+            .await
+            .unwrap();
+        assert_eq!(
+            res.hidden_votes_info
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .pro,
+            vec![
+                "SPÖ".into(),
+                "ÖVP".to_string(),
+                "GRÜNE".into(),
+                "FPÖ".into(),
+                "BZÖ".into(),
+            ]
+        );
+
+        let br_hidden_votes = res.br_hidden_votes_info.unwrap();
+        assert_eq!(br_hidden_votes.was_declined, Some(false));
+        assert_eq!(br_hidden_votes.voted_unanimously, true);
     }
 
     //
@@ -2325,7 +2441,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.accepted, Some(AcceptedState::Accepted));
-        println!("res: {res:?}");
+        assert_eq!(
+            res.hidden_votes_info
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .pro,
+            vec![
+                "ÖVP".to_string(),
+                "SPÖ".into(),
+                "NEOS".into(),
+                "GRÜNE".into()
+            ]
+        );
+        assert_eq!(
+            res.hidden_votes_info
+                .pro_contra_parties
+                .as_ref()
+                .unwrap()
+                .contra,
+            vec!["FPÖ".to_string(),]
+        );
     }
     // gegenstand/XXII/E/97
     #[tokio::test]
@@ -3957,6 +4093,7 @@ mod tests {
     // XXIV/I/1516
     #[tokio::test]
     async fn test_xxiv_i_1516() {
+        // Zurückverwiesen ? wie handeln?
         let scraper = AustriaScraper::default();
         let res = scraper
             .get_legis_init("/gegenstand/XXIV/I/1516")

@@ -14,6 +14,7 @@ use super::extract_invisibly_declined_from_text;
 pub async fn extract_hidden_votes(
     legis_content: &Value,
     ityp: &str,
+    stop_at_phase: &str,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
     let status = legis_content.get("status");
@@ -38,11 +39,7 @@ pub async fn extract_hidden_votes(
             continue;
         };
 
-        if phase["name"]
-            .as_str()
-            .unwrap()
-            .contains("Plenarberatungen NR")
-        {
+        if phase["name"].as_str().unwrap().contains(stop_at_phase) {
             most_fitting_votes = extract_most_fitting_votes(stages, status, ityp).await;
             break;
         }
@@ -95,6 +92,13 @@ pub fn contains_multiple_of(text: &str, of: &str) -> bool {
     text.find(of) != text.rfind(of)
 }
 
+//https://www.parlament.gv.at/gegenstand/BR/BRSITZ/751
+pub fn contains_session_or_no_links(text: &str) -> bool {
+    (text.contains("gegenstand/") && !contains_multiple_of(text, "gegenstand/"))
+        && (text.contains("NRSITZ/") || text.contains("gegenstand/BR/BRSITZ"))
+        || !text.contains("gegenstand/")
+}
+
 pub async fn extract_most_fitting_votes(
     stages: &Value,
     status: Option<&Value>,
@@ -125,8 +129,8 @@ pub async fn extract_most_fitting_votes(
             || text.contains("angenommen")
             || (text.contains("Nationalrates: Genehmigung")))
             || ((text.to_lowercase().contains("ausschuss") || text.to_lowercase().contains("ausschuß")) && !text.contains("Nationalrat")) // auschuß: gp XX had these a lot e.g.  XX/I/308
-            || (contains_multiple_of(text, "gegenstand/") // better way would probably be to check for NRSITZ gegenstand link, if not present AND another gegenstand link is present => skip (Either zero links or a single NRSITZ link should be allowed) See: XXVII/I/604
-                && !(ityp == "UEA" && text.contains("/E")))
+            // || (contains_multiple_of(text, "gegenstand/") // better way would probably be to check for NRSITZ gegenstand link, if not present AND another gegenstand link is present => skip (Either zero links or a single NRSITZ link should be allowed) See: XXVII/I/604
+            || (!contains_session_or_no_links(text) && !text.contains("/E/"))
         // AEA: what to do in the case of XXVIII/I/318?
         {
             continue;
@@ -204,8 +208,6 @@ pub async fn extract_most_fitting_votes(
                     //     continue;
                     // };
 
-                    dbg!(site_start);
-                    dbg!(site_end);
                     match extractor
                         .text_accumulation(
                             &url[..last_idx + 1],
@@ -252,6 +254,11 @@ pub async fn extract_most_fitting_votes(
         hidden_votes.pro_contra_parties = extract_pro_contra_party_codes_from_string(text);
         if hidden_votes.pro_contra_parties.is_some() {
             break;
+        } else {
+            let text = text.to_lowercase();
+            if text.contains("einhellig") || text.contains("einstimmig") {
+                hidden_votes.voted_unanimously = true
+            }
         }
     }
 

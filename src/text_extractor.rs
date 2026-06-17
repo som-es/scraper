@@ -9,8 +9,7 @@ use scraper::Html;
 
 use crate::{
     caching::{disk_caching, get_disk_cache},
-    http_client, remove_page_info, remove_plenar_info, remove_steno_info, remove_titles_from_str,
-    text_utils::{remove_multiple_of, remove_paran_contents},
+    http_client, remove_page_info, remove_plenar_info, remove_steno_info,
 };
 
 mod text_from_html;

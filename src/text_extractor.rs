@@ -95,6 +95,7 @@ pub struct TextExtractor {
     pub president_no_one_left: Regex,
     pub only_president: Regex,
     pub steno_info_regex: Regex,
+    pub br_steno_info_regex: Regex,
 }
 
 unsafe impl Sync for TextExtractor {}
@@ -111,6 +112,8 @@ impl TextExtractor {
         let only_president = Regex::new(r"\nPräsident(?:[^!,])*?:").unwrap();
         let steno_info_regex =
             Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
+        let br_steno_info_regex =
+            Regex::new(r"Bundesrat[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
 
         Self {
             cached_html: Default::default(),
@@ -121,11 +124,18 @@ impl TextExtractor {
             president_no_one_left,
             only_president,
             steno_info_regex,
+            br_steno_info_regex,
         }
     }
 
     pub fn remove_steno_info(&self, haystack: &str) -> String {
-        remove_steno_info(haystack, &self.steno_info_regex)
+        remove_steno_info(
+            haystack,
+            &[
+                self.steno_info_regex.clone(),
+                self.br_steno_info_regex.clone(),
+            ],
+        )
     }
 
     pub async fn get_html(
@@ -163,7 +173,10 @@ impl TextExtractor {
             self.state = State::Cached(Some(key.to_string()));
 
             let url = url.to_string();
-            let steno_info_regex = self.steno_info_regex.clone();
+            let steno_info_regex = [
+                self.steno_info_regex.clone(),
+                self.br_steno_info_regex.clone(),
+            ];
             let (html, text) = tokio::task::spawn_blocking(move || {
                 let html = Html::parse_document(&html);
 
@@ -182,7 +195,10 @@ impl TextExtractor {
             return text;
         }
         let text = if only_text {
-            let steno_info_regex = self.steno_info_regex.clone();
+            let steno_info_regex = [
+                self.steno_info_regex.clone(),
+                self.br_steno_info_regex.clone(),
+            ];
             tokio::task::spawn_blocking(move || {
                 remove_steno_info(&extract_text_from_html(&html), &steno_info_regex)
             })

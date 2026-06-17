@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
 
 use regex::Regex;
 
@@ -56,11 +56,15 @@ pub fn remove_page_info(haystack: &str) -> String {
     re.replace_all(haystack, "").to_string()
 }
 
-pub fn remove_steno_info(haystack: &str, re: &Regex) -> String {
+pub fn remove_steno_info(haystack: &str, re: &[Regex]) -> String {
     // let re = Regex::new(r"Nationalrat, [\S\s]*Stenographisches Protokoll[\S\s]*\d+").unwrap();
     // Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+
     // let re = Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?[Seite]{5}? \d+").unwrap();
-    re.replace_all(haystack, "").to_string()
+    let mut haystack = Cow::Borrowed(haystack);
+    for re in re {
+        haystack = Cow::Owned(re.replace_all(&haystack, "").to_string());
+    }
+    haystack.to_string()
 }
 
 pub fn remove_plenar_info(haystack: &str) -> String {

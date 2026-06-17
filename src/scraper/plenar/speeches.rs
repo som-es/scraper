@@ -90,12 +90,19 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
                     .flat_map(|speech| {
                         let delegate_id = speech[3].as_u64()?;
                         let ty = speech[5].as_str()?.to_string();
-                        let duration = speech[7].as_str()?.split(':').collect::<Vec<&str>>();
-                        let duration_in_seconds = duration[0].parse::<u32>().ok()? * 60
-                            + duration[1].parse::<u32>().ok()?;
+                        let duration_in_seconds = speech[7]
+                            .as_str()
+                            .map(|duration| {
+                                let duration = duration.split(':').collect::<Vec<&str>>();
+
+                                Some(
+                                    duration[0].parse::<u32>().ok()? * 60
+                                        + duration[1].parse::<u32>().ok()?,
+                                )
+                            })
+                            .flatten();
 
                         Some(PlenarSpeech {
-                            // TODO: get spoken text html urls, use content[0]
                             speech: Speech {
                                 delegate_id,
                                 delegate_display_name: String::new(),

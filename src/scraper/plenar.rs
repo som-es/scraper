@@ -976,9 +976,14 @@ mod tests {
             // "/dokument/XXVII/NRSITZ/211/A_-_12_03_00_00295752.html"
             "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/211/fnameorig_1598890.html#RU_295752"
         );
-        assert_eq!(plenar.debates[0].speeches[0].duration_in_seconds, 831);
         assert_eq!(
-            plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4].duration_in_seconds,
+            plenar.debates[0].speeches[0].duration_in_seconds.unwrap(),
+            831
+        );
+        assert_eq!(
+            plenar.debates[1].speeches[plenar.debates[1].speeches.len() - 4]
+                .duration_in_seconds
+                .unwrap(),
             300
         );
         assert_eq!(
@@ -1139,22 +1144,28 @@ mod tests {
         let opinion_none_speech = &plenar.debates[0].speeches[2];
         assert_eq!(opinion_none_speech.speech.delegate_id, 83127);
         assert_eq!(opinion_none_speech.speech.opinion, Opinion::Against);
-        assert_eq!(opinion_none_speech.duration_in_seconds, 5 * 60 + 12);
+        assert_eq!(
+            opinion_none_speech.duration_in_seconds.unwrap(),
+            5 * 60 + 12
+        );
 
         let next_debate_speech = &plenar.debates[1].speeches[1];
         assert_eq!(next_debate_speech.speech.delegate_id, 2006);
         assert_eq!(next_debate_speech.speech.opinion, Opinion::Infavor);
-        assert_eq!(next_debate_speech.duration_in_seconds, 5 * 60 + 32);
+        assert_eq!(next_debate_speech.duration_in_seconds.unwrap(), 5 * 60 + 32);
 
         let last_speech_of_next_debate = plenar.debates[1].speeches.last().unwrap();
         assert_eq!(last_speech_of_next_debate.speech.delegate_id, 83299);
         assert_eq!(last_speech_of_next_debate.speech.opinion, Opinion::Infavor);
-        assert_eq!(last_speech_of_next_debate.duration_in_seconds, 2 * 60 + 20);
+        assert_eq!(
+            last_speech_of_next_debate.duration_in_seconds.unwrap(),
+            2 * 60 + 20
+        );
 
         let next_debate_speech = &plenar.debates[2].speeches[0];
         assert_eq!(next_debate_speech.speech.delegate_id, 8178);
         assert_eq!(next_debate_speech.speech.opinion, Opinion::Against);
-        assert_eq!(next_debate_speech.duration_in_seconds, 4 * 60 + 28);
+        assert_eq!(next_debate_speech.duration_in_seconds.unwrap(), 4 * 60 + 28);
 
         let mut extractor = TextExtractor::new();
 
@@ -2111,5 +2122,96 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
         );
         assert_eq!(plenar.council, "BR");
         dbg!(plenar);
+    }
+
+    #[tokio::test]
+    async fn test_combine_with_doc_speeches_xxviii_nr_79() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/79")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            plenar.title,
+            "79. Sitzung des Nationalrats vom 21. Mai 2026"
+        );
+        assert_eq!(
+            plenar.description,
+            "79. Sitzung des Nationalrats vom 21. Mai 2026 (79/NRSITZ)"
+        );
+        assert_eq!(plenar.ityp, "NRSITZ");
+        assert_eq!(plenar.council, "NR");
+        assert_eq!(plenar.inr, 79);
+
+        assert!(
+            !plenar.debates.is_empty(),
+            "Debates list should not be empty"
+        );
+        let debate = &plenar.debates[0];
+
+        assert_eq!(debate.info.about, "Umsatzsteuergesetz 1994");
+        assert_eq!(debate.info.references.len(), 1);
+
+        let reference = &debate.info.references[0];
+        assert_eq!(reference.gp, "XXVIII");
+        assert_eq!(reference.ityp, "I");
+        assert_eq!(reference.inr, 489);
+
+        assert_eq!(debate.speeches.len(), 22);
+
+        let speech_0 = &debate.speeches[0];
+        assert_eq!(speech_0.ty, "c");
+        assert_eq!(speech_0.duration_in_seconds, Some(209));
+        assert_eq!(speech_0.speech.delegate_id, 30647);
+        assert_eq!(
+            speech_0.speech.delegate_display_name,
+            "Michael Fürtbauer (F)"
+        );
+
+        assert!(matches!(speech_0.speech.opinion, Opinion::Against));
+        assert_eq!(speech_0.speech.spoken_text_html_urls.len(), 1);
+        assert_eq!(speech_0.speech.spoken_text_html_urls[0].site_start, None);
+        assert_eq!(speech_0.speech.spoken_text_html_urls[0].site_end, None);
+        assert_eq!(
+            speech_0.speech.spoken_text_html_urls[0].document_url,
+            "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/79/A_-_10_25_58_00963776.html#16"
+        );
+
+        let speech_3 = &debate.speeches[3];
+        assert_eq!(speech_3.ty, "tb");
+        assert_eq!(speech_3.duration_in_seconds, Some(42));
+        assert_eq!(speech_3.speech.delegate_id, 1970);
+        assert_eq!(
+            speech_3.speech.delegate_display_name,
+            "Mag. Gerhard Kaniak (F)"
+        );
+
+        if let Opinion::Other(ref opinion_text) = speech_3.speech.opinion {
+            assert_eq!(opinion_text, "tatsächliche Berichtigung");
+        } else {
+            panic!("Expected Opinion::Other for the 4th speech");
+        }
+
+        let speech_13 = &debate.speeches[13];
+        assert_eq!(speech_13.ty, "p");
+        assert_eq!(speech_13.duration_in_seconds, None);
+        assert_eq!(speech_13.speech.delegate_id, 91141);
+        assert_eq!(
+            speech_13.speech.delegate_display_name,
+            "Dipl.-Ing. Karin Doppelbauer (N)"
+        );
+        assert!(matches!(speech_13.speech.opinion, Opinion::None));
+        assert!(speech_13.speech.spoken_text_html_urls.is_empty());
+
+        let speech_21 = &debate.speeches[21];
+        assert_eq!(speech_21.ty, "p");
+        assert_eq!(speech_21.duration_in_seconds, Some(422));
+        assert_eq!(speech_21.speech.delegate_id, 83113);
+        assert_eq!(speech_21.speech.delegate_display_name, "Philip Kucher (S)");
+        assert!(matches!(speech_21.speech.opinion, Opinion::Infavor));
+        assert_eq!(speech_21.speech.spoken_text_html_urls.len(), 1);
     }
 }

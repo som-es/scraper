@@ -36,57 +36,42 @@ pub fn fit_speech(
         });
     let name_regex = Regex::new(&name_regex).unwrap();
 
-    let start_at_delegate_speech_idx = name_regex.find(&unfitted_speech).map(|x| x.start());
-
-    let speech_text = match start_at_delegate_speech_idx {
-        Some(start_at_delegate_speech_idx) => {
-            let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
-
-            let mut end_speech_idx = time_marker_re
-                .find(start_at_delegate_speech)
-                .map(|x| x.start())
-                .unwrap_or(start_at_delegate_speech.len())
-                .min(
-                    president_regex
-                        .find(start_at_delegate_speech)
-                        .map(|x| x.start())
-                        .unwrap_or(start_at_delegate_speech.len()),
-                )
-                .min(
-                    president_last_regex
-                        .find(start_at_delegate_speech)
-                        .map(|x| x.start())
-                        .unwrap_or(start_at_delegate_speech.len()),
-                )
-                .min(
-                    president_no_one_left
-                        .find(start_at_delegate_speech)
-                        .map(|x| x.start())
-                        .unwrap_or(start_at_delegate_speech.len()),
-                );
-
-            if end_speech_idx == start_at_delegate_speech.len() {
-                // last "greedy" try - this is not always correct
-                end_speech_idx = only_president
-                    .find_iter(start_at_delegate_speech)
-                    .last()
-                    .map(|x| x.start())
-                    .unwrap_or(start_at_delegate_speech.len());
-                if end_speech_idx <= 150 {
-                    // nummer sicher
-                    end_speech_idx = start_at_delegate_speech.len();
-                }
-            }
-            let fitted_speech = start_at_delegate_speech[..end_speech_idx].to_string();
-            Some(fitted_speech)
-        }
-        None => Some(unfitted_speech),
+    let time_marked_speech = if let Some(matched) = time_marker_re.find(&unfitted_speech) {
+        &unfitted_speech[matched.end()..]
+    } else {
+        &unfitted_speech
     };
 
-    if let Some(speech_text) = &speech_text {
-        if speech_text.len() >= UNREALISTIC_SPEECH_LENGTH {
-            return None;
-        }
-    }
-    speech_text
+    let start_at_delegate_speech =
+        if let Some(start_idx) = name_regex.find(time_marked_speech).map(|x| x.start()) {
+            &time_marked_speech[start_idx..]
+        } else {
+            time_marked_speech
+        };
+
+    let end_speech_idx = time_marker_re
+        .find(start_at_delegate_speech)
+        .map(|x| x.start())
+        .unwrap_or(start_at_delegate_speech.len())
+        .min(
+            president_regex
+                .find(start_at_delegate_speech)
+                .map(|x| x.start())
+                .unwrap_or(start_at_delegate_speech.len()),
+        )
+        .min(
+            president_last_regex
+                .find(start_at_delegate_speech)
+                .map(|x| x.start())
+                .unwrap_or(start_at_delegate_speech.len()),
+        )
+        .min(
+            president_no_one_left
+                .find(start_at_delegate_speech)
+                .map(|x| x.start())
+                .unwrap_or(start_at_delegate_speech.len()),
+        );
+
+    let fitted_speech = start_at_delegate_speech[..end_speech_idx].to_string();
+    Some(fitted_speech)
 }

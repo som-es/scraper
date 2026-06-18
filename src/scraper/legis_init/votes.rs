@@ -297,14 +297,8 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
     let from_html_text = &from_html_text.replace("Graf Herbert L.", "Graf Herbert L");
 
     // println!("from html text: {from_html_text}");
-    let pro_regex = Regex::new(
-        r"(?m)Mit\s+.*?Ja[\s\S]*?stimmten\s*die\s*(?:Abg.*dnet.|Bundesr.t.)\s*[()\sa-zA-Z]*\s*:",
-    )
-    .unwrap();
-    let contra_regex = Regex::new(
-        r"(?m)Mit\s+.*?Nein[\s\S]*?stimmten\s*die\s*(?:Abg.*dnet.|Bundesr.t.)\s*[()\sa-zA-Z]*\s*:",
-    )
-    .unwrap();
+
+    let (pro_regex, contra_regex) = crate::pro_contra_named_vote_indicators();
 
     let pro_match = pro_regex.find(from_html_text)?;
     let contra_match: regex::Match<'_> = contra_regex.find(from_html_text)?;

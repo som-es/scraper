@@ -1,8 +1,10 @@
 use std::ops::Deref;
 
+use ego_tree::NodeRef;
+use regex::{Match, Matches};
 use scraper::{ElementRef, Html, Selector};
 
-use crate::text_utils::remove_paran_contents;
+use crate::{text_utils::remove_paran_contents, TextExtractor};
 
 pub fn extract_text_from_html(html: &str) -> String {
     let (_, text) = remove_paran_contents(html, '<', '>');
@@ -84,7 +86,7 @@ pub fn extract_text_from_html_via_rn_id(document: &Html, name_attribute: &str) -
         .select(&selector)
         .flat_map(|node| {
             let mut html = String::new();
-            let mut current_sibling = node.next_sibling()?;
+            let mut current_sibling = *node;
             while let Some(sibling) = current_sibling.next_sibling() {
                 let Some(el) = ElementRef::wrap(sibling) else {
                     break;
@@ -138,26 +140,67 @@ pub fn extract_text_from_html_via_name_attribute(document: &Html, name_attribute
 
 pub const NAME_ATTRIBUTES: [&str; 4] = ["RU_", "R_", "T_", "TEXTOBJ_"];
 
+fn compress_matches<'h>(matches: Vec<Match<'h>>) -> Vec<Match<'h>> {
+    let mut end = None;
+    matches
+        .into_iter()
+        .filter(|matched| {
+            let keep = if Some(matched.start() - 1) == end {
+                false
+            } else {
+                true
+            };
+            end = Some(matched.end());
+            keep
+        })
+        .collect()
+}
+
 pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
     document: &Html,
     name_attribute: &str,
+    text_extrator: TextExtractor,
 ) -> Option<String> {
     if NAME_ATTRIBUTES
         .iter()
         .any(|attr| name_attribute.starts_with(attr))
     {
-        let second_variant =
-            extract_text_from_html_via_name_attribute_next_section(document, name_attribute, 2, 1)
-                .unwrap_or_default();
+        let mut text = String::new();
+        let mut tracked_matches_count = 0;
+        for section in 0..20 {
+            let variant = extract_text_from_html_via_name_attribute_next_section(
+                document,
+                name_attribute,
+                2,
+                section,
+            )
+            .unwrap_or_default();
+            let matches = compress_matches(
+                text_extrator
+                    .time_marker_re
+                    .find_iter(&variant)
+                    .collect::<Vec<_>>(),
+            );
+            if matches.len() > 2 {
+                if text.is_empty() {
+                    return Some(variant[..matches[1].end()].to_owned());
+                } else {
+                    return None;
+                }
+            }
+            if let Some(_matched) = matches.get(0) {
+                text.push_str(&variant);
+                tracked_matches_count += 1;
+            } else {
+                text.push_str(&variant);
+            }
 
-        let first_variant =
-            extract_text_from_html_via_name_attribute_parent_parent(document, name_attribute);
-
-        if first_variant.len() > second_variant.len() {
-            Some(first_variant)
-        } else {
-            Some(second_variant)
+            if tracked_matches_count == 2 || matches.len() == 2 {
+                break;
+            }
         }
+
+        Some(text)
     } else {
         // resolve via Randnummern RN
         Some(extract_text_from_html_via_rn_id(document, name_attribute))

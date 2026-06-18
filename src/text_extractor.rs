@@ -118,7 +118,7 @@ impl TextExtractor {
         let br_steno_info_regex =
             Regex::new(r"Bundesrat[\s]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
 
-        let time_marker_re = Regex::new(r"(?m)^\d+\.\d+$").unwrap();
+        let time_marker_re = Regex::new(r"(?m)^\d+\.\d+(?:\.\d+)?[\s]?$").unwrap();
 
         Self {
             cached_html: Default::default(),
@@ -149,7 +149,7 @@ impl TextExtractor {
         url: &str,
         key: Option<&str>,
         cache_key: &str,
-        attribute_extraction_fn: Option<fn(&Html, &str) -> Option<String>>,
+        attribute_extraction_fn: Option<fn(&Html, &str, Self) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
         let mut html = match get_disk_cache(cache_key, 60 * 60 * 24 * 30).await {
@@ -183,13 +183,14 @@ impl TextExtractor {
                 self.steno_info_regex.clone(),
                 self.br_steno_info_regex.clone(),
             ];
+            let extractor = self.clone();
             let (html, text) = tokio::task::spawn_blocking(move || {
                 let html = Html::parse_document(&html);
 
                 let text =
                     attribute_extraction_fn.unwrap_or(
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
-                    )(&html, url.split('#').nth(1).unwrap())
+                    )(&html, url.split('#').nth(1).unwrap(), extractor)
                     // .inspect(|x| println!("--------------------- {x}\n --------------"))
                     .map(|text| remove_steno_info(&text, &steno_info_regex));
                 (html, text)
@@ -246,6 +247,24 @@ impl TextExtractor {
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
         self.fit_speech(unfitted_speech, name).await
+    }
+
+    pub async fn full_speech_extraction(
+        &mut self,
+        speech_infos: &[SpeechTextInfo],
+        name: &str,
+    ) -> Option<String> {
+        let mut total_text = String::new();
+        for text_info in speech_infos {
+            if let Some(text) = self.speech_extraction_with_fit(text_info, &name).await {
+                total_text.push_str(&text);
+            }
+        }
+        if total_text.is_empty() {
+            None
+        } else {
+            Some(total_text)
+        }
     }
 
     pub async fn raw_speech_extraction(&mut self, speech_info: &SpeechTextInfo) -> Option<String> {
@@ -369,7 +388,7 @@ impl TextExtractor {
     pub async fn extract_text_from_url(
         &mut self,
         speech: &impl HasHTMLUrl,
-        search_strategy_fn: Option<fn(&Html, &str) -> Option<String>>,
+        search_strategy_fn: Option<fn(&Html, &str, TextExtractor) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
         let url = speech.html_url();
@@ -397,7 +416,8 @@ impl TextExtractor {
                     let f = search_strategy_fn.unwrap_or(
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     );
-                    f(html.as_ref().unwrap(), url).map(|text| self.remove_steno_info(&text))
+                    f(html.as_ref().unwrap(), url, self.clone())
+                        .map(|text| self.remove_steno_info(&text))
                 } else {
                     self.cached_html = Default::default();
                     self.state = State::NoCache;
@@ -414,11 +434,25 @@ fn contains_single_named_votes(yes_indicator: &Regex, no_indicator: &Regex, text
         && no_indicator.find_iter(&text).count() == 1;
 }
 
-pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Option<String> {
-    let votes_yes_indicator =
-        Regex::new(r"Mit[\S\s]*Ja[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
-    let votes_no_indicator =
-        Regex::new(r"Mit[\S\s]*Nein[\S\s]*stimmten[\S\s]*die[\S\s]*Abge").unwrap();
+pub fn pro_contra_named_vote_indicators() -> (Regex, Regex) {
+    let votes_yes_indicator = Regex::new(
+        r"(?m)Mit\s+.*?Ja[\s\S]*?stimmten\s*die\s*(?:Abg.*dnet.|Bundesr.t.)\s*[()\sa-zA-Z]*\s*:",
+    )
+    .unwrap();
+    let votes_no_indicator = Regex::new(
+        r"(?m)Mit\s+.*?Nein[\s\S]*?stimmten\s*die\s*(?:Abg.*dnet.|Bundesr.t.)\s*[()\sa-zA-Z]*\s*:",
+    )
+    .unwrap();
+
+    (votes_yes_indicator, votes_no_indicator)
+}
+
+pub fn find_optimal_votes_by_name(
+    document: &Html,
+    name_attribute: &str,
+    _extractor: TextExtractor,
+) -> Option<String> {
+    let (votes_yes_indicator, votes_no_indicator) = pro_contra_named_vote_indicators();
 
     if NAME_ATTRIBUTES
         .iter()
@@ -467,6 +501,8 @@ pub fn find_optimal_votes_by_name(document: &Html, name_attribute: &str) -> Opti
 
 #[cfg(test)]
 mod tests {
+
+    use common_scrapes::{Opinion::Other, PlenarSpeech, Speech, SpeechTextInfo};
 
     use crate::{
         find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar,
@@ -564,7 +600,8 @@ mod tests {
             .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await
             .unwrap();
-        println!("res: {res}");
+        println!("res: {res:?}");
+        assert!(res.contains("s\nAbstimmungsverhaltens in das Stenographische Protokoll aufgenommen. \nMit „Ja“ stimmten die\nAbgeordneten:\nBaumgartner, Bayr, Becher, Berlakovich\nNikolaus, Bernhard, Blimlinger, Brandstätter Helmut, Brandstötter\nHenrike, Brandweiner, Bures, Bürstmayr;\nDeckenbacher, Diesner-Wais, Disoski,\nDoppelbauer, Drobits;\nEcker Cornelia, Egger Kurt, Einwallner, El-Nagashi,\nEngelberg, Erasim, Eßl;\nFeichtinger, Fürlinger;\nGahr, Gerstl, Gödl, Götze, Graf\nTanja, Grebien, Greiner Karin, Großbauer;\nHamann Sibylle,\nHammer Lukas, Hammer Michael, Hanger Andreas, Haubner, Hechenberger,\nHeinisch-Hosek, Herr, Himmelbauer, Hintner, Hofinger Manfred, Höfinger Johann, Holzleitner, Holzner, Hörl, Hoyos-Trauttmansdorff;\nJachs, Jeitler-Cincelli;\nKaufmann, Keck, Kirchbaumer, Köchl, Köllner,\nKollross, Kopf, Koza, Krainer Kai Jan, Kucharowits, Kucher Philip, Kühberger,\nKünsberg Sarre, Kuntzl;\nLeichtfried, Lindner, Lindinger, Lopatka;\n\n\nMarchetti, Matznetter, Maurer, Meinl-Reisinger,\nMelchior, Minnich;\nNeßler, Neumann-Hartberger, Niss\nMaria Theresia, Nussbaum;\nObernosterer, Oberrauner Petra, Ofenauer\nFriedrich, Ottenschläger;\nPfurtscheller, Pöttinger, Prammer, Prinz;\nRausch Bettina, Reimon, Rendi-Wagner, Ribo,\nRössler;\nSalzmann,\nSaxinger, Schallmeiner, Scharzenberger, Schatz, Scherak, Scheucher-Pichler, Schmuckenschlager, Schnabel, Schroll, Schwarz Gabriela, Schwarz Jakob,\nSeemayer, Seidl, Shetty, Sieber Norbert, Smodics-Neumann, Smolle, Sobotka, Stammler,\nStark, Steinacker, Stocker, Stöger Alois, Stögmüller, Strache, Strasser;\nTanda, Taschner, Tomaselli, Totter, Troch;\nVoglauer;\nWeber, Weidinger, Weratschnig, Werner, Wimmer Petra, Wimmer\nRainer, Wöginger;\nYildirim, Yılmaz;\nZarits Christoph, Zopf, Zorba.\nMit „Nein“ stimmten\ndie Abgeordneten:\nAmesbauer, Angerer;\nBösch, Brückl;\nDeimek;\nEcker Rosa;\nFiedler, Fuchs, Fürst;\nGraf Martin;\nHafenecker, Hauser, Hofer;\nKainz, Kaniak, Kassegger, Kickl, Krisper;\nLausch, Loacker;\nMargreiter, Muchitsch, Mühlberghuber;\nRagger, Rauch Walter, Ries Christian;\nSchmiedlechner, Schnedlitz, Schrangl, Stefan,\nSteger Petra;\nWurm;\nZanger Wolfgang.\n*****\n"));
     }
 
     #[tokio::test]
@@ -577,7 +614,8 @@ mod tests {
             .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await
             .unwrap();
-        println!("res: {res}");
+        println!("res: {res:?}");
+        assert!(res.contains("SPÖ!\u{a0}– Zwischenruf\ndes Abg. Stögmüller.)\nGemäß §\u{a0}66 Abs.\u{a0}8 der\nGeschäftsordnung werden die Namen der Abgeordneten unter Angabe ihres\nAbstimmungsverhaltens in das Stenographische Proto\u{ad}koll\u{a0}aufgenommen. \n\n\nMit „Ja“\nstimmten die Abgeordneten: \nBaumgartner, Berlakovich\nNikolaus, Bernhard, Blimlinger, Brandstätter Helmut, Brandstötter\nHenrike, Brandweiner, Bürstmayr;\nDeckenbacher, Diesner-Wais, Disoski,\nDoppelbauer;\nEgger Kurt, El-Nagashi, Engelberg, Ernst-Dziedzic, Eßl;\nFiedler, Fischer, Fürlinger;\nGahr, Gerstl, Gödl, Graf\nTanja, Grebien, Großbauer, Grünberg;\nHamann Sibylle, Hammer Lukas,\nHammer Michael, Hanger Andreas, Haubner, Hechenberger, Himmelbauer, Hintner, Höfinger\nJohann, Hofinger Manfred, Holzner, Hörl, Hoyos-Trauttmansdorff;\nJachs, Jeitler-Cincelli;\nKirchbaumer, Kopf, Koza, Krisper,\nKugler Gudrun, Kühberger, Künsberg Sarre;\nLindinger, Litschauer, Loacker;\nMarchetti, Margreiter, Maurer,\nMeinl-Reisinger, Melchior, Minnich;\nNeßler, Neumann-Hartberger,\nNiss Maria Theresia;\nObernosterer, Ofenauer Friedrich, Ottenschläger;\nPfurtscheller, Pöttinger,\nPrammer, Prinz;\nRausch Bettina, Reimon, Reiter,\nRibo, Rössler;\nSalzmann, Saxinger, Schallmeiner, Scharzenberger, Scheucher-Pichler,\nSchmidhofer, Schmuckenschlager, Schnabel, Schwarz, Seidl, Shetty, Sieber\nNorbert, Singer \nJohann, Smodics-Neumann, Smolle, Sobotka, Stammler, Stark, Steinacker, Stocker,\nStögmüller; \nTanda, Taschner, Tomaselli, Totter;\n\n\nVoglauer;\nWeber, Weidinger, Weratschnig, Werner, Wöginger;\nZarits Christoph, Zopf, Zorba.\nMit „Nein“ stimmten die\nAbgeordneten: \nAmesbauer;\nBecher, Brückl, Bures;\nDeimek, Drobits;\nEcker Rosa, Einwallner, Erasim;\nFeichtinger, Fürst;\nGraf Martin, Greiner Karin;\nHafenecker, Hauser, Heinisch-Hosek, Herbert Werner, Hofer,\nHolzleitner;\nKaniak, Kassegger, Keck, Köchl, Köllner, Kollross,\nKrainer Kai Jan, Kucharowits, Kucher Philip, Kuntzl;\nLaimer, Lausch, Leichtfried, Linder Maximilian, Lindner\nMario;\nMatznetter, Muchitsch;\nNussbaum;\nOberrauner, Oxonitsch;\nRagger, Rauch Walter, Reifenberger, Ries Christian;\nSchatz, Schmiedlechner, Schroll, Seemayer, Silvan, Spalt,\nSteger Petra, Stöger Alois, Strache;\nTanzler, Troch;\n\n\nWimmer Petra, Wimmer Rainer, Wurm;\nYildirim;\nZanger Wolfgang.\n*****\n(Anhaltende Zwischenrufe bei\nSPÖ, FPÖ und Grünen.)\n"));
     }
 
     #[tokio::test]
@@ -616,7 +654,9 @@ mod tests {
             )
             .await
             .unwrap();
-        println!("res: {res}");
+        println!("res: {res:?}");
+        assert!(res.contains("rsatzpflege eventuell bei wenigen Tagen"));
+        assert!(res.len() < 3000);
     }
 
     #[tokio::test]
@@ -652,7 +692,7 @@ mod tests {
                 true,
             )
             .await;
-        println!("res: {res:?}");
+        assert!(res.is_none());
     }
 
     /*#[tokio::test]
@@ -753,22 +793,5 @@ mod tests {
             )
             .await;
         println!("text: {text:?}");
-    }
-
-    #[tokio::test]
-    async fn test_title_back_speech_fit() {
-        let speech = "Bundesminister für Land- und Forstwirtschaft, Klima- und Umweltschutz, Regionen und Wasserwirtschaft Mag. Norbert Totschnig, MSc: Vielen Dank, sehr geehrter Herr Präsident! Geschätzte Damen und Herren Nationalrätinnen und Nationalräte! Hohes Haus! Ich möchte mein Statement erstens in die UG 42: Landwirtschaft, Forstwirtschaft und Wasserwirtschaft, und zweitens in die UG 43: Umwelt, Klimawandelanpassung und Kreislaufwirtschaft, unterteilen.
-
-        Zur Landwirtschaft: Mit dem Budget für die Land- und Forstwirtschaft, Wasserwirtschaft und Regionen setzen wir ein klares Zeichen für unsere bäuerlichen Familienbetriebe, für intakte Regionen, für eine nachhaltige Ressourcennutzung. Das ist ein klares Statement für eine ökosoziale Verantwortung, die wir seit vielen Jahren in diesem Land leben. Es stehen rund 3 Milliarden Euro zur Verfügung, genau sind es 2,84 Milliarden Euro für 2025 und 2,88 Milliarden Euro für 2026. Damit sichern wir die Versorgung im Land, damit sichern wir die Lebensqualität im ländlichen Raum.
-
-        Herr Kollege Schmiedlechner, ich weiß nicht, über welches Budget du geredet hast, es waren jedenfalls nicht das Budget 2025 und das Budget 2026. (Abg. Reiter [ÖVP]: Wahrscheinlich hat er es nicht gelesen!) Natürlich sparen wir auch im Bereich der Landwirtschaft ein. Wir sparen in der Verwaltung ein. Das führt dazu, dass wir in Zukunft auch mehr an Effizienz brauchen. Wir müssen KI einsetzen, es werden da und dort auch keine Posten nachbesetzt. Da sparen wir insgesamt 16 Millionen Euro ein. Wenn wir alles zusammenrechnen, inklusive der Mittel für die Förderungen, technische Anpassungen im Bereich der Gemeinsamen Agrarpolitik, in der Landwirtschaft, Forstwirtschaft und beim Wald – vorhin schon angesprochen –, dann reden wir von 125 Millionen Euro in beiden Jahren, bei einem Budget von insgesamt fast 6 Milliarden Euro. Also wir sparen, aber es ist noch genügend Geld da, vor allem in den Bereichen, in denen wir Wert darauf legen, dass die Finanzierung auch weiterhin gesichert ist. (Beifall bei der ÖVP.)";
-
-        let name = "Norbert Totschnig, MSc (ÖVP)";
-
-        let mut text_extractor = TextExtractor::new();
-        let fitted_speech = text_extractor.fit_speech(speech.to_string(), name).await;
-        let truth_fitted_speech = "Norbert Totschnig, MSc: Vielen Dank, sehr geehrter Herr Präsident! Geschätzte Damen und Herren Nationalrätinnen und Nationalräte! Hohes Haus! Ich möchte mein Statement erstens in die UG 42: Landwirtschaft, Forstwirtschaft und Wasserwirtschaft, und zweitens in die UG 43: Umwelt, Klimawandelanpassung und Kreislaufwirtschaft, unterteilen.\n        Zur Landwirtschaft: Mit dem Budget für die Land- und Forstwirtschaft, Wasserwirtschaft und Regionen setzen wir ein klares Zeichen für unsere bäuerlichen Familienbetriebe, für intakte Regionen, für eine nachhaltige Ressourcennutzung. Das ist ein klares Statement für eine ökosoziale Verantwortung, die wir seit vielen Jahren in diesem Land leben. Es stehen rund 3 Milliarden Euro zur Verfügung, genau sind es 2,84 Milliarden Euro für 2025 und 2,88 Milliarden Euro für 2026. Damit sichern wir die Versorgung im Land, damit sichern wir die Lebensqualität im ländlichen Raum.\n        Herr Kollege Schmiedlechner, ich weiß nicht, über welches Budget du geredet hast, es waren jedenfalls nicht das Budget 2025 und das Budget 2026. (Abg. Reiter [ÖVP]: Wahrscheinlich hat er es nicht gelesen!) Natürlich sparen wir auch im Bereich der Landwirtschaft ein. Wir sparen in der Verwaltung ein. Das führt dazu, dass wir in Zukunft auch mehr an Effizienz brauchen. Wir müssen KI einsetzen, es werden da und dort auch keine Posten nachbesetzt. Da sparen wir insgesamt 16 Millionen Euro ein. Wenn wir alles zusammenrechnen, inklusive der Mittel für die Förderungen, technische Anpassungen im Bereich der Gemeinsamen Agrarpolitik, in der Landwirtschaft, Forstwirtschaft und beim Wald – vorhin schon angesprochen –, dann reden wir von 125 Millionen Euro in beiden Jahren, bei einem Budget von insgesamt fast 6 Milliarden Euro. Also wir sparen, aber es ist noch genügend Geld da, vor allem in den Bereichen, in denen wir Wert darauf legen, dass die Finanzierung auch weiterhin gesichert ist. (Beifall bei der ÖVP.)";
-
-        assert_eq!(truth_fitted_speech, fitted_speech.unwrap());
     }
 }

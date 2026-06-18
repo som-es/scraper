@@ -96,6 +96,7 @@ pub struct TextExtractor {
     pub only_president: Regex,
     pub steno_info_regex: Regex,
     pub br_steno_info_regex: Regex,
+    pub time_marker_re: Regex,
 }
 
 unsafe impl Sync for TextExtractor {}
@@ -110,10 +111,14 @@ impl TextExtractor {
         let president_no_one_left =
             Regex::new(r"\nPräsident(?:[^!,])*?:[\s\S]*niemand.*geschlossen").unwrap();
         let only_president = Regex::new(r"\nPräsident(?:[^!,])*?:").unwrap();
-        let steno_info_regex =
-            Regex::new(r"Nationalrat,[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
+        let steno_info_regex = Regex::new(
+            r"Nationalrat,[\sXVICLMD.]*?[\s]*GP[\s]*Stenographisches Protokoll[\s\S]*?/.+?\d+",
+        )
+        .unwrap();
         let br_steno_info_regex =
-            Regex::new(r"Bundesrat[\s\S]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
+            Regex::new(r"Bundesrat[\s]*?Stenographisches Protokoll[\s\S]*?/.+?\d+").unwrap();
+
+        let time_marker_re = Regex::new(r"(?m)^\d+\.\d+$").unwrap();
 
         Self {
             cached_html: Default::default(),
@@ -125,6 +130,7 @@ impl TextExtractor {
             only_president,
             steno_info_regex,
             br_steno_info_regex,
+            time_marker_re,
         }
     }
 
@@ -215,6 +221,7 @@ impl TextExtractor {
         let president_last_regex = self.president_last_regex.clone();
         let president_no_one_left = self.president_no_one_left.clone();
         let only_president = self.only_president.clone();
+        let time_marker_re = self.time_marker_re.clone();
         let name = name.to_string();
         tokio::task::spawn_blocking(move || {
             fit_speech(
@@ -224,6 +231,7 @@ impl TextExtractor {
                 &president_last_regex,
                 &president_no_one_left,
                 &only_president,
+                &time_marker_re,
             )
         })
         .await

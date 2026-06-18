@@ -13,6 +13,7 @@ pub fn fit_speech(
     president_last_regex: &Regex,
     president_no_one_left: &Regex,
     only_president: &Regex,
+    time_marker_re: &Regex,
 ) -> Option<String> {
     let unfitted_speech = unfitted_speech.replace('\u{ad}', "");
     let unfitted_speech = unfitted_speech.replace('\u{a0}', " ");
@@ -41,10 +42,16 @@ pub fn fit_speech(
         Some(start_at_delegate_speech_idx) => {
             let start_at_delegate_speech = &unfitted_speech[start_at_delegate_speech_idx..];
 
-            let mut end_speech_idx = president_regex
+            let mut end_speech_idx = time_marker_re
                 .find(start_at_delegate_speech)
                 .map(|x| x.start())
                 .unwrap_or(start_at_delegate_speech.len())
+                .min(
+                    president_regex
+                        .find(start_at_delegate_speech)
+                        .map(|x| x.start())
+                        .unwrap_or(start_at_delegate_speech.len()),
+                )
                 .min(
                     president_last_regex
                         .find(start_at_delegate_speech)

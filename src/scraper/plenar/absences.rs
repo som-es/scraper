@@ -27,7 +27,6 @@ async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
-    // println!("processing noew: absence doc: {doc:?}");
     extract_absences_from_text(&text)
 }
 

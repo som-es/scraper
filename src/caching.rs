@@ -22,6 +22,14 @@ pub async fn get_disk_cache_parsed<T, O: Future<Output = (Option<T>, Option<u64>
         //     // ignores cache
         return None;
     }
+    let entry = if entry.starts_with("http") {
+        entry
+            .find("://")
+            .and_then(|idx| Some(&entry[idx + 2..])) // +2, skip :/, keep starting with /
+            .unwrap_or(entry)
+    } else {
+        entry
+    };
     let cache_path = format!("{}{entry}.json", cache_dir());
     if !tokio::fs::try_exists(&cache_path).await.ok()? {
         return None;
@@ -50,6 +58,14 @@ pub async fn get_disk_cache(entry: &str, redo_secs: u64) -> Option<String> {
         //     // ignores cache
         return None;
     }
+    let entry = if entry.starts_with("http") {
+        entry
+            .find("://")
+            .and_then(|idx| Some(&entry[idx + 2..])) // +2, skip :/, keep starting with /
+            .unwrap_or(entry)
+    } else {
+        entry
+    };
     let cache_path = format!("{}{entry}.json", cache_dir());
     if !tokio::fs::try_exists(&cache_path).await.ok()? {
         return None;

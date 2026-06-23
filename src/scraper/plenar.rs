@@ -252,7 +252,7 @@ fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>>
 mod tests {
     use std::{collections::HashSet, iter};
 
-    use common_scrapes::{Document, Opinion, Speech, SpeechTextInfo};
+    use common_scrapes::{Document, Opinion, Reference, Speech, SpeechTextInfo};
 
     use crate::{text_utils::compare_words, AustriaScraper, Scraper, TextExtractor};
 
@@ -2143,6 +2143,38 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
         );
         assert_eq!(plenar.council, "BR");
         dbg!(plenar);
+    }
+
+    #[tokio::test]
+    async fn test_plenar_info_br_991() {
+        let scraper = AustriaScraper::default();
+
+        let plenar_info = scraper
+            .get_plenar("/gegenstand/BR/BRSITZ/991")
+            .await
+            .unwrap();
+        let debate = &plenar_info.debates[2];
+        dbg!(debate);
+        assert_eq!(
+            debate.info.references,
+            vec![
+                Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "I".into(),
+                    inr: 443
+                },
+                Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "I".into(),
+                    inr: 444,
+                },
+                Reference {
+                    gp: "XXVIII".into(),
+                    ityp: "I".into(),
+                    inr: 445,
+                },
+            ]
+        );
     }
 
     #[tokio::test]

@@ -126,7 +126,7 @@ mod tests {
         PlenarSpeech, Speech, SpeechTextInfo,
     };
 
-    use crate::TextExtractor;
+    use crate::{plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
 
     #[tokio::test]
     async fn test_edith_muehlberghuber_speech() {
@@ -367,6 +367,71 @@ mod tests {
             .unwrap();
 
         assert_eq!(text, "August Wöginger (ÖVP) (zur Geschäftsbehandlung): Herr Präsident! Hohes Haus! Ehrlichkeit und Redlichkeit sind wichtige Tugenden in der Politik. Die Freiheitliche Partei hat in den letzten Minuten beides gebrochen. (Abg. Hafenecker [FPÖ]: Selbstironie ist ja immerhin da!)\nErstens einmal stehen Sie nicht zu der Aussage, die Abgeordneter Schnedlitz hier getätigt hat. Er hat eindeutig gesagt, dass das Parlament während der Coronazeit ausgeschaltet wurde. (Abg. Hafenecker [FPÖ]: Teilweise!) – Nicht teilweise! Er hat gesagt, es wurde ausgeschaltet. Er hat es ein paar Sätze später sogar noch wiederholt.\nUnd betreffend Redlichkeit, meine Damen und Herren von der FPÖ: Das war eine der schwierigsten Phasen in den letzten Jahren, die die Republik zu stemmen hatte. (Abg. Lausch [FPÖ]: Deswegen habt ihr auch 25 Jahre den Dollfuß bei euch hängen lassen!) – Ihr schafft es nicht einmal, einmal zuzuhören. Es ist wirklich - - (Abg. Lausch [FPÖ]: Dann bleibts bei der Wahrheit! – Heiterkeit bei der ÖVP.) \nPräsident Peter Haubner: Herr Klubobmann Wöginger ist am Wort. \nAbgeordneter August Wöginger (zur Geschäftsbehandlung) (fortsetzend): Herr Präsident! Der Ordnungsruf war ja das gelindeste Mittel, das man hier anwenden kann, der gehört natürlich her, aber eigentlich gehört jetzt die Sitzung unterbrochen, das Protokoll herbeigeschafft, um zu schauen, wie das wirklich gesagt wurde. Und wenn das dann bestätigt, was wir ohnedies alle gehört haben, dann verlange ich eine öffentliche Entschuldigung des Abgeordneten Schnedlitz hier im Hohen Haus. So geht das nicht! (Beifall bei ÖVP, SPÖ, NEOS und Grünen. – Abg. Amesbauer [FPÖ]: Habts ihr sonst keine Sorgen? Ich meine, das ist ja lächerlich! – Unruhe im Saal.)\n");
+    }
+
+    #[tokio::test]
+    async fn test_extract_nrsitz_xxviii_77_speeches() {
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/77")
+            .await
+            .unwrap();
+
+        let mut extractor = TextExtractor::new();
+        let mut trigger = false;
+        for debate in plenar.debates {
+            dbg!(&debate.info);
+            for speech in debate.speeches {
+                if speech.speech.spoken_text_html_urls.is_empty() {
+                    if trigger {
+                        panic!("should not happen in this dataset");
+                    }
+                    dbg!(&speech);
+                    continue;
+                }
+                dbg!(speech);
+            }
+        }
+    }
+    #[tokio::test]
+    async fn test_extract_nrsitz_xxviii_79_speeches() {
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/79")
+            .await
+            .unwrap();
+
+        let mut lengths = vec![];
+        let mut extractor = TextExtractor::new();
+        let mut trigger = false;
+        for debate in plenar.debates {
+            dbg!(&debate.info);
+            for speech in debate.speeches {
+                if speech.speech.spoken_text_html_urls.is_empty() {
+                    if trigger {
+                        panic!("should not happen in this dataset");
+                    }
+                    trigger = true;
+                    dbg!(&speech);
+                    continue;
+                }
+                assert!(speech.speech.spoken_text_html_urls.len() <= 1);
+                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                let speech_text = extractor
+                    .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
+                    .await
+                    .unwrap();
+                lengths.push(speech_text.len());
+                println!(
+                    "{} -------------------------------------- {}{}",
+                    &speech.speech.delegate_display_name,
+                    AustriaScraper::BASE_URL,
+                    speech_info.document_url
+                );
+                println!("speech_text: {speech_text}");
+                println!("--------------------------------------");
+            }
+        }
     }
 
     #[tokio::test]

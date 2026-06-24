@@ -263,7 +263,7 @@ impl TextExtractor {
     ) -> Option<String> {
         let mut total_text = String::new();
         for text_info in speech_infos {
-            if let Some(text) = self.speech_extraction_with_fit(text_info, &name).await {
+            if let Some(text) = self.speech_extraction_with_fit(text_info, name).await {
                 total_text.push_str(&text);
             }
         }
@@ -413,7 +413,7 @@ impl TextExtractor {
 
         match &self.state {
             State::NoCache => {
-                self.get_html(&url, key, cache_key, search_strategy_fn, only_text)
+                self.get_html(url, key, cache_key, search_strategy_fn, only_text)
                     .await
             }
             State::Cached(prev_url) => {
@@ -428,7 +428,7 @@ impl TextExtractor {
                 } else {
                     self.cached_html = Default::default();
                     self.state = State::NoCache;
-                    self.get_html(&url, key, cache_key, search_strategy_fn, only_text)
+                    self.get_html(url, key, cache_key, search_strategy_fn, only_text)
                         .await
                 }
             }
@@ -437,8 +437,8 @@ impl TextExtractor {
 }
 
 fn contains_single_named_votes(yes_indicator: &Regex, no_indicator: &Regex, text: &str) -> bool {
-    return yes_indicator.find_iter(&text).count() == 1
-        && no_indicator.find_iter(&text).count() == 1;
+    yes_indicator.find_iter(text).count() == 1
+        && no_indicator.find_iter(text).count() == 1
 }
 
 pub fn pro_contra_named_vote_indicators() -> (Regex, Regex) {

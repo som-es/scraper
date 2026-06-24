@@ -56,12 +56,11 @@ impl CallToOrder for AustriaScraper {
 
         let updated_at = raw_call_to_order["update"].as_str();
         let updated_at = updated_at
-            .map(|updated_at| {
+            .and_then(|updated_at| {
                 convert_vienna_datetime_to_utc(
                     NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
                 )
-            })
-            .flatten();
+            });
 
         let ityp = call_to_order_content["ityp"]
             .as_str()

@@ -194,8 +194,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     skip_words.extend(
         unique_titles()
             .iter()
-            .map(|title| title.split('.'))
-            .flatten()
+            .flat_map(|title| title.split('.'))
             .map(|title| title.trim_matches(char::is_whitespace)),
     );
 

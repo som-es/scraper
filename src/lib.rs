@@ -189,7 +189,7 @@ pub type DeclineUrlGegenstand = (String, String, Option<u32>);
 
 pub fn extract_reference_from_gegenstand_url(url: &str) -> Option<Reference> {
     let mut gegenstand_url = url.split('/');
-    if url.chars().next() == Some('/') {
+    if url.starts_with('/') {
         gegenstand_url.next();
     }
     gegenstand_url.next();

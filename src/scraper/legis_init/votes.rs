@@ -269,10 +269,7 @@ pub fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
 
     let captures = match vote_counts_regex.captures(text) {
         Some(captures) => captures,
-        None => match prefixed_vote_counts_regex.captures(text) {
-            Some(captures) => captures,
-            None => return None,
-        },
+        None => prefixed_vote_counts_regex.captures(text)?,
     };
     Some((
         captures.get(1)?.as_str().parse().unwrap(),

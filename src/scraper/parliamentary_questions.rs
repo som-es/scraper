@@ -56,8 +56,7 @@ impl ParliamentaryQAScraper for AustriaScraper {
 
         let references = content
             .get("reference")
-            .map(|reference| reference.as_array())
-            .flatten()
+            .and_then(|reference| reference.as_array())
             .map(|references| references.as_slice())
             .unwrap_or(&[]);
 
@@ -71,10 +70,7 @@ impl ParliamentaryQAScraper for AustriaScraper {
             })
             .collect::<Vec<_>>();
 
-        let qa_type = match extract_qa_type_from_ityp(&proposal.ityp) {
-            Some(value) => value,
-            None => return None,
-        };
+        let qa_type = extract_qa_type_from_ityp(&proposal.ityp)?;
 
         Some(ParliamentaryQAEntity {
             base_info: proposal,

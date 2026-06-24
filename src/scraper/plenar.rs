@@ -146,12 +146,11 @@ impl Plenar for AustriaScraper {
 
         let updated_at = plenar_content_0["update"].as_str();
         let updated_at = updated_at
-            .map(|updated_at| {
+            .and_then(|updated_at| {
                 convert_vienna_datetime_to_utc(
                     NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
                 )
-            })
-            .flatten();
+            });
 
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];

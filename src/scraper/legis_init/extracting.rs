@@ -132,8 +132,7 @@ pub fn extract_topics(legis_content: &Value, topics_name: &str) -> Option<Vec<St
             .as_array()?
             .iter()
             .flat_map(|topic| topic["label"].as_str().map(|topic| topic.to_string()))
-            .filter(|topic| already_seen_topics.insert(topic.clone())) // some topics are duplicated ... -> e.g. XXVII/I/2451
-            .into_iter()
+            .filter(|topic| already_seen_topics.insert(topic.clone()))
             .collect::<Vec<String>>(),
     )
 }

@@ -118,7 +118,7 @@ impl ProposalScraper for AustriaScraper {
             issuer_ids = names
                 .iter()
                 .filter(|name| name["funktext"] == "Eingebracht von")
-                .flat_map(|name| name["url"].as_str().map(|url| person_url_to_id(url)))
+                .flat_map(|name| name["url"].as_str().map(person_url_to_id))
                 .flatten()
                 .collect::<Vec<u64>>();
 

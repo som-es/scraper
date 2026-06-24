@@ -92,15 +92,14 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
                         let ty = speech[5].as_str()?.to_string();
                         let duration_in_seconds = speech[7]
                             .as_str()
-                            .map(|duration| {
+                            .and_then(|duration| {
                                 let duration = duration.split(':').collect::<Vec<&str>>();
 
                                 Some(
                                     duration[0].parse::<u32>().ok()? * 60
                                         + duration[1].parse::<u32>().ok()?,
                                 )
-                            })
-                            .flatten();
+                            });
 
                         Some(PlenarSpeech {
                             speech: Speech {

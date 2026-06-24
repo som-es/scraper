@@ -144,11 +144,7 @@ fn compress_matches<'h>(matches: Vec<Match<'h>>) -> Vec<Match<'h>> {
     matches
         .into_iter()
         .filter(|matched| {
-            let keep = if Some(matched.start() - 1) == end {
-                false
-            } else {
-                true
-            };
+            let keep = Some(matched.start() - 1) != end;
             end = Some(matched.end());
             keep
         })
@@ -188,7 +184,7 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
                     return None;
                 }
             }
-            if let Some(_matched) = matches.get(0) {
+            if let Some(_matched) = matches.first() {
                 text.push_str(&variant);
                 tracked_matches_count += 1;
             } else {

@@ -156,8 +156,7 @@ impl ParliamentDate {
         let parse_datetime = |s: &str| {
             NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
                 .ok()
-                .map(convert_vienna_datetime_to_utc)
-                .flatten()
+                .and_then(convert_vienna_datetime_to_utc)
         };
 
         let date = row.get(0).and_then(|v| v.as_str()).and_then(parse_date)?;

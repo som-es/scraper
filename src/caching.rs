@@ -59,8 +59,7 @@ pub async fn get_disk_cache_parsed<T, O: Future<Output = (Option<T>, Option<u64>
     }
     let entry = if entry.starts_with("http") {
         entry
-            .find("://")
-            .and_then(|idx| Some(&entry[idx + 2..])) // +2, skip :/, keep starting with /
+            .find("://").map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
             .unwrap_or(entry)
     } else {
         entry
@@ -94,8 +93,7 @@ pub async fn get_disk_cache(entry: &str, cache_config: &CacheConfig) -> Option<S
     }
     let entry = if entry.starts_with("http") {
         entry
-            .find("://")
-            .and_then(|idx| Some(&entry[idx + 2..])) // +2, skip :/, keep starting with /
+            .find("://").map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
             .unwrap_or(entry)
     } else {
         entry
@@ -124,8 +122,7 @@ pub async fn disk_caching(
 ) -> std::io::Result<()> {
     let entry = if entry.starts_with("http") {
         entry
-            .find("://")
-            .and_then(|idx| Some(&entry[idx + 2..])) // +2, skip :/, keep starting with /
+            .find("://").map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
             .unwrap_or(entry)
     } else {
         entry

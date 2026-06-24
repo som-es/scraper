@@ -145,7 +145,7 @@ pub trait DelegateScraper: Scraper {
         }
         let mut delegate = Self::person_info_into_delegate(raw_delegate)
             .ok_or(ScraperError::InvalidDelegateInfoError)?;
-        let new_gender = Gender::from_indicators([info.gender.as_str()].into_iter());
+        let new_gender = Gender::from_indicators([info.gender.as_str()]);
         if new_gender != Gender::Unknown {
             if delegate.gender == Gender::Unknown {
                 delegate.gender = new_gender;
@@ -312,12 +312,11 @@ pub fn extract_prev_name(prev_name_info: Option<&str>) -> Option<PrevNameInfo> {
             let prev_name = &prev_name_info[idx + 2..prev_name_info.len() - 1]
                 .trim_matches(char::is_whitespace);
             let till = date_start_idx
-                .map(|date_start_idx| {
+                .and_then(|date_start_idx| {
                     let till_date_str = &prev_name_info[date_start_idx + 5..idx];
 
                     NaiveDate::parse_from_str(till_date_str, "%d.%m.%Y").ok()
-                })
-                .flatten();
+                });
             PrevNameInfo {
                 prev_name: prev_name.to_string(),
                 till,

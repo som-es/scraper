@@ -131,7 +131,6 @@ pub async fn disk_caching(
         entry
     };
     let cache_path = format!("{}{entry}.json", cache_config.cache_dir());
-    dbg!(&cache_path);
     let cache_path = PathBuf::from(cache_path);
     tokio::fs::create_dir_all(&cache_path.parent().unwrap()).await?;
     tokio::fs::write(cache_path, data).await.unwrap();

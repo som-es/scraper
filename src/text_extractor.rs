@@ -161,7 +161,6 @@ impl TextExtractor {
         let mut html = match get_disk_cache(cache_key, &self.cache_config).await {
             Some(html) => html,
             None => {
-                dbg!(url, "NO CACHE");
                 let response = match self.client.get(url).send().await {
                     Ok(res) => res,
                     Err(e) => {

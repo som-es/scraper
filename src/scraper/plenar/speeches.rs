@@ -444,7 +444,6 @@ mod tests {
             .await
             .unwrap();
 
-        let mut lengths = vec![];
         let mut extractor = TextExtractor::default();
         extractor.cache_config = CacheConfig {
             cache_dir: "./test-data".into(),
@@ -452,41 +451,54 @@ mod tests {
             redo_secs: u64::MAX,
         };
         for debate in plenar.debates {
-            if !debate
+            if debate
                 .info
                 .about
                 .starts_with("Nationaler Aktionsplan gegen Gewalt")
             {
-                continue;
+                dbg!(&debate.info);
+                for (actual_speech, speech) in
+                    TEST_SPEECHES_NRSITZ_XXVIII_73.iter().zip(&debate.speeches)
+                {
+                    assert!(speech.speech.spoken_text_html_urls.len() <= 1);
+                    let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                    let speech_text = extractor
+                        .speech_extraction_with_fit(
+                            speech_info,
+                            &speech.speech.delegate_display_name,
+                        )
+                        .await
+                        .unwrap();
+                    assert!(!speech_text.is_empty());
+                    assert_eq!(actual_speech, &speech_text);
+                }
             }
-            dbg!(&debate.info);
-            for (actual_speech, speech) in
-                TEST_SPEECHES_NRSITZ_XXVIII_73.iter().zip(debate.speeches)
+            if debate
+                .info
+                .about
+                .starts_with("Prüfung der rechtlichen Rahmenbedingungen zum Schutz von Gesundheits")
             {
-                // if speech.speech.spoken_text_html_urls.is_empty() {
-                //     if trigger {
-                //         panic!("should not happen in this dataset");
-                //     }
-                //     trigger = true;
-                //     dbg!(&speech);
-                //     continue;
-                // }
-                assert!(speech.speech.spoken_text_html_urls.len() <= 1);
-                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
-                let speech_text = extractor
-                    .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
-                    .await
-                    .unwrap();
-                lengths.push(speech_text.len());
-                dbg!(&speech);
-                println!(
-                    "{} -------------------------------------- {}",
-                    &speech.speech.delegate_display_name, speech_info.document_url
-                );
-                println!("speech_text: {speech_text:?}");
-                println!("--------------------------------------");
-                assert!(!speech_text.is_empty());
-                assert_eq!(actual_speech, &speech_text);
+                dbg!(&debate.info);
+                for speech in debate.speeches {
+                    assert!(speech.speech.spoken_text_html_urls.len() <= 1);
+                    let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                    let speech_text = extractor
+                        .speech_extraction_with_fit(
+                            speech_info,
+                            &speech.speech.delegate_display_name,
+                        )
+                        .await
+                        .unwrap();
+                    dbg!(&speech);
+                    println!(
+                        "{} -------------------------------------- {}",
+                        &speech.speech.delegate_display_name, speech_info.document_url
+                    );
+                    println!("speech_text: {speech_text:?}");
+                    println!("--------------------------------------");
+                    assert!(!speech_text.is_empty());
+                    // assert_eq!(actual_speech, &speech_text);
+                }
             }
         }
     }

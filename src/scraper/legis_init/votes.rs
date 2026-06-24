@@ -4,9 +4,10 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::{
-    add_base_url_to_url, extract_pro_contra_party_codes_from_string, find_optimal_votes_by_name,
-    legis_init::group_names_from_vote_section, yes_no_votes_inside_regex,
-    yes_no_votes_prefixed_regex, yes_no_votes_regex, AustriaScraper, Scraper, TextExtractor,
+    add_base_url_to_url, caching::CacheConfig, extract_pro_contra_party_codes_from_string,
+    find_optimal_votes_by_name, legis_init::group_names_from_vote_section,
+    yes_no_votes_inside_regex, yes_no_votes_prefixed_regex, yes_no_votes_regex, AustriaScraper,
+    Scraper, TextExtractor,
 };
 
 use super::extract_invisibly_declined_from_text;
@@ -14,13 +15,14 @@ use super::extract_invisibly_declined_from_text;
 pub async fn extract_hidden_votes(
     legis_content: &Value,
     stop_at_phase: &str,
+    cache_config: &CacheConfig,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
     let status = legis_content.get("status");
 
     if legis_content.get("phase").is_none() {
         if let Some(stages) = legis_content.get("stages") {
-            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status, cache_config).await;
         }
 
         return most_fitting_votes;
@@ -39,7 +41,7 @@ pub async fn extract_hidden_votes(
         };
 
         if phase["name"].as_str().unwrap().contains(stop_at_phase) {
-            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status, cache_config).await;
             break;
         }
     }
@@ -101,6 +103,7 @@ pub fn contains_session_or_no_links(text: &str) -> bool {
 pub async fn extract_most_fitting_votes(
     stages: &Value,
     status: Option<&Value>,
+    cache_config: &CacheConfig,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let sitzung_id_regex = Regex::new(r"(\d+). Sitzung").unwrap();
     let is_site_stored_regex = Regex::new(r"SEITE_\d+").unwrap();
@@ -188,7 +191,7 @@ pub async fn extract_most_fitting_votes(
 
                 let url = add_base_url_to_url(url, AustriaScraper::BASE_URL);
 
-                let mut extractor = TextExtractor::default();
+                let mut extractor = TextExtractor::new(cache_config.clone());
                 // dbg!(protocol_link_obj);
 
                 let html_text = if is_site_stored_regex.is_match(&url.to_ascii_uppercase()) {

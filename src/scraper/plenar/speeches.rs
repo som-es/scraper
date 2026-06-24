@@ -123,7 +123,11 @@ mod tests {
         PlenarSpeech, Speech, SpeechTextInfo,
     };
 
-    use crate::{caching::CacheConfig, plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
+    use crate::{
+        caching::CacheConfig,
+        plenar::{tests::test_data::TEST_SPEECHES_NRSITZ_XXVIII_73, Plenar},
+        AustriaScraper, Scraper, TextExtractor,
+    };
 
     #[tokio::test]
     async fn test_edith_muehlberghuber_speech() {
@@ -447,8 +451,6 @@ mod tests {
             ignore_current_gp_cache: false,
             redo_secs: u64::MAX,
         };
-        let mut trigger = false;
-        // let speeches = [];
         for debate in plenar.debates {
             if !debate
                 .info
@@ -458,7 +460,9 @@ mod tests {
                 continue;
             }
             dbg!(&debate.info);
-            for speech in debate.speeches {
+            for (actual_speech, speech) in
+                TEST_SPEECHES_NRSITZ_XXVIII_73.iter().zip(debate.speeches)
+            {
                 // if speech.speech.spoken_text_html_urls.is_empty() {
                 //     if trigger {
                 //         panic!("should not happen in this dataset");
@@ -482,13 +486,14 @@ mod tests {
                 println!("speech_text: {speech_text:?}");
                 println!("--------------------------------------");
                 assert!(!speech_text.is_empty());
-                // assert_eq!(text_speech, &speech_text);
+                assert_eq!(actual_speech, &speech_text);
             }
         }
     }
+
     #[tokio::test]
     async fn test_extract_nrsitz_xxviii_75_speeches_in_cached_snippets() {
-        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let _ = simple_logger::init_with_level(log::Level::Info);
         let mut scraper = AustriaScraper::default();
         scraper.cache_config = CacheConfig {
             cache_dir: "./test-data".into(),

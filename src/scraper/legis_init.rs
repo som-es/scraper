@@ -232,11 +232,13 @@ impl LegislativeInitiatives for AustriaScraper {
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content);
 
         let (plenary_session, hidden_votes) =
-            extract_hidden_votes(legis_content, "Plenarberatungen NR").await;
+            extract_hidden_votes(legis_content, "Plenarberatungen NR", &self.cache_config).await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
 
         let (br_plenary_session, br_hidden_votes) = match voting {
-            Some(Voting::Law) => extract_hidden_votes(legis_content, "Plenarberatungen BR").await,
+            Some(Voting::Law) => {
+                extract_hidden_votes(legis_content, "Plenarberatungen BR", &self.cache_config).await
+            }
             _ => (None, None),
         };
 

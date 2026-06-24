@@ -139,7 +139,7 @@ pub fn extract_text_from_html_via_name_attribute(document: &Html, name_attribute
 
 pub const NAME_ATTRIBUTES: [&str; 4] = ["RU_", "R_", "T_", "TEXTOBJ_"];
 
-fn compress_matches<'h>(matches: Vec<Match<'h>>) -> Vec<Match<'h>> {
+pub fn compress_matches<'h>(matches: Vec<Match<'h>>) -> Vec<Match<'h>> {
     let mut end = None;
     matches
         .into_iter()

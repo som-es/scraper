@@ -479,8 +479,31 @@ mod tests {
                 .starts_with("Prüfung der rechtlichen Rahmenbedingungen zum Schutz von Gesundheits")
             {
                 dbg!(&debate.info);
-                for speech in debate.speeches {
+                for speech in &debate.speeches {
                     assert!(speech.speech.spoken_text_html_urls.len() <= 1);
+                    let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                    let speech_text = extractor
+                        .speech_extraction_with_fit(
+                            speech_info,
+                            &speech.speech.delegate_display_name,
+                        )
+                        .await
+                        .unwrap();
+                    // dbg!(&speech);
+                    // println!(
+                    //     "{} -------------------------------------- {}",
+                    //     &speech.speech.delegate_display_name, speech_info.document_url
+                    // );
+                    // println!("speech_text: {speech_text:?}");
+                    // println!("--------------------------------------");
+                    assert!(!speech_text.is_empty());
+                    // assert_eq!(actual_speech, &speech_text);
+                }
+            }
+            if debate.info.about.starts_with("ESG-Rating-Verordnung") {
+                dbg!(&debate.info);
+                for speech in &debate.speeches {
+                    assert_eq!(speech.speech.spoken_text_html_urls.len(), 1);
                     let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
                     let speech_text = extractor
                         .speech_extraction_with_fit(

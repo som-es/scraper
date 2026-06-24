@@ -335,9 +335,7 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
         None => {
             let end_contra_idx = contra_open_ended.find('*')?;
 
-            let x = &contra_open_ended[..end_contra_idx - 1];
-            dbg!(x);
-            x
+            &contra_open_ended[..end_contra_idx - 1]
         }
     };
 

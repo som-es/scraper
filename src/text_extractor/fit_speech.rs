@@ -1,7 +1,7 @@
 use regex::Regex;
 
 use crate::{
-    remove_titles_from_str,
+    compress_matches, remove_titles_from_str,
     text_utils::{remove_multiple_of, remove_paran_contents},
 };
 
@@ -54,7 +54,13 @@ pub fn fit_speech(
         });
     let name_regex = Regex::new(&name_regex).unwrap();
 
-    let start_at_delegate_speech = if is_speech_snippet {
+    let matches = compress_matches(
+        time_marker_re
+            .find_iter(&unfitted_speech)
+            .collect::<Vec<_>>(),
+    );
+
+    let start_at_delegate_speech = if is_speech_snippet && matches.len() < 2 {
         if let Some(start_idx) = name_regex.find(&unfitted_speech).map(|x| x.start()) {
             &unfitted_speech[start_idx..]
         } else {

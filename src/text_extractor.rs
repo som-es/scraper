@@ -164,17 +164,14 @@ impl TextExtractor {
                 let response = match self.client.get(url).send().await {
                     Ok(res) => res,
                     Err(e) => {
-                        dbg!(url, "error url");
                         log::error!("url: {url} Error: {e:?}");
                         return None;
                     }
                 };
                 let html = response.text().await.ok()?;
                 if let Err(e) = disk_caching(cache_key, &html, &self.cache_config).await {
-                    dbg!(url, "could not cache");
                     log::warn!("could not cache {cache_key}: {e:?}")
                 }
-                dbg!(url, "continue");
                 html
             }
         };

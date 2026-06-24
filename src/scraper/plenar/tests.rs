@@ -1,6 +1,7 @@
 pub mod test_data;
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
+use chrono::NaiveTime;
 use common_scrapes::{Opinion, Reference, Speech, SpeechTextInfo};
 
 use crate::{
@@ -2034,6 +2035,7 @@ async fn test_combine_with_doc_speeches_xxviii_nr_79() {
         speech_0.speech.delegate_display_name,
         "Michael Fürtbauer (F)"
     );
+    assert_eq!(speech_0.start, NaiveTime::from_str("10:26").ok());
 
     assert!(matches!(speech_0.speech.opinion, Opinion::Against));
     assert_eq!(speech_0.speech.spoken_text_html_urls.len(), 1);
@@ -2052,6 +2054,7 @@ async fn test_combine_with_doc_speeches_xxviii_nr_79() {
         speech_3.speech.delegate_display_name,
         "Mag. Gerhard Kaniak (F)"
     );
+    assert_eq!(speech_3.start, NaiveTime::from_str("10:37").ok());
 
     if let Opinion::Other(ref opinion_text) = speech_3.speech.opinion {
         assert_eq!(opinion_text, "tatsächliche Berichtigung");

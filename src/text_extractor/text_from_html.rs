@@ -144,7 +144,7 @@ pub fn compress_matches<'h>(matches: Vec<Match<'h>>) -> Vec<Match<'h>> {
     matches
         .into_iter()
         .filter(|matched| {
-            let keep = Some(matched.start() - 1) != end;
+            let keep = matched.start() == 0 || Some(matched.start() - 1) != end;
             end = Some(matched.end());
             keep
         })

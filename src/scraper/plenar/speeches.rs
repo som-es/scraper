@@ -1,7 +1,8 @@
 use crate::plenar::{Debate, DebateInfo};
+use chrono::NaiveTime;
 use common_scrapes::{Opinion, PlenarSpeech, Reference, Speech};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 pub(super) fn combine_speech_info(
     debates_with_speeches: Vec<(DebateInfo, Vec<PlenarSpeech>)>,
@@ -90,6 +91,10 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
                     .flat_map(|speech| {
                         let delegate_id = speech[3].as_u64()?;
                         let ty = speech[5].as_str()?.to_string();
+                        let start = speech[6]
+                            .as_str()
+                            .map(|start| NaiveTime::from_str(start).ok())
+                            .flatten();
                         let duration_in_seconds = speech[7].as_str().and_then(|duration| {
                             let duration = duration.split(':').collect::<Vec<&str>>();
 
@@ -108,6 +113,7 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
                             },
                             ty,
                             duration_in_seconds,
+                            start,
                         })
                     })
                     .collect::<Vec<_>>(),
@@ -185,30 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_speech_fit_bmff_susanne_raab() {
-        let speech =  PlenarSpeech {
-           ty: "rb".into(),
-           duration_in_seconds: Some(
-               242,
-           ),
-           speech: Speech {
-               delegate_id: 6486,
-               delegate_display_name: "BM MMag. Dr. Susanne Raab (V)".into(),
-               opinion: Other(
-                   "Regierungsbank".into(),
-               ),
-               spoken_text_html_urls: vec![
-                   SpeechTextInfo {
-                       site_start: Some(
-                           281,
-                       ),
-                       site_end: Some(
-                           283,
-                       ),
-                       document_url: "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/241/fnameorig_1629737.html#RU_310851".into(),
-                   },
-               ],
-           },
-       };
+        let speech =  PlenarSpeech {ty:"rb".into(),duration_in_seconds:Some(242,),speech:Speech{delegate_id:6486,delegate_display_name:"BM MMag. Dr. Susanne Raab (V)".into(),opinion:Other("Regierungsbank".into(),),spoken_text_html_urls:vec![SpeechTextInfo{site_start:Some(281,),site_end:Some(283,),document_url:"https://www.parlament.gv.at/dokument/XXVII/NRSITZ/241/fnameorig_1629737.html#RU_310851".into(),},],}, start: None };
 
         let mut extractor = TextExtractor::default();
         extractor.cache_config = CacheConfig {
@@ -589,6 +572,39 @@ mod tests {
                 println!("speech_text: {speech_text:?}");
                 println!("--------------------------------------");
                 assert_eq!(text_speech, &speech_text);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_nrsitz_xxviii_66_speeches() {
+        let scraper = AustriaScraper::default();
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/66")
+            .await
+            .unwrap();
+
+        let mut extractor = TextExtractor::default();
+        for debate in plenar.debates {
+            if !debate.info.about.starts_with("Dringlicher Antrag der Abgeordneten Leonore Gewessler, BA, Kolleginnen und Kollegen betreffend W") {
+                continue
+            }
+            dbg!(&debate.info);
+            for speech in debate.speeches {
+                dbg!(&speech);
+                assert!(speech.speech.spoken_text_html_urls.len() == 1);
+                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                let speech_text = extractor
+                    .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
+                    .await
+                    .unwrap();
+                println!(
+                    "{} -------------------------------------- {}",
+                    &speech.speech.delegate_display_name, speech_info.document_url
+                );
+                println!("speech_text: {speech_text}");
+                println!("--------------------------------------");
+                assert!(!speech_text.is_empty());
             }
         }
     }

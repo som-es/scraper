@@ -363,7 +363,6 @@ mod tests {
         };
 
         let mut extractor = TextExtractor::default();
-        let mut extractor = TextExtractor::default();
         extractor.cache_config = CacheConfig {
             cache_dir: "./test-data".into(),
             ignore_current_gp_cache: false,

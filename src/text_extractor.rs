@@ -8,7 +8,7 @@ use regex::Regex;
 use scraper::Html;
 
 use crate::{
-    caching::{cache_dir, disk_caching, get_disk_cache, CacheConfig},
+    caching::{disk_caching, get_disk_cache, CacheConfig},
     http_client, remove_page_info, remove_plenar_info, remove_steno_info,
 };
 
@@ -509,11 +509,9 @@ pub fn find_optimal_votes_by_name(
 #[cfg(test)]
 mod tests {
 
-    use common_scrapes::{Opinion::Other, PlenarSpeech, Speech, SpeechTextInfo};
-
     use crate::{
         find_optimal_votes_by_name, legis_init::LegislativeInitiatives, plenar::Plenar,
-        AustriaScraper, HasHTMLUrl, Scraper, TextExtractor,
+        AustriaScraper, HasHTMLUrl, TextExtractor,
     };
 
     // https://www.parlament.gv.at/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028

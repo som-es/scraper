@@ -439,7 +439,7 @@ pub fn extract_birthdate(raw_birthinfo: &Value) -> Option<NaiveDate> {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use common_scrapes::{Gender, Mandate, SocialMedia};
+    use common_scrapes::{Gender, Mandate};
 
     use crate::{
         error::ScraperError,

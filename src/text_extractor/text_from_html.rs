@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
-use ego_tree::NodeRef;
-use regex::{Match, Matches};
+use regex::Match;
 use scraper::{ElementRef, Html, Selector};
 
 use crate::{text_utils::remove_paran_contents, TextExtractor};

@@ -112,7 +112,6 @@ impl EnactmentScraper for AustriaScraper {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use common_scrapes::AcceptedState;
 
     use crate::{enactment::EnactmentScraper, AustriaScraper};
 

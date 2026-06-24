@@ -106,7 +106,7 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
 mod tests {
     use common_scrapes::SpeechTextInfo;
 
-    use crate::{AustriaScraper, Scraper, TextExtractor};
+    use crate::TextExtractor;
 
     use super::extract_person_id_from_a_tag;
 

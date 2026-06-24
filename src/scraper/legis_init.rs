@@ -7,7 +7,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use common_scrapes::{
     AcceptedState, LegislativeInitiative, RelatedDelegate, Speech, VoteType, Voting,
 };
-use serde_json::{json, Value};
+use serde_json::Value;
 use votes::extract_hidden_votes;
 
 use crate::{
@@ -17,13 +17,8 @@ use crate::{
     extract_plenar_documents, extract_text_from_html, person_url_to_id,
     proposals::ProposalScraper,
     speeches::extract_speeches,
-    AustriaScraper, GegenstandPaths, LastUpdated, Scraper, TextExtractor,
+    AustriaScraper, GegenstandPaths, LastUpdated, Scraper,
 };
-
-// const PARTIES: LazyLock<Vec<Party>> = LazyLock::new(|| {
-//     let scraper = AustriaScraper::default();
-//     pollster::block_on(scraper.get_parties()).unwrap()
-// });
 
 impl LastUpdated for LegislativeInitiative {
     fn last_updated(&self) -> DateTime<Utc> {
@@ -246,13 +241,11 @@ impl LegislativeInitiatives for AustriaScraper {
         let (was_invisibly_declined, _) = extract_invisibly_declined(legis_content);
 
         let (plenary_session, hidden_votes) =
-            extract_hidden_votes(legis_content, &ityp, "Plenarberatungen NR").await;
+            extract_hidden_votes(legis_content, "Plenarberatungen NR").await;
         let mut hidden_votes = hidden_votes.unwrap_or_default();
 
         let (br_plenary_session, br_hidden_votes) = match voting {
-            Some(Voting::Law) => {
-                extract_hidden_votes(legis_content, &ityp, "Plenarberatungen BR").await
-            }
+            Some(Voting::Law) => extract_hidden_votes(legis_content, "Plenarberatungen BR").await,
             _ => (None, None),
         };
 

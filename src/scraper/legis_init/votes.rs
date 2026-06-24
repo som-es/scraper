@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use common_scrapes::{Document, HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedByName};
+use common_scrapes::{HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedByName};
 use regex::Regex;
 use serde_json::Value;
 
@@ -13,7 +13,6 @@ use super::extract_invisibly_declined_from_text;
 
 pub async fn extract_hidden_votes(
     legis_content: &Value,
-    ityp: &str,
     stop_at_phase: &str,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let mut most_fitting_votes = (None, None);
@@ -21,7 +20,7 @@ pub async fn extract_hidden_votes(
 
     if legis_content.get("phase").is_none() {
         if let Some(stages) = legis_content.get("stages") {
-            most_fitting_votes = extract_most_fitting_votes(stages, status, ityp).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
         }
 
         return most_fitting_votes;
@@ -40,7 +39,7 @@ pub async fn extract_hidden_votes(
         };
 
         if phase["name"].as_str().unwrap().contains(stop_at_phase) {
-            most_fitting_votes = extract_most_fitting_votes(stages, status, ityp).await;
+            most_fitting_votes = extract_most_fitting_votes(stages, status).await;
             break;
         }
     }
@@ -102,7 +101,6 @@ pub fn contains_session_or_no_links(text: &str) -> bool {
 pub async fn extract_most_fitting_votes(
     stages: &Value,
     status: Option<&Value>,
-    ityp: &str,
 ) -> (Option<u64>, Option<HiddenVotes>) {
     let sitzung_id_regex = Regex::new(r"(\d+). Sitzung").unwrap();
     let is_site_stored_regex = Regex::new(r"SEITE_\d+").unwrap();

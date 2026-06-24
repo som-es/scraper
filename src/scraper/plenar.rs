@@ -82,11 +82,13 @@ pub trait Plenar: Scraper {
     async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo>;
 
     async fn get_plenar(&self, plenar_path: &str) -> Result<PlenarInfo, ScraperError> {
-        let raw = match get_disk_cache_json(plenar_path).await {
+        let raw = match get_disk_cache_json(plenar_path, self.cache_config()).await {
             Some(raw) => raw,
             None => {
                 let raw_plenar = self.get_gegenstand_info(plenar_path).await?;
-                if let Err(e) = disk_caching(plenar_path, raw_plenar.to_string()).await {
+                if let Err(e) =
+                    disk_caching(plenar_path, raw_plenar.to_string(), self.cache_config()).await
+                {
                     log::warn!("could cache raw {plenar_path}: {e:?}")
                 }
                 raw_plenar
@@ -254,7 +256,9 @@ mod tests {
 
     use common_scrapes::{Document, Opinion, Reference, Speech, SpeechTextInfo};
 
-    use crate::{text_utils::compare_words, AustriaScraper, Scraper, TextExtractor};
+    use crate::{
+        caching::CacheConfig, text_utils::compare_words, AustriaScraper, Scraper, TextExtractor,
+    };
 
     use super::Plenar;
 
@@ -296,7 +300,7 @@ mod tests {
         return;
         let mut scraper = AustriaScraper::default();
 
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut all_speeches_count = 0;
@@ -403,7 +407,7 @@ mod tests {
         return;
         let mut scraper = AustriaScraper::default();
 
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
         let mut all_speeches_count = 0;
@@ -621,7 +625,13 @@ mod tests {
     // /gegenstand/XXVIII/NRSITZ/6
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        scraper.text_extractor.cache_config = scraper.cache_config.clone();
 
         let plenar = scraper
             .get_plenar("/gegenstand/XXVIII/NRSITZ/5")
@@ -648,8 +658,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxviii_nrsitz_6_absences() {
-        let scraper = AustriaScraper::default();
-
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let plenar = scraper
             .get_plenar("/gegenstand/XXVIII/NRSITZ/6")
             .await
@@ -672,8 +686,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxv_nrsitz_12_absences() {
         let _ = simple_logger::init_with_level(log::Level::Info);
-        let scraper = AustriaScraper::default();
-
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let plenar = scraper
             .get_plenar("/gegenstand/XXV/NRSITZ/12")
             .await
@@ -693,8 +711,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxv_nrsitz_14_absences() {
         let _ = simple_logger::init_with_level(log::Level::Info);
-        let scraper = AustriaScraper::default();
-
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let plenar = scraper
             .get_plenar("/gegenstand/XXV/NRSITZ/14")
             .await
@@ -716,7 +738,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_plenar_gegenstand_xxv_nrsitz_30_absences() {
         let _ = simple_logger::init_with_level(log::Level::Info);
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
 
         let plenar = scraper
             .get_plenar("/gegenstand/XXV/NRSITZ/30")
@@ -1069,7 +1096,7 @@ mod tests {
                 .expect("Failed to get paths");
             for path in paths {
                 let plenar = scraper.get_plenar(&path).await.unwrap();
-                let mut extractor = TextExtractor::new();
+                let mut extractor = TextExtractor::default();
 
                 for debate in &plenar.debates {
                     for speech in &debate.speeches {
@@ -1110,7 +1137,7 @@ mod tests {
             .get_plenar("/gegenstand/XXII/NRSITZ/117")
             .await
             .unwrap();
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let mut lengths = vec![];
         let mut required_lengths = [
@@ -1201,7 +1228,7 @@ mod tests {
         assert_eq!(next_debate_speech.speech.opinion, Opinion::Against);
         assert_eq!(next_debate_speech.duration_in_seconds.unwrap(), 4 * 60 + 28);
 
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let mut lengths = vec![];
         let mut required_lenghts = [
@@ -1331,7 +1358,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_plenar_speeches() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let mut scraper = AustriaScraper::default();
         scraper.scrape_info.gp = vec!["XXIV".to_string()];
@@ -1410,7 +1437,7 @@ mod tests {
             2572, 3376, 3243, 2186, 3026, 2342, 5423, 6178, 5338, 2150, 1882, 2739, 2484, 3642,
             3760, 2227, 651, 1157, 1926, 3337, 3064, 2499, 1661, 1996, 3511, 3105,
         ];
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         let mut lengths = vec![];
         let mut i = 0;
         for debate in &plenar.debates {
@@ -1458,7 +1485,7 @@ mod tests {
             }],
         };
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
 
         let speech_text = text_extractor
             .speech_extraction_with_fit(
@@ -1480,7 +1507,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 dbg!(speech);
@@ -1512,7 +1539,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 dbg!(speech);
@@ -1539,7 +1566,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 dbg!(speech);
@@ -1568,7 +1595,12 @@ mod tests {
     async fn test_plenar_speech_diesner_martina() {
         // let mut extractor = TextExtractor::new();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
+        text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let speech = Speech {
             delegate_id: 16218,
             delegate_display_name: "Martina Diesner-Wais (V)".into(),
@@ -1605,7 +1637,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
     async fn test_plenar_speech_paul_stich() {
         // let mut extractor = TextExtractor::new();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         let speech = Speech {
             delegate_id: 30707,
             delegate_display_name: "Paul Stich (S)".into(),
@@ -1616,7 +1648,11 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
                 document_url: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/35/A_-_23_40_42_00818253.html#211".into(),
             }],
         };
-
+        text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1648,7 +1684,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 if speech.speech.spoken_text_html_urls.is_empty() {
@@ -1682,7 +1718,12 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
+        text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1931,7 +1972,12 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
+        text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -1994,7 +2040,12 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
+        text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -2048,7 +2099,12 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             }],
         };
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
+        text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let speech_text = text_extractor
             .speech_extraction_with_fit(
                 &speech.spoken_text_html_urls[0],
@@ -2092,7 +2148,7 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
             .await
             .unwrap();
 
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         for debate in &plenar.debates {
             for speech in &debate.speeches {
                 if speech.speech.spoken_text_html_urls.is_empty() {
@@ -2181,7 +2237,17 @@ Wir als ÖVP werden diesem Vorschlag zustimmen. Ich als Vorsitzende des Volksanw
     async fn test_combine_with_doc_speeches_xxviii_nr_79() {
         let _ = simple_logger::init_with_level(log::Level::Info);
 
-        let scraper = AustriaScraper::default();
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        scraper.text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         let plenar = scraper
             .get_plenar("/gegenstand/XXVIII/NRSITZ/79")
             .await

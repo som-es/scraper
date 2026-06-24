@@ -77,11 +77,16 @@ pub trait MinistrialProposalScraper: Scraper {
         &self,
         gegenstand_info: GegenstandInfo,
     ) -> Result<MinistrialProposal, ScraperError> {
-        let raw = match get_disk_cache_json(&gegenstand_info.path).await {
+        let raw = match get_disk_cache_json(&gegenstand_info.path, self.cache_config()).await {
             Some(raw) => raw,
             None => {
                 let raw_proposal = self.get_gegenstand_info(&gegenstand_info.path).await?;
-                if let Err(e) = disk_caching(&gegenstand_info.path, raw_proposal.to_string()).await
+                if let Err(e) = disk_caching(
+                    &gegenstand_info.path,
+                    raw_proposal.to_string(),
+                    self.cache_config(),
+                )
+                .await
                 {
                     log::warn!("could cache raw {}: {e:?}", gegenstand_info.path)
                 }

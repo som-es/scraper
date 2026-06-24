@@ -3,7 +3,7 @@ use common_scrapes::GovOfficial;
 use serde_json::{json, Value};
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json_with_secs},
+    caching::{disk_caching, get_disk_cache_json_with_secs, CacheConfig},
     delegates::DelegateScraper,
     error::ScraperError,
     extract_text_from_html, AustriaScraper, Scraper,
@@ -81,12 +81,23 @@ impl GovOfficials for AustriaScraper {
 
     async fn gov_officials(&self) -> Option<Vec<GovOfficial>> {
         let path = "/officials.json";
-        let gov_officials_raw = match get_disk_cache_json_with_secs(path, 60 * 60 * 24 * 2).await {
+        let gov_officials_raw = match get_disk_cache_json_with_secs(
+            path,
+            &CacheConfig {
+                redo_secs: 60 * 60 * 24 * 2,
+                cache_dir: self.cache_config.cache_dir().to_string(),
+                ignore_current_gp_cache: self.cache_config.ignore_current_gp_cache,
+            },
+        )
+        .await
+        {
             Some(raw) => raw,
             None => {
                 let raw_proposal = self.post_gov_officials_payload().await.ok()?;
 
-                if let Err(e) = disk_caching(path, raw_proposal.to_string()).await {
+                if let Err(e) =
+                    disk_caching(path, raw_proposal.to_string(), &self.cache_config).await
+                {
                     log::warn!("could cache raw {path}: {e:?}")
                 }
                 raw_proposal

@@ -6,15 +6,33 @@ use crate::{
     UNREALISTIC_SPEECH_LENGTH,
 };
 
+#[derive(Debug, Clone)]
+pub struct FitSpeechRegexes {
+    pub president_regex: Regex,
+    pub president_last_regex: Regex,
+    pub president_no_one_left: Regex,
+    pub only_president: Regex,
+    pub steno_info_regex: Regex,
+    pub br_steno_info_regex: Regex,
+    pub time_marker_re: Regex,
+}
+
 pub fn fit_speech(
     unfitted_speech: String,
     name: &str,
-    president_regex: &Regex,
-    president_last_regex: &Regex,
-    president_no_one_left: &Regex,
-    only_president: &Regex,
-    time_marker_re: &Regex,
+    fit_speech_regexes: &FitSpeechRegexes,
+    is_speech_snippet: bool,
 ) -> Option<String> {
+    let FitSpeechRegexes {
+        president_regex,
+        president_last_regex,
+        president_no_one_left,
+        only_president: _,
+        steno_info_regex: _,
+        br_steno_info_regex: _,
+        time_marker_re,
+    } = fit_speech_regexes;
+
     let unfitted_speech = unfitted_speech.replace('\u{ad}', "");
     let unfitted_speech = unfitted_speech.replace('\u{a0}', " ");
     let unfitted_speech = unfitted_speech.replace("\r\n", "\n");
@@ -36,18 +54,25 @@ pub fn fit_speech(
         });
     let name_regex = Regex::new(&name_regex).unwrap();
 
-    let time_marked_speech = if let Some(matched) = time_marker_re.find(&unfitted_speech) {
-        &unfitted_speech[matched.end()..]
+    let start_at_delegate_speech = if is_speech_snippet {
+        if let Some(start_idx) = name_regex.find(&unfitted_speech).map(|x| x.start()) {
+            &unfitted_speech[start_idx..]
+        } else {
+            unfitted_speech.as_str()
+        }
     } else {
-        &unfitted_speech
-    };
+        let time_marked_speech = if let Some(matched) = time_marker_re.find(&unfitted_speech) {
+            &unfitted_speech[matched.end()..]
+        } else {
+            unfitted_speech.as_str()
+        };
 
-    let start_at_delegate_speech =
         if let Some(start_idx) = name_regex.find(time_marked_speech).map(|x| x.start()) {
             &time_marked_speech[start_idx..]
         } else {
             time_marked_speech
-        };
+        }
+    };
 
     let end_speech_idx = time_marker_re
         .find(start_at_delegate_speech)

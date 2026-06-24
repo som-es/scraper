@@ -177,6 +177,7 @@ pub fn extract_text_from_html_via_name_attribute_finding_optimal_solution(
             .unwrap_or_default();
             let matches = compress_matches(
                 text_extrator
+                    .fit_speech_regexes
                     .time_marker_re
                     .find_iter(&variant)
                     .collect::<Vec<_>>(),

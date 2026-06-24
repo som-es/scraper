@@ -8,7 +8,7 @@ use regex::Regex;
 use scraper::Html;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache},
+    caching::{cache_dir, disk_caching, get_disk_cache, CacheConfig},
     http_client, remove_page_info, remove_plenar_info, remove_steno_info,
 };
 
@@ -90,13 +90,8 @@ pub struct TextExtractor {
     pub cached_html: Arc<RwLock<Option<Html>>>,
     state: State,
     pub client: reqwest::Client,
-    pub president_regex: Regex,
-    pub president_last_regex: Regex,
-    pub president_no_one_left: Regex,
-    pub only_president: Regex,
-    pub steno_info_regex: Regex,
-    pub br_steno_info_regex: Regex,
-    pub time_marker_re: Regex,
+    pub fit_speech_regexes: FitSpeechRegexes,
+    pub cache_config: CacheConfig,
 }
 
 unsafe impl Sync for TextExtractor {}
@@ -104,8 +99,16 @@ unsafe impl Send for TextExtractor {}
 
 pub const UNREALISTIC_SPEECH_LENGTH: usize = 50000;
 
+impl Default for TextExtractor {
+    fn default() -> Self {
+        let mut cache_config = CacheConfig::default();
+        cache_config.redo_secs = 60 * 60 * 24 * 30;
+        Self::new(cache_config)
+    }
+}
+
 impl TextExtractor {
-    pub fn new() -> Self {
+    pub fn new(cache_config: CacheConfig) -> Self {
         let president_regex = Regex::new(r"\nPräsident(?:[^!,])*?:.*[Nn]ächste.*").unwrap();
         let president_last_regex = Regex::new(r"\nPräsident(?:[^!,])*?:.*[lL]etzte.*").unwrap();
         let president_no_one_left =
@@ -124,13 +127,16 @@ impl TextExtractor {
             cached_html: Default::default(),
             state: State::NoCache,
             client: http_client().unwrap(),
-            president_regex,
-            president_last_regex,
-            president_no_one_left,
-            only_president,
-            steno_info_regex,
-            br_steno_info_regex,
-            time_marker_re,
+            fit_speech_regexes: FitSpeechRegexes {
+                president_regex,
+                president_last_regex,
+                president_no_one_left,
+                only_president,
+                steno_info_regex,
+                br_steno_info_regex,
+                time_marker_re,
+            },
+            cache_config,
         }
     }
 
@@ -138,8 +144,8 @@ impl TextExtractor {
         remove_steno_info(
             haystack,
             &[
-                self.steno_info_regex.clone(),
-                self.br_steno_info_regex.clone(),
+                self.fit_speech_regexes.steno_info_regex.clone(),
+                self.fit_speech_regexes.br_steno_info_regex.clone(),
             ],
         )
     }
@@ -152,7 +158,7 @@ impl TextExtractor {
         attribute_extraction_fn: Option<fn(&Html, &str, Self) -> Option<String>>,
         only_text: bool,
     ) -> Option<String> {
-        let mut html = match get_disk_cache(cache_key, 60 * 60 * 24 * 30).await {
+        let mut html = match get_disk_cache(cache_key, &self.cache_config).await {
             Some(html) => html,
             None => {
                 let response = match self.client.get(url).send().await {
@@ -163,7 +169,7 @@ impl TextExtractor {
                     }
                 };
                 let html = response.text().await.ok()?;
-                if let Err(e) = disk_caching(cache_key, &html).await {
+                if let Err(e) = disk_caching(cache_key, &html, &self.cache_config).await {
                     log::warn!("could not cache {cache_key}: {e:?}")
                 }
                 html
@@ -180,8 +186,8 @@ impl TextExtractor {
 
             let url = url.to_string();
             let steno_info_regex = [
-                self.steno_info_regex.clone(),
-                self.br_steno_info_regex.clone(),
+                self.fit_speech_regexes.steno_info_regex.clone(),
+                self.fit_speech_regexes.br_steno_info_regex.clone(),
             ];
             let extractor = self.clone();
             let (html, text) = tokio::task::spawn_blocking(move || {
@@ -203,8 +209,8 @@ impl TextExtractor {
         }
         let text = if only_text {
             let steno_info_regex = [
-                self.steno_info_regex.clone(),
-                self.br_steno_info_regex.clone(),
+                self.fit_speech_regexes.steno_info_regex.clone(),
+                self.fit_speech_regexes.br_steno_info_regex.clone(),
             ];
             tokio::task::spawn_blocking(move || {
                 remove_steno_info(&extract_text_from_html(&html), &steno_info_regex)
@@ -217,22 +223,22 @@ impl TextExtractor {
         Some(text)
     }
 
-    pub async fn fit_speech(&mut self, unfitted_speech: String, name: &str) -> Option<String> {
-        let president_regex = self.president_regex.clone();
-        let president_last_regex = self.president_last_regex.clone();
-        let president_no_one_left = self.president_no_one_left.clone();
-        let only_president = self.only_president.clone();
-        let time_marker_re = self.time_marker_re.clone();
+    pub async fn fit_speech(
+        &mut self,
+        unfitted_speech: String,
+        name: &str,
+        document_url: &str,
+    ) -> Option<String> {
+        let fit_speech_regexes = self.fit_speech_regexes.clone();
+        let is_snippet_regex = Regex::new(r"[A-Z]_-_").unwrap();
+        let is_speech_snippet = is_snippet_regex.is_match(document_url);
         let name = name.to_string();
         tokio::task::spawn_blocking(move || {
             fit_speech(
                 unfitted_speech,
                 &name,
-                &president_regex,
-                &president_last_regex,
-                &president_no_one_left,
-                &only_president,
-                &time_marker_re,
+                &fit_speech_regexes,
+                is_speech_snippet,
             )
         })
         .await
@@ -246,7 +252,8 @@ impl TextExtractor {
         name: &str,
     ) -> Option<String> {
         let unfitted_speech = self.raw_speech_extraction(speech_info).await?;
-        self.fit_speech(unfitted_speech, name).await
+        self.fit_speech(unfitted_speech, name, &speech_info.document_url)
+            .await
     }
 
     pub async fn full_speech_extraction(
@@ -512,7 +519,7 @@ mod tests {
     // https://www.parlament.gv.at/dokument/XXVII/NRSITZ/233/fnameorig_1627077.html#RU_306028
     #[tokio::test]
     async fn text_another_speech_extraction() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let res = extractor
             .extract_text_from_url(
@@ -529,7 +536,7 @@ mod tests {
     async fn text_another_speech_extraction_with_actual_pages() {
         let scraper = AustriaScraper::default();
         // /gegenstand/XXIII/I/682
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
         let legis_init = scraper
             .get_legis_init("/gegenstand/XXIII/I/682")
             .await
@@ -556,7 +563,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
         for speech in init.speeches {
             println!("!!!!!!!! speech url {}", speech.html_url());
             let text = extractor.extract_text_from_url(&speech, None, true).await;
@@ -566,7 +573,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_missing_text_not_anymore_since_optimal_check() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let res = extractor
             .extract_text_from_url(
@@ -581,7 +588,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/135/fnameorig_1463119.html#TEXTOBJ_258489";
         let res = extractor
@@ -593,7 +600,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name_failing_not_anymore() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/139/fnameorig_1463126.html#TEXTOBJ_260400";
         let res = extractor
@@ -606,7 +613,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_on_votes_by_name_failing() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let url = "https://www.parlament.gv.at/dokument/XXVII/NRSITZ/213/fnameorig_1632713.html#TEXTOBJ_296821";
         // let res = extractor.extract_text_from_url(&url, None, true).await.unwrap();
@@ -620,7 +627,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_wrong_text() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let scraper = AustriaScraper::default();
         let plenar = scraper
@@ -644,7 +651,7 @@ mod tests {
     #[tokio::test]
     async fn test_text_extractor_fail_not_anymore() {
         // /dokument/XXV/NRSITZ/25/fnameorig_359671.html#RU_121870
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let res = extractor
             .extract_text_from_url(
@@ -661,7 +668,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_text_extractor_no_steno_info() {
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let res = extractor
             .extract_text_from_url(
@@ -682,7 +689,7 @@ mod tests {
     #[tokio::test]
     async fn test_text_extractor_fail_older() {
         // /dokument/XXVI/NRSITZ/36/fnameorig_741083.html#Seite_0134.html
-        let mut extractor = TextExtractor::new();
+        let mut extractor = TextExtractor::default();
 
         let res = extractor
             .extract_text_from_url(
@@ -781,7 +788,7 @@ mod tests {
     #[tokio::test]
     async fn test_text_acc() {
         // https://www.parlament.gv.at/dokument/XXIV/NRSITZ/185/SEITE_0171.html
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
 
         let text = text_extractor
             .text_accumulation(

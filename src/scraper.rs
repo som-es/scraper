@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
+    caching::{disk_caching, get_disk_cache_json, CacheConfig},
     error::ScraperError,
     http_client,
     request::request,
@@ -77,17 +77,20 @@ pub trait Scraper {
     }
 
     async fn cache(&self, path: &str) -> Result<Value, ScraperError> {
-        Ok(match get_disk_cache_json(path).await {
+        Ok(match get_disk_cache_json(path, self.cache_config()).await {
             Some(raw) => raw,
             None => {
                 let raw_value = self.get_gegenstand_info(path).await?;
-                if let Err(e) = disk_caching(path, raw_value.to_string()).await {
+                if let Err(e) = disk_caching(path, raw_value.to_string(), self.cache_config()).await
+                {
                     log::warn!("could cache raw {path}: {e:?}")
                 }
                 raw_value
             }
         })
     }
+
+    fn cache_config(&self) -> &CacheConfig;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -146,15 +149,17 @@ pub struct AustriaScraper {
     pub text_extractor: TextExtractor,
     pub scrape_info: GeneralScrapeInfo,
     pub proposal_payload: Value,
+    pub cache_config: CacheConfig,
 }
 
 impl Default for AustriaScraper {
     fn default() -> Self {
         Self {
             client: http_client().unwrap(),
-            text_extractor: TextExtractor::new(),
+            text_extractor: TextExtractor::default(),
             scrape_info: Default::default(),
             proposal_payload: Default::default(),
+            cache_config: Default::default(),
         }
     }
 }
@@ -195,5 +200,9 @@ impl Scraper for AustriaScraper {
     #[inline]
     fn client(&self) -> &Client {
         &self.client
+    }
+
+    fn cache_config(&self) -> &CacheConfig {
+        &self.cache_config
     }
 }

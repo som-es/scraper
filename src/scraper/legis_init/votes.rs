@@ -190,7 +190,7 @@ pub async fn extract_most_fitting_votes(
 
                 let url = add_base_url_to_url(url, AustriaScraper::BASE_URL);
 
-                let mut extractor = TextExtractor::new();
+                let mut extractor = TextExtractor::default();
                 // dbg!(protocol_link_obj);
 
                 let html_text = if is_site_stored_regex.is_match(&url.to_ascii_uppercase()) {

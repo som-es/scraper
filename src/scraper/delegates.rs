@@ -127,7 +127,7 @@ pub trait DelegateScraper: Scraper {
     fn person_info_into_delegate(person_info: Value) -> Option<Delegate>;
 
     async fn get_delegate_cached(&self, info: DelegateInfo) -> Result<Delegate, ScraperError> {
-        match get_disk_cache_json(&info.path).await {
+        match get_disk_cache_json(&info.path, self.cache_config()).await {
             Some(raw) => self.get_delegate_from_value(info, raw).await,
             None => self.get_delegate(info).await,
         }
@@ -138,7 +138,9 @@ pub trait DelegateScraper: Scraper {
         info: DelegateInfo,
         raw_delegate: Value,
     ) -> Result<Delegate, ScraperError> {
-        if let Err(e) = disk_caching(&info.path, raw_delegate.to_string()).await {
+        if let Err(e) =
+            disk_caching(&info.path, raw_delegate.to_string(), self.cache_config()).await
+        {
             log::warn!("could cache raw delegate {}: {e:?}", info.path)
         }
         let mut delegate = Self::person_info_into_delegate(raw_delegate)

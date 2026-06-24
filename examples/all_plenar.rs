@@ -4,7 +4,7 @@ use somes_scraper::{plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
 async fn main() {
     let mut scraper = AustriaScraper::default();
 
-    let mut extractor = TextExtractor::new();
+    let mut extractor = TextExtractor::default();
 
     std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
     let mut all_speeches_count = 0;

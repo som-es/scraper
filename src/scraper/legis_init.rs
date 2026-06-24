@@ -55,7 +55,7 @@ pub trait LegislativeInitiatives: ProposalScraper + Sync {
                 return Err(ScraperError::NoVoteFound);
             }
         }
-        match get_disk_cache_parsed::<_, _>(&proposal_path, 60 * 60 * 24 * 190, |raw| async {
+        match get_disk_cache_parsed::<_, _>(&proposal_path, self.cache_config(), |raw| async {
             let legis_init = self.raw_legis_into_legis(raw).await;
             let redo_secs = if let Some(legis_init) = legis_init.as_ref() {
                 let dur = chrono::Local::now().to_utc() - legis_init.created_at;
@@ -77,7 +77,13 @@ pub trait LegislativeInitiatives: ProposalScraper + Sync {
 
                 let raw_proposal = self.get_gegenstand_info(&proposal_path).await?;
 
-                if let Err(e) = disk_caching(&proposal_path, raw_proposal.to_string()).await {
+                if let Err(e) = disk_caching(
+                    &proposal_path,
+                    raw_proposal.to_string(),
+                    self.cache_config(),
+                )
+                .await
+                {
                     log::warn!("could cache raw {proposal_path}: {e:?}")
                 }
 
@@ -2302,7 +2308,7 @@ mod tests {
     // gegenstand/XXVI/I/275 => named br
     #[tokio::test]
     async fn test_xxvi_i_275() {
-        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let _ = simple_logger::init_with_level(log::Level::Info);
         let scraper = AustriaScraper::default();
 
         let res = scraper
@@ -2793,7 +2799,7 @@ mod tests {
     #[tokio::test]
     async fn test_named_vote_xxviii_a_372_by_document_link() {
         let url = "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/41/A_-_17_40_32_00837360.html#121.11";
-        let mut text_extractor = TextExtractor::new();
+        let mut text_extractor = TextExtractor::default();
         let text = text_extractor
             .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
             .await

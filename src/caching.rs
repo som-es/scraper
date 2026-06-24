@@ -59,7 +59,8 @@ pub async fn get_disk_cache_parsed<T, O: Future<Output = (Option<T>, Option<u64>
     }
     let entry = if entry.starts_with("http") {
         entry
-            .find("://").map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
+            .find("://")
+            .map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
             .unwrap_or(entry)
     } else {
         entry
@@ -93,7 +94,8 @@ pub async fn get_disk_cache(entry: &str, cache_config: &CacheConfig) -> Option<S
     }
     let entry = if entry.starts_with("http") {
         entry
-            .find("://").map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
+            .find("://")
+            .map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
             .unwrap_or(entry)
     } else {
         entry
@@ -122,12 +124,14 @@ pub async fn disk_caching(
 ) -> std::io::Result<()> {
     let entry = if entry.starts_with("http") {
         entry
-            .find("://").map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
+            .find("://")
+            .map(|idx| &entry[idx + 2..]) // +2, skip :/, keep starting with /
             .unwrap_or(entry)
     } else {
         entry
     };
     let cache_path = format!("{}{entry}.json", cache_config.cache_dir());
+    dbg!(&cache_path);
     let cache_path = PathBuf::from(cache_path);
     tokio::fs::create_dir_all(&cache_path.parent().unwrap()).await?;
     tokio::fs::write(cache_path, data).await.unwrap();

@@ -90,16 +90,14 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
                     .flat_map(|speech| {
                         let delegate_id = speech[3].as_u64()?;
                         let ty = speech[5].as_str()?.to_string();
-                        let duration_in_seconds = speech[7]
-                            .as_str()
-                            .and_then(|duration| {
-                                let duration = duration.split(':').collect::<Vec<&str>>();
+                        let duration_in_seconds = speech[7].as_str().and_then(|duration| {
+                            let duration = duration.split(':').collect::<Vec<&str>>();
 
-                                Some(
-                                    duration[0].parse::<u32>().ok()? * 60
-                                        + duration[1].parse::<u32>().ok()?,
-                                )
-                            });
+                            Some(
+                                duration[0].parse::<u32>().ok()? * 60
+                                    + duration[1].parse::<u32>().ok()?,
+                            )
+                        });
 
                         Some(PlenarSpeech {
                             speech: Speech {
@@ -424,6 +422,67 @@ mod tests {
                     continue;
                 }
                 dbg!(speech);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_nrsitz_xxviii_73_speeches_in_cached_snippets() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        let plenar = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/73")
+            .await
+            .unwrap();
+
+        let mut lengths = vec![];
+        let mut extractor = TextExtractor::default();
+        extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        let mut trigger = false;
+        // let speeches = [];
+        for debate in plenar.debates {
+            if !debate
+                .info
+                .about
+                .starts_with("Nationaler Aktionsplan gegen Gewalt")
+            {
+                continue;
+            }
+            dbg!(&debate.info);
+            for speech in debate.speeches {
+                // if speech.speech.spoken_text_html_urls.is_empty() {
+                //     if trigger {
+                //         panic!("should not happen in this dataset");
+                //     }
+                //     trigger = true;
+                //     dbg!(&speech);
+                //     continue;
+                // }
+                assert!(speech.speech.spoken_text_html_urls.len() <= 1);
+                let speech_info = speech.speech.spoken_text_html_urls.first().unwrap();
+                let speech_text = extractor
+                    .speech_extraction_with_fit(speech_info, &speech.speech.delegate_display_name)
+                    .await
+                    .unwrap();
+                lengths.push(speech_text.len());
+                dbg!(&speech);
+                println!(
+                    "{} -------------------------------------- {}",
+                    &speech.speech.delegate_display_name, speech_info.document_url
+                );
+                println!("speech_text: {speech_text:?}");
+                println!("--------------------------------------");
+                assert!(!speech_text.is_empty());
+                // assert_eq!(text_speech, &speech_text);
             }
         }
     }

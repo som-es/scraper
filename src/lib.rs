@@ -120,9 +120,9 @@ fn unique_titles() -> HashSet<&'static str> {
         "Dipl.-Kfm. Dr. h.c.", "Dipl.-Vw. Dr.", "Dipl.-Ing. Mag.", "MSc BA", "MA MLS", "MA, MSc",
         "Dr. Dr. h.c. mult.", "Dipl.-Kfm.", "Ing.", "Ing. Mag.", "Ing. Dr.", "Ing. MSc",
         "Mst.", "Mst. DI (FH)", "Mag. (FH)", "PMM", "abs. iur.", "Edler von", "Ritter von",
-        "BM", "StS",
+        "BM", "StS", "Bakk", "Bakk.",
 
-        "BM", "StS", "MEP", "PRRH", "VA", "VK", "BK", "GAST",
+        "BM", "StS", "MEP", "PRRH", "VA", "VK", "BK", "GAST", "bakk", "bakk",
         "Dr.", "Mag.", "Dipl.-Kfm.", "Dipl.-Ing.", "Dipl.-Kffr.", "Dipl.-Vw.",
         "DDr.", "Dr. Dr. h.c.", "Dr. Dr. h.c. mult.", "Dr. h.c.", "Dr. h.c. mult.", "Dr. Dr.",
         "Mag. Dr.", "Mag. (FH)", "MMag.", "MMag. Dr.", "MMMag.", "MMMag. Dr.",

@@ -68,8 +68,6 @@ pub trait LegislativeInitiatives: ProposalScraper + Sync {
         {
             Some(legis_init) => Ok(legis_init),
             None => {
-                log::info!("NO CACHE!!!!!!!! {proposal_path:?}");
-
                 let raw_proposal = self.get_gegenstand_info(&proposal_path).await?;
 
                 if let Err(e) = disk_caching(
@@ -102,11 +100,6 @@ pub const LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES: [&str; 22] = [
 
 #[async_trait]
 impl LegislativeInitiatives for AustriaScraper {
-    // const FILTER_PATH: &'static str =
-    //     "/Filter/api/filter/data/101?js=eval&showAll=true&export=true";
-    // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
-    // "/Filter/api/json/post?jsMode=EVAL&FBEZ=WFP_003&listeId=undefined&showAll=true&export=true";
-
     async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative> {
         let description = raw_legis["meta"]["description"].as_str()?.to_string();
         let title = raw_legis["meta"]["title"].as_str()?.to_string();
@@ -196,8 +189,9 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let nr_plenary_activity_date = NaiveDate::parse_from_str(date, "%d.%m.%Y ").ok()?;
 
-        let br_plenary_activity_date = br_plenary_date
-            .and_then(|br_plenary_date| NaiveDate::parse_from_str(br_plenary_date, "%d.%m.%Y ").ok());
+        let br_plenary_activity_date = br_plenary_date.and_then(|br_plenary_date| {
+            NaiveDate::parse_from_str(br_plenary_date, "%d.%m.%Y ").ok()
+        });
 
         let vote_infavor = legis_content["vote"]["infavor"].as_bool();
 
@@ -227,12 +221,11 @@ impl LegislativeInitiatives for AustriaScraper {
         )?;
 
         let updated_at = legis_content["update"].as_str();
-        let updated_at = updated_at
-            .and_then(|updated_at| {
-                convert_vienna_datetime_to_utc(
-                    NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
-                )
-            });
+        let updated_at = updated_at.and_then(|updated_at| {
+            convert_vienna_datetime_to_utc(
+                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
+            )
+        });
 
         let requires_simple_majority =
             extract_majority_on_indicators(legis_content).unwrap_or(true);

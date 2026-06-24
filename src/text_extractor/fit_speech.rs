@@ -42,6 +42,7 @@ pub fn fit_speech(
     let (_, name) = remove_paran_contents(name, '(', ')');
     let name = name.trim_matches(char::is_whitespace);
     let name = remove_titles_from_str(name);
+    let name = &name[..name.rfind(',').unwrap_or(name.len())];
     // BK Werner Faymann (S) remove the BK, BM etc
     let name_regex = name
         .split_whitespace()

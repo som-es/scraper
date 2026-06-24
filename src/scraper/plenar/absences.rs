@@ -3,14 +3,22 @@ use std::collections::HashSet;
 use common_scrapes::{Document, FileType};
 use regex::Regex;
 
-use crate::{filter::filter_name_extraction, plenar::Absences, unique_titles, TextExtractor};
+use crate::{
+    caching::CacheConfig, filter::filter_name_extraction, plenar::Absences, unique_titles,
+    TextExtractor,
+};
 
-pub(super) async fn extract_absences(documents: &[Document]) -> Option<Absences> {
+pub(super) async fn extract_absences(
+    documents: &[Document],
+    cache_config: &CacheConfig,
+) -> Option<Absences> {
     for document in documents {
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
         {
-            let Some(extracted_absences) = extract_absences_from_document(document).await else {
+            let Some(extracted_absences) =
+                extract_absences_from_document(document, cache_config).await
+            else {
                 continue;
             };
             return Some(Absences {
@@ -22,8 +30,11 @@ pub(super) async fn extract_absences(documents: &[Document]) -> Option<Absences>
     None
 }
 
-async fn extract_absences_from_document(doc: &Document) -> Option<Vec<String>> {
-    let mut extractor = TextExtractor::default();
+async fn extract_absences_from_document(
+    doc: &Document,
+    cache_config: &CacheConfig,
+) -> Option<Vec<String>> {
+    let mut extractor = TextExtractor::new(cache_config.clone());
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
@@ -238,7 +249,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 mod tests {
     use common_scrapes::Document;
 
-    use crate::plenar::absences::extract_absences_from_document;
+    use crate::{caching::CacheConfig, plenar::absences::extract_absences_from_document};
 
     #[tokio::test]
     async fn test_absences_extraction_from_doc() {
@@ -250,7 +261,9 @@ mod tests {
             ftype: common_scrapes::FileType::HTML,
         };
 
-        let absences = extract_absences_from_document(&doc).await.unwrap();
+        let absences = extract_absences_from_document(&doc, &CacheConfig::default())
+            .await
+            .unwrap();
         println!("absences: {absences:?}");
         assert_eq!(&absences, &Vec::<String>::new());
     }
@@ -266,7 +279,9 @@ mod tests {
             ftype: common_scrapes::FileType::HTML,
         };
 
-        let absences = extract_absences_from_document(&doc).await.unwrap();
+        let absences = extract_absences_from_document(&doc, &CacheConfig::default())
+            .await
+            .unwrap();
         assert_eq!(absences, vec!["Wilhelm Molterer".to_string()]);
         println!("absences: {absences:?}");
     }

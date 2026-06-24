@@ -161,17 +161,21 @@ impl TextExtractor {
         let mut html = match get_disk_cache(cache_key, &self.cache_config).await {
             Some(html) => html,
             None => {
+                dbg!(url, "NO CACHE");
                 let response = match self.client.get(url).send().await {
                     Ok(res) => res,
                     Err(e) => {
+                        dbg!(url, "error url");
                         log::error!("url: {url} Error: {e:?}");
                         return None;
                     }
                 };
                 let html = response.text().await.ok()?;
                 if let Err(e) = disk_caching(cache_key, &html, &self.cache_config).await {
+                    dbg!(url, "could not cache");
                     log::warn!("could not cache {cache_key}: {e:?}")
                 }
+                dbg!(url, "continue");
                 html
             }
         };
@@ -437,8 +441,7 @@ impl TextExtractor {
 }
 
 fn contains_single_named_votes(yes_indicator: &Regex, no_indicator: &Regex, text: &str) -> bool {
-    yes_indicator.find_iter(text).count() == 1
-        && no_indicator.find_iter(text).count() == 1
+    yes_indicator.find_iter(text).count() == 1 && no_indicator.find_iter(text).count() == 1
 }
 
 pub fn pro_contra_named_vote_indicators() -> (Regex, Regex) {

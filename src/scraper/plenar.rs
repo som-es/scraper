@@ -8,7 +8,7 @@ mod call_to_orders;
 mod speeches;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache_json},
+    caching::{disk_caching, get_disk_cache_json, CacheConfig},
     call_to_order::CallToOrderInfo,
     convert_vienna_datetime_to_utc, documents,
     error::ScraperError,
@@ -79,7 +79,10 @@ pub trait Plenar: Scraper {
 
     fn plenar_paths(&self, plenar_infos: Value) -> Result<GegenstandPaths, ScraperError>;
 
-    async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo>;
+    async fn raw_plenar_into_plenar_info(
+        raw_plenar: Value,
+        cache_config: &CacheConfig,
+    ) -> Option<PlenarInfo>;
 
     async fn get_plenar(&self, plenar_path: &str) -> Result<PlenarInfo, ScraperError> {
         let raw = match get_disk_cache_json(plenar_path, self.cache_config()).await {
@@ -95,7 +98,7 @@ pub trait Plenar: Scraper {
             }
         };
 
-        Self::raw_plenar_into_plenar_info(raw)
+        Self::raw_plenar_into_plenar_info(raw, self.cache_config())
             .await
             .ok_or(ScraperError::PlenarGegenstandParseError)
     }
@@ -115,7 +118,10 @@ impl Plenar for AustriaScraper {
             .ok_or(ScraperError::ProposalParseError)
     }
 
-    async fn raw_plenar_into_plenar_info(raw_plenar: Value) -> Option<PlenarInfo> {
+    async fn raw_plenar_into_plenar_info(
+        raw_plenar: Value,
+        cache_config: &CacheConfig,
+    ) -> Option<PlenarInfo> {
         let description = raw_plenar["meta"]["description"]
             .as_str()
             .unwrap()
@@ -145,12 +151,11 @@ impl Plenar for AustriaScraper {
         .map(convert_vienna_datetime_to_utc)??;
 
         let updated_at = plenar_content_0["update"].as_str();
-        let updated_at = updated_at
-            .and_then(|updated_at| {
-                convert_vienna_datetime_to_utc(
-                    NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
-                )
-            });
+        let updated_at = updated_at.and_then(|updated_at| {
+            convert_vienna_datetime_to_utc(
+                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
+            )
+        });
 
         let mut document_link_speeches = vec![];
         let mut call_to_orders = vec![];
@@ -198,7 +203,7 @@ impl Plenar for AustriaScraper {
             .cloned()
             .collect::<Vec<_>>();
 
-        let absences = extract_absences(&absences_documents).await;
+        let absences = extract_absences(&absences_documents, cache_config).await;
         log::info!("!!!!!!! absences: {absences:?}");
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216

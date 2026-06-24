@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Präsidium, 5. Sitzung, XXVIII. GP des NR, 09:09</title>
+<link rel="stylesheet" href="/static/css/webfonts/lato.css" />
+<style>
+<!--
+@font-face {
+    font-family: Lato Semibold;
+    font-style: normal;
+    src: url(/static/css/webfonts/Lato-Semibold.woff2) format('woff2')
+}
+* {
+    font-family: Lato, sans-serif;
+}
+p, li, h1, h2 {
+    margin-right: 0;
+    margin-left: 0;
+    padding-right: 0;
+    padding-left: 0;
+    line-height: 1.5;
+}
+p, li {
+    margin-top: 0;
+    margin-bottom: 12pt;
+    font-weight: normal;
+    font-size: 12pt;
+    letter-spacing: 0.1pt;
+}
+div strong, p strong, li strong {
+    letter-spacing: 0.2pt;
+}
+h1, h2 {
+    margin-top: 20pt;
+    margin-bottom: 12pt;
+    font-weight: bold;
+    font-size: 12pt;
+    letter-spacing: 1pt;
+}
+.randnummer {
+    margin-top: 6pt;
+    margin-bottom: 6pt;
+    font-size: 10pt;
+    color: rgba(0, 0, 0, 0.6);
+    letter-spacing: 1pt;
+    text-align: right;
+    page-break-after: avoid;
+}
+.autorisierungsstatus {
+    font-size: 10pt;
+    font-style: italic;
+    text-align: center;
+}
+._RB {
+    margin-top: 12pt;
+    margin-bottom: 4pt;
+    font-size: 10pt;
+    page-break-after: avoid;
+}
+._RE {
+    margin-top: 4pt;
+    margin-bottom: 12pt;
+    font-size: 10pt;
+}
+._SB {
+    margin-top: 12pt;
+    margin-bottom: 12pt;
+    font-family: Lato Semibold;
+    font-size: 20pt;
+    letter-spacing: 1.5pt;
+    page-break-after: avoid;
+}
+._FP {
+    margin-top: 12pt;
+    margin-bottom: 12pt;
+    font-weight: bold;
+    letter-spacing: 1pt;
+}
+._ZM {
+    margin-top: 16pt;
+    margin-bottom: 12pt;
+    font-weight: bold;
+    letter-spacing: 0.2pt;
+}
+ol,ul {
+    padding: 0;
+    margin: 0;
+}
+ol {
+    list-style-type: decimal;
+    list-style-position: inside;
+}
+ul {
+    list-style-type: "- ";
+    list-style-position: inside;
+}
+div.inhaltsverzeichnis-verweis {
+    display: flex;
+    justify-content: space-between;
+}
+div.inhaltsverzeichnis-verweis p a {
+    flex-shrink: 0;
+}
+hr {
+    border: none;
+    border-bottom: 1pt solid black;
+    height: 0;
+    max-width: 5cm;
+    color: black;
+    background-color: black;
+    margin: 12pt 0 12pt 0;
+}
+.image {
+    display: table;
+    clear: both;
+    text-align: center;
+    margin: 0.9em auto;
+    min-width: 50px;
+}
+.image img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    min-width: 100%;
+    height: auto;
+}
+.image-style-block-align-right {
+    margin-right: 0;
+    margin-left: auto;
+}
+.image-style-block-align-left {
+    margin-left: 0;
+    margin-right: auto;
+}
+.image.image_resized {
+    max-width: 100%;
+    display: block;
+    box-sizing: border-box;
+}
+.image.image_resized img {
+    width: 100%;
+}
+-->
+</style>
+</head>
+<body>
+<p id="2" class="randnummer" title="Präsidium">RN/2</p><h1>Präsidium</h1><p><strong>Präsident Dr. <a href="https://www.parlament.gv.at/person/51570" target="_blank">Walter Rosenkranz</a>:</strong> Die Sitzung ist eröffnet.</p><p>Die Amtlichen Protokolle der 3. und der 4. Sitzung vom 20. November 2024 sind in der Parlamentsdirektion aufgelegen und wurden nicht beanstandet.</p><p id="2.1" class="randnummer-placeholder-value randnummer" title="Präsidium">RN/2.1</p><p>Als verhindert gemeldet sind die Abgeordneten Giuliani-Sterrer, Herbert, Gmeinbauer, Voglauer und Zadić.</p><p>Frau Abgeordnete und Bundesministerin Zadić, wir wissen den Grund der Verhinderung, es ist ein besonders erfreulicher, und wir wollen Ihnen auch allesamt sehr herzlich zur Geburt Ihres zweiten Kindes gratulieren. <i>(</i><i>Allgemeiner Beifall.</i><i>)</i></p><p id="2.2" class="randnummer-placeholder-value randnummer" title="Präsidium">RN/2.2</p><p class="_ZM">Vertretung von Mitgliedern der Bundesregierung</p><p><strong>Präsident Dr. <a href="https://www.parlament.gv.at/person/51570" target="_blank">Walter Rosenkranz</a>:</strong> Für den heutigen Sitzungstag hat das Bundeskanzleramt über die Vertretung von Mitgliedern der Bundesregierung folgende Mitteilung gemacht:</p><p>Vertreten wird Bundesministerin für Justiz Dr. <a href="https://www.parlament.gv.at/person/2345" target="_blank">Alma Zadić</a>, LL.M. durch Bundesminister für Soziales, Gesundheit, Pflege und Konsumentenschutz <a href="https://www.parlament.gv.at/person/21029" target="_blank">Johannes Rauch</a>.</p><p>Ferner gebe ich die Vertretung von Mitgliedern der Bundesregierung, welche sich in einem anderen Mitgliedstaat der Europäischen Union aufhalten, wie folgt bekannt: Ab 16 Uhr wird Bundesminister für Inneres Mag. <a href="https://www.parlament.gv.at/person/20445" target="_blank">Gerhard Karner</a> durch Bundesministerin für Landesverteidigung Mag. <a href="https://www.parlament.gv.at/person/6485" target="_blank">Klaudia Tanner</a> vertreten.</p><hr/><p>Ich gebe bekannt, dass diese Sitzung, abgesehen vom Parlamentslivestream, überdies von ORF 2 bis 13 Uhr übertragen wird; ORF III wird diese Sitzung bis 19.15 Uhr senden, anschließend wird die Sitzung auf ORF ON übertragen.</p>
+</body>
+</html>

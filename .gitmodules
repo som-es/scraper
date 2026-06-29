@@ -1,3 +1,0 @@
-[submodule "common-scrapes"]
-	path = common-scrapes
-	url = ssh://git@github.com/som-es/common-scrapes

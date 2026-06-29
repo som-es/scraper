@@ -41,10 +41,6 @@ impl Parties for AustriaScraper {
             }
             let parties = legis_init.votes.into_iter().map(|vote| vote.party);
 
-            // if path.contains("XXIV") {
-            //     let parties = parties.clone().collect::<Vec<_>>();
-            //     log::error!("path: {path:?} parties: {parties:?}");
-            // }
             votes.extend(parties);
 
             added_vote_legis_inits += 1;
@@ -53,7 +49,6 @@ impl Parties for AustriaScraper {
                 break;
             }
         }
-        /*
 
         added_vote_legis_inits = 0;
         for path in legis_paths.iter() {
@@ -71,9 +66,7 @@ impl Parties for AustriaScraper {
                 break;
             }
         }
-
-        Ok(votes.into_iter().collect())*/
-        Ok(vec![])
+        Ok(votes.into_iter().collect())
     }
 }
 

@@ -93,11 +93,20 @@ pub fn contains_multiple_of(text: &str, of: &str) -> bool {
     text.find(of) != text.rfind(of)
 }
 
+fn encounters_of(text: &str, of: &str) -> usize {
+    let mut count = text.matches(of).count();
+    if text.contains("/E/") && count > 0 {
+        count -= 1;
+    }
+    count
+}
+
 //https://www.parlament.gv.at/gegenstand/BR/BRSITZ/751
 pub fn contains_session_or_no_links(text: &str) -> bool {
-    (text.contains("gegenstand/") && !contains_multiple_of(text, "gegenstand/"))
+    let gegenstands = encounters_of(text, "gegenstand/");
+    (text.contains("gegenstand/") && gegenstands == 1)
         && (text.contains("NRSITZ/") || text.contains("gegenstand/BR/BRSITZ"))
-        || !text.contains("gegenstand/")
+        || gegenstands == 0
 }
 
 pub async fn extract_most_fitting_votes(
@@ -131,7 +140,7 @@ pub async fn extract_most_fitting_votes(
             || (text.contains("Nationalrates: Genehmigung")))
             || ((text.to_lowercase().contains("ausschuss") || text.to_lowercase().contains("ausschuß")) && !text.contains("Nationalrat")) // auschuß: gp XX had these a lot e.g.  XX/I/308
             // || (contains_multiple_of(text, "gegenstand/") // better way would probably be to check for NRSITZ gegenstand link, if not present AND another gegenstand link is present => skip (Either zero links or a single NRSITZ link should be allowed) See: XXVII/I/604
-            || (!contains_session_or_no_links(text) && !text.contains("/E/"))
+            || (!contains_session_or_no_links(text))
         // AEA: what to do in the case of XXVIII/I/318?
         {
             continue;

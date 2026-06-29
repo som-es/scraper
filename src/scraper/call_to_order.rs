@@ -45,7 +45,7 @@ impl CallToOrder for AustriaScraper {
 
         let call_to_order_content = &raw_call_to_order["content"];
 
-        let created_at = raw_call_to_order["einlangen"]
+        let created_at = call_to_order_content["einlangen"]
             .as_str()
             .ok_or(CallToOrderError::EinlangenNotAString)?;
         let created_at = convert_vienna_datetime_to_utc(
@@ -54,13 +54,12 @@ impl CallToOrder for AustriaScraper {
         )
         .ok_or(CallToOrderError::InvalidTimestamp)?;
 
-        let updated_at = raw_call_to_order["update"].as_str();
-        let updated_at = updated_at
-            .and_then(|updated_at| {
-                convert_vienna_datetime_to_utc(
-                    NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
-                )
-            });
+        let updated_at = call_to_order_content["update"].as_str();
+        let updated_at = updated_at.and_then(|updated_at| {
+            convert_vienna_datetime_to_utc(
+                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
+            )
+        });
 
         let ityp = call_to_order_content["ityp"]
             .as_str()

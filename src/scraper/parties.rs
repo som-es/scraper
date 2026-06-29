@@ -74,17 +74,27 @@ impl Parties for AustriaScraper {
 mod tests {
     use common_scrapes::Party;
 
-    use crate::AustriaScraper;
+    use crate::{caching::CacheConfig, AustriaScraper};
 
     use super::Parties;
 
     #[tokio::test]
     async fn test_get_parties_xxvii() {
         let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        scraper.text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         scraper.scrape_info.gp = vec!["XXVII".to_string()];
 
         let mut parties = scraper.get_parties().await.unwrap();
-        parties.sort_by(|a, b| b.fraction.cmp(&a.fraction));
+        parties.sort_by(|a, b| b.fraction.cmp(&a.fraction).then(b.name.cmp(&a.name)));
         assert_eq!(
             parties,
             vec![
@@ -125,10 +135,20 @@ mod tests {
     #[tokio::test]
     async fn test_get_parties_xxiii() {
         let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        scraper.text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         scraper.scrape_info.gp = vec!["XXIII".to_string()];
 
         let mut parties = scraper.get_parties().await.unwrap();
-        parties.sort_by(|a, b| b.fraction.cmp(&a.fraction));
+        parties.sort_by(|a, b| b.fraction.cmp(&a.fraction).then(b.name.cmp(&a.name)));
         assert_eq!(
             parties,
             vec![
@@ -145,16 +165,16 @@ mod tests {
                     code: "V".to_string(),
                 },
                 Party {
-                    name: "FPÖ".to_string(),
-                    color: "#0052FB".to_string(),
-                    fraction: 21,
-                    code: "F".to_string(),
-                },
-                Party {
                     name: "GRÜNE".to_string(),
                     color: "#69B12E".to_string(),
                     fraction: 21,
                     code: "G".to_string(),
+                },
+                Party {
+                    name: "FPÖ".to_string(),
+                    color: "#0052FB".to_string(),
+                    fraction: 21,
+                    code: "F".to_string(),
                 },
                 Party {
                     name: "BZÖ".to_string(),
@@ -169,6 +189,16 @@ mod tests {
     #[tokio::test]
     async fn test_get_parties_xxii() {
         let mut scraper = AustriaScraper::default();
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+        scraper.text_extractor.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
         for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
             let parties = scraper.get_parties().await.unwrap();

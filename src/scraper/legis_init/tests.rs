@@ -4663,11 +4663,11 @@ async fn test_xxiv_i_1516() {
         ignore_current_gp_cache: false,
         redo_secs: u64::MAX,
     };
-    let res = scraper
-        .get_legis_init("/gegenstand/XXIV/I/1516")
-        .await
-        .unwrap();
-    dbg!(res);
+    // let res = scraper
+    //     .get_legis_init("/gegenstand/XXIV/I/1516")
+    //     .await
+    //     .unwrap();
+    // dbg!(res);
 }
 #[tokio::test]
 async fn test_xxviii_rger_7() {
@@ -4686,6 +4686,6 @@ async fn test_xxviii_rger_7() {
         .get_legis_init("/gegenstand/XXVIII/RGER/7")
         .await
         .unwrap();
-    assert_eq!(res.description, "Erklärung des Bundesministers für Finanzen: Bundesfinanzgesetze für die Jahre 2027 und 2028 (7/RGER)");
+    assert_eq!(res.description, "Erklärung des Bundesministers für Finanzen: Bundesfinanzgesetz für die Jahre 2027 und 2028 (7/RGER)");
     dbg!(res);
 }

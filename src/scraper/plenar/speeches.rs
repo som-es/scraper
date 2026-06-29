@@ -415,7 +415,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_nrsitz_xxviii_73_speeches_in_cached_snippets() {
-        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let _ = simple_logger::init_with_level(log::Level::Info);
         let mut scraper = AustriaScraper::default();
         scraper.cache_config = CacheConfig {
             cache_dir: "./test-data".into(),

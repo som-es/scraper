@@ -1,7 +1,7 @@
 use common_scrapes::Proposal;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::error::ScraperError;
+use crate::{error::ScraperError, eu_parliament::votes::Vote};
 
 use super::{votes::EuRollCallVote, EuParliamentScraper};
 
@@ -24,7 +24,7 @@ pub struct Voteable {
     /// call (see `EuParliamentScraper::get_votes_for_proposal`). More than one entry
     /// when a procedure went through multiple roll-call votes (e.g. separate first-
     /// and second-reading votes).
-    pub votes: Vec<EuRollCallVote>,
+    pub votes: Vec<Vote>,
 }
 
 impl Voteable {
@@ -57,7 +57,7 @@ mod tests {
         assert_eq!(voteable.proposal.ityp, "BUD");
         assert!(voteable.has_votes());
         assert_eq!(voteable.votes.len(), 1);
-        assert_eq!(voteable.votes[0].favor_count, 547);
+        assert_eq!(voteable.votes[0].meta.favor_count.unwrap(), 547);
     }
 
     #[tokio::test]
@@ -75,8 +75,8 @@ mod tests {
         assert_eq!(voteable.proposal.ityp, "COD");
         assert!(voteable.has_votes());
         assert_eq!(voteable.votes.len(), 1);
-        assert_eq!(voteable.votes[0].voting_id, "168997");
-        assert_eq!(voteable.votes[0].favor_count, 511);
+        assert_eq!(voteable.votes[0].meta.voting_id, 168997);
+        assert_eq!(voteable.votes[0].meta.favor_count, Some(511));
     }
 
     #[tokio::test]
@@ -95,9 +95,9 @@ mod tests {
         assert_eq!(voteable.proposal.ityp, "INI");
         assert!(voteable.has_votes());
         assert_eq!(voteable.votes.len(), 1);
-        assert_eq!(voteable.votes[0].voting_id, "194869");
-        assert_eq!(voteable.votes[0].favor_count, 366);
-        assert_eq!(voteable.votes[0].against_count, 192);
-        assert_eq!(voteable.votes[0].abstention_count, 39);
+        assert_eq!(voteable.votes[0].meta.voting_id, 194869);
+        assert_eq!(voteable.votes[0].meta.favor_count, Some(366));
+        assert_eq!(voteable.votes[0].meta.against_count, Some(192));
+        assert_eq!(voteable.votes[0].meta.abstention_count, Some(39));
     }
 }

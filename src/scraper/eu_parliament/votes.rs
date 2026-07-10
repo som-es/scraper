@@ -8,15 +8,43 @@ use serde_json::Value;
 use crate::{
     caching::{disk_caching, get_disk_cache, get_disk_cache_json},
     error::ScraperError,
+    eu_parliament::votes::{
+        roll_call_parser::parse_roll_call_votes_xml,
+        vot_parsers::{parse_vot_xml, VotEntry, VotingRecord},
+    },
     request::request_text,
 };
 
 use super::{id_to_u64, last_path_segment, EuParliamentScraper};
 
+mod roll_call_parser;
+mod vot_parsers;
+
+#[derive(Debug, Clone)]
+pub enum ParseError {
+    Xml(String),
+    Number(String),
+    MissingAttribute(&'static str),
+    NoResult,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::Xml(m) => write!(f, "xml error: {m}"),
+            ParseError::Number(m) => write!(f, "invalid number: {m}"),
+            ParseError::MissingAttribute(a) => write!(f, "missing required attribute: {a}"),
+            ParseError::NoResult => write!(f, "no RollCallVote.Result element found"),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}
+
 /// How one MEP voted in a single roll-call vote (RCV).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EuVoteChoice {
-    Favor,
+    For,
     Against,
     Abstention,
 }
@@ -27,38 +55,72 @@ pub struct EuDelegateVote {
     pub choice: EuVoteChoice,
 }
 
-/// A roll-call vote (RCV) taken during a plenary sitting.
-///
-/// This intentionally does *not* reuse AT's `Vote`/`HiddenVotes`/`VotedByName` types:
-/// those model aggregated per-party tallies, with individual named votes only
-/// reconstructed on a best-effort basis by scraping free-text minutes
-/// (`extract_votes_by_name` in `legis_init/votes.rs`). The EU Open Data API instead
-/// exposes the outcome of *every* MEP's vote directly and precisely as three id lists,
-/// so `votes` here is a flat per-delegate record rather than a per-party one.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EuRollCallVote {
-    /// e.g. `"MTG-PL-2024-01-15-DEC-163199"`
-    pub id: String,
-    /// e.g. `"168997"` — the id shared between this vote's JSON representation
-    /// (`notation_votingId`) and the DOCEO "VOT"/"RCV" XML documents' `votingId`
-    /// attribute; see [`EuParliamentScraper::get_votes_for_proposal`].
-    pub voting_id: String,
-    pub sitting_date: NaiveDate,
-    /// English-language description of what was voted on, when available (e.g. "Request
-    /// by the PPE and Verts/ALE groups"). Often a procedural blurb rather than the
-    /// legislative text's title; see `related_document_ids` to resolve the latter.
+    pub voting_id: u64,
     pub description: Option<String>,
-    pub outcome: Option<AcceptedState>,
     pub favor_count: u32,
     pub against_count: u32,
     pub abstention_count: u32,
     pub votes: Vec<EuDelegateVote>,
-    /// ids of documents this vote is recorded in (minutes/verbatim report), e.g.
-    /// `"eli/dl/doc/PV-9-2024-01-15-RCV-ITM-001"`.
-    pub related_document_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Vote {
+    pub roll_call_vote: Option<EuRollCallVote>,
+    pub meta: VotingRecord,
+    pub sitting_date: NaiveDate,
+    pub is_main: Option<bool>,
+}
+
+const MAIN_VOTE_INDICATORS: [&str; 42] = [
+    "draft council decision",
+    "projet de decision du conseil",
+    "projet de reglement du conseil",
+    "projet du conseil",
+    "projet de recommendation",
+    "projet commun",
+    "motion for resolution",
+    "motion for resolution (as a whole)",
+    "motion for resolution (text as a whole)",
+    "motion for a resolution",
+    "motion for a resolution (as a whole)",
+    "motion for a resolution (text as a whole)",
+    "proposition de rejet",
+    "proposition de rejet de la position du conseil",
+    "proposal for rejection",
+    "proposition de resolution",
+    "proposition de resolution (ensemble du texte)",
+    "proposition de la resolution",
+    "proposition de la resolution (ensemble du texte)",
+    "proposition de recommandation",
+    "resolution",
+    "proposals for decision",
+    "proposition de decision",
+    "propositions de decision",
+    "proposal for a decision",
+    "proposal for a decision (as a whole)",
+    "proposition de decision (ensemble du texte)",
+    "commission proposal",
+    "proposition de la commission",
+    "proposition de commission",
+    "proposition de la commission et amendement",
+    "proposition de la commission et amendements",
+    "proposition de la commission au conseil",
+    "provisional agreement",
+    "accord provisoire",
+    "accord provisoire (proposition de la commission - non modifiee)",
+    "final vote",
+    "decision d'engager des negociations interinstitutionnelles",
+    "projet de decision du conseil europeen",
+    "projet de decision",
+    "demande de decision d'urgence",
+    "request for an urgent decision",
+];
+
 impl EuParliamentScraper {
+    const VOTE_BASE_URL: &str = "https://www.europarl.europa.eu/doceo/document/";
+
     /// The plenary-sitting id EP uses for a given calendar date, e.g. `2024-01-15` ->
     /// `"MTG-PL-2024-01-15"`. Only dates on which a plenary sitting was actually held
     /// will resolve to real data.
@@ -66,74 +128,10 @@ impl EuParliamentScraper {
         format!("MTG-PL-{}", date.format("%Y-%m-%d"))
     }
 
-    /// Fetches every roll-call vote recorded during the plenary sitting `sitting_id`
-    /// (see [`Self::sitting_id`]). Non-roll-call decisions (e.g. hand-count agenda
-    /// votes) are skipped since they carry no per-MEP breakdown.
-    ///
-    /// A past sitting's decisions never change, so — unlike [`Self::get_all_pages`] in
-    /// general, which is used for genuinely-live lists and deliberately isn't
-    /// cached — this result is cached on disk, same as [`Self::get_one_cached`].
-    pub async fn get_roll_call_votes(
-        &self,
-        sitting_id: &str,
-    ) -> Result<Vec<EuRollCallVote>, ScraperError> {
-        let cache_key = format!("/meetings/{sitting_id}/decisions");
-        let rows = match get_disk_cache_json(&cache_key, self.cache_config()).await {
-            Some(cached) => cached.as_array().cloned().unwrap_or_default(),
-            None => {
-                let rows = self
-                    .get_all_pages(&format!("meetings/{sitting_id}/decisions"), "")
-                    .await?;
-                if let Ok(serialized) = serde_json::to_string(&rows) {
-                    if let Err(e) = disk_caching(&cache_key, serialized, self.cache_config()).await
-                    {
-                        log::warn!("could not cache {cache_key}: {e:?}");
-                    }
-                }
-                rows
-            }
-        };
-
-        Ok(rows.iter().flat_map(raw_decision_into_vote).collect())
-    }
-
-    /// Fetches the roll-call vote(s) that decided procedure `process_id`.
-    ///
-    /// There is no field linking a vote directly to a procedure id in the JSON API —
-    /// and the one mechanism that gets close (`PLENARY_VOTE_RESULTS` events in the
-    /// procedure's own `consists_of`, whose id reappears in a vote's
-    /// `inverse_consists_of`) is unreliable: that event is simply missing from some
-    /// procedures' `consists_of` even when a real roll-call vote happened on them
-    /// (confirmed for `2024-0021`, "gradual roll-out of Eudamed").
-    ///
-    /// Instead, this resolves the link via the EP's DOCEO "VOT" documents (plenary
-    /// vote list, `PV-{term}-{date}-VOT`), which are also mirrored on the Open Data API
-    /// host as plain XML (unlike `www.europarl.europa.eu`, which fronts them with an
-    /// AWS WAF bot challenge). Each `<vote>` entry's `<label>` carries an official
-    /// reference verbatim, but *which* reference depends on what's being voted on:
-    /// - a direct first-reading vote on the bare Commission proposal (e.g.
-    ///   `2024-0021`) uses the procedure reference itself, e.g.
-    ///   `"...C9-0010/2024 – 2024/0021(COD))"` — matched via `{year}/{inr}({ityp})`
-    ///   built from the procedure's own id.
-    /// - a vote on a committee report (the common case for most legislative
-    ///   procedures, e.g. `2024-0003`) uses the *report's* reference instead, e.g.
-    ///   `"Report: Margarida Marques (A9-0173/2024)"` — matched via
-    ///   [`super::proposals::report_references`], built from the procedure's own
-    ///   `created_a_realization_of` document ids.
-    ///
-    /// A `<vote>`'s nested `<voting votingId="...">` elements give the id(s) to filter
-    /// [`Self::get_roll_call_votes`]'s result by.
-    ///
-    /// Candidate sitting dates come from [`super::proposals::plenary_sitting_dates`],
-    /// which doesn't require `PLENARY_VOTE_RESULTS` either. A procedure can have more
-    /// than one matching vote (e.g. separate first- and second-reading votes), and this
-    /// returns an empty `Vec` for procedures that were never put to a recorded
-    /// roll-call vote (adopted by hand vote, withdrawn, still pending, ...) or whose
-    /// vote used some other reference format not covered by the two above.
     pub async fn get_votes_for_proposal(
         &self,
         process_id: &str,
-    ) -> Result<Vec<EuRollCallVote>, ScraperError> {
+    ) -> Result<Vec<Vote>, ScraperError> {
         let raw_procedure = self
             .get_one_cached(&format!("procedures/{process_id}"))
             .await?;
@@ -148,51 +146,70 @@ impl EuParliamentScraper {
 
         let mut votes = Vec::new();
         for (term, date) in sitting_dates {
-            let Ok(vot_entries) = self.get_vot_entries(&term, date).await else {
-                continue;
+            let vot_entries = match self.get_vot_entries(&term, date).await {
+                Ok(vot_entries) => vot_entries,
+                Err(e) => {
+                    log::error!("e: {e:?}");
+                    continue;
+                }
             };
 
-            let voting_ids: Vec<&str> = vot_entries
-                .iter()
+            let voting_records = vot_entries
+                .into_iter()
                 .filter(|entry| references.iter().any(|r| entry.label.contains(r)))
-                .flat_map(|entry| entry.voting_ids.iter().map(String::as_str))
-                .collect();
+                .flat_map(|entry| entry.votings.into_iter().map(|voting| voting))
+                .collect::<Vec<_>>();
 
-            if voting_ids.is_empty() {
+            if voting_records.is_empty() {
                 continue;
             }
 
-            let sitting_votes = self.get_roll_call_votes(&Self::sitting_id(date)).await?;
-            votes.extend(
-                sitting_votes
-                    .into_iter()
-                    .filter(|vote| voting_ids.contains(&vote.voting_id.as_str())),
-            );
+            let roll_call_votes = self
+                .get_roll_call_entries(&term, date)
+                .await
+                .unwrap_or_default();
+
+            votes.extend(voting_records.into_iter().map(|voting_record| {
+                Vote {
+                    roll_call_vote: roll_call_votes
+                        .iter()
+                        .find(|roll_call_vote| roll_call_vote.voting_id == voting_record.voting_id)
+                        .cloned(),
+                    sitting_date: date,
+                    is_main: voting_record
+                        .title
+                        .as_ref()
+                        .map(|title| MAIN_VOTE_INDICATORS.contains(&title.to_lowercase().as_str())),
+                    meta: voting_record,
+                }
+            }));
         }
         Ok(votes)
     }
 
-    /// Fetches and parses the DOCEO "VOT" document for a plenary sitting — a compact
-    /// per-sitting index from official procedure/report reference to `votingId`(s).
-    /// Distinct from the much larger "RCV" document, which carries the actual per-MEP
-    /// breakdown; that's never parsed here since `/meetings/{sitting}/decisions`
-    /// already gives the same breakdown more directly as JSON.
-    async fn get_vot_entries(
+    async fn get_xml_data(
         &self,
         term: &str,
         date: NaiveDate,
-    ) -> Result<Vec<VotEntry>, ScraperError> {
-        let doc_id = format!("PV-{term}-{}-VOT", date.format("%Y-%m-%d"));
-        let cache_key = format!("/eu-parliament/vot-xml/{doc_id}");
+        vote_file: VoteFile,
+    ) -> Result<String, ScraperError> {
+        let doc_id = format!(
+            "PV-{term}-{}-{}",
+            date.format("%Y-%m-%d"),
+            vote_file.as_str()
+        );
+        let cache_key = format!("/eu-parliament/{}-xml/{doc_id}", vote_file.as_str());
 
         let xml = match get_disk_cache(&cache_key, self.cache_config()).await {
             Some(cached) => cached,
             None => {
+                // let url = format!("{}{doc_id}.xml", Self::VOTE_BASE_URL);
                 let raw_doc = self.get_one_cached(&format!("documents/{doc_id}")).await?;
                 let link_path =
                     english_xml_manifestation(&raw_doc).ok_or(ScraperError::ParseError)?;
                 let url = format!("https://data.europarl.europa.eu/{link_path}");
-                let xml = request_text(self.client(), url).await?;
+                dbg!(&url);
+                let xml = request_text(self.client(), &url).await?;
                 if let Err(e) = disk_caching(&cache_key, &xml, self.cache_config()).await {
                     log::warn!("could not cache {cache_key}: {e:?}");
                 }
@@ -200,12 +217,28 @@ impl EuParliamentScraper {
             }
         };
 
+        Ok(xml)
+    }
+
+    async fn get_vot_entries(
+        &self,
+        term: &str,
+        date: NaiveDate,
+    ) -> Result<Vec<VotEntry>, ScraperError> {
+        let xml = self.get_xml_data(term, date, VoteFile::Vote).await?;
         Ok(parse_vot_xml(&xml))
+    }
+
+    async fn get_roll_call_entries(
+        &self,
+        term: &str,
+        date: NaiveDate,
+    ) -> Result<Vec<EuRollCallVote>, ScraperError> {
+        let xml = self.get_xml_data(term, date, VoteFile::RollCall).await?;
+        parse_roll_call_votes_xml(&xml).map_err(|e| ScraperError::ParseErrorVerbose(e))
     }
 }
 
-/// Finds the English-language XML manifestation link (`is_exemplified_by`) on a
-/// document resource fetched via `/documents/{id}`.
 fn english_xml_manifestation(raw_doc: &Value) -> Option<String> {
     raw_doc["is_realized_by"]
         .as_array()?
@@ -227,166 +260,24 @@ fn english_xml_manifestation(raw_doc: &Value) -> Option<String> {
         .as_str()
         .map(ToString::to_string)
 }
-
-/// One `<vote>` entry from a DOCEO "VOT" document.
-struct VotEntry {
-    /// e.g. `"Proposal for a regulation (COM(2024)0043 - C9-0010/2024 – 2024/0021(COD))"`
-    label: String,
-    /// the nested `<voting votingId="...">` id(s); a `<vote>` covers e.g. both an
-    /// amendment vote and the final-passage vote for the same procedure
-    voting_ids: Vec<String>,
+enum VoteFile {
+    Vote,
+    RollCall,
 }
 
-/// Parses a DOCEO "VOT" document's `<votes><vote>...</vote>...</votes>` list.
-///
-/// Schema (from a real fetched `PV-9-2024-04-25-VOT_en.xml`):
-/// ```xml
-/// <vote listIndex="0" dlvId="946508" indexSched="160" type="REPORT">
-///   <title>Gradual roll-out of Eudamed...</title>
-///   <label>Proposal for a regulation (COM(2024)0043 - C9-0010/2024 – 2024/0021(COD))</label>
-///   <votings>
-///     <voting type="AMENDMENT" votingId="168997" result="ADOPTED" resultType="ROLL_CALL" ...>
-///       <title>Commission proposal</title>
-///       <label status="rcv">C9-0010/2024 – Commission proposal</label>
-///       ...
-///     </voting>
-///   </votings>
-/// </vote>
-/// ```
-/// Note `<voting>` has its own nested `<label>` — only the outer `<vote>`'s `<label>`
-/// (captured while `in_voting` is false) carries the procedure reference used for
-/// matching in [`EuParliamentScraper::get_votes_for_proposal`].
-fn parse_vot_xml(xml: &str) -> Vec<VotEntry> {
-    let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
-
-    let mut entries = Vec::new();
-    let mut in_vote = false;
-    let mut in_voting = false;
-    let mut in_vote_label = false;
-    let mut current_label = String::new();
-    let mut current_voting_ids = Vec::new();
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) => match e.name().as_ref() {
-                b"vote" => {
-                    in_vote = true;
-                    current_label.clear();
-                    current_voting_ids.clear();
-                }
-                b"label" if in_vote && !in_voting => {
-                    in_vote_label = true;
-                }
-                b"voting" if in_vote => {
-                    in_voting = true;
-                    let voting_id = e
-                        .attributes()
-                        .flatten()
-                        .find(|attr| attr.key.as_ref() == b"votingId")
-                        .and_then(|attr| attr.decode_and_unescape_value(reader.decoder()).ok());
-                    if let Some(voting_id) = voting_id {
-                        current_voting_ids.push(voting_id.to_string());
-                    }
-                }
-                _ => {}
-            },
-            Ok(Event::Text(e)) if in_vote_label => {
-                current_label.push_str(&e.unescape().unwrap_or_default());
-            }
-            Ok(Event::End(e)) => match e.name().as_ref() {
-                b"label" if in_vote_label => in_vote_label = false,
-                b"voting" => in_voting = false,
-                b"vote" => {
-                    in_vote = false;
-                    if !current_voting_ids.is_empty() {
-                        entries.push(VotEntry {
-                            label: std::mem::take(&mut current_label),
-                            voting_ids: std::mem::take(&mut current_voting_ids),
-                        });
-                    }
-                }
-                _ => {}
-            },
-            Ok(Event::Eof) => break,
-            Err(_) => break,
-            _ => {}
+impl VoteFile {
+    pub fn as_str(&self) -> &str {
+        match self {
+            VoteFile::Vote => "VOT",
+            VoteFile::RollCall => "RCV",
         }
     }
-
-    entries
-}
-
-fn raw_decision_into_vote(raw: &Value) -> Option<EuRollCallVote> {
-    if raw["decision_method"].as_str() != Some("def/ep-decision-methods/VOTE_ELECTRONIC_ROLLCALL") {
-        return None;
-    }
-    let id = raw["activity_id"].as_str()?.to_string();
-    let voting_id = raw["notation_votingId"].as_str()?.to_string();
-    let sitting_date =
-        NaiveDate::parse_from_str(raw["activity_date"].as_str()?, "%Y-%m-%d").ok()?;
-
-    let description = raw["referenceText"]["en"]
-        .as_str()
-        .or_else(|| raw["activity_label"]["en"].as_str())
-        .map(ToString::to_string);
-
-    let outcome = match raw["decision_outcome"].as_str() {
-        Some(o) if o.ends_with("ADOPTED") => Some(AcceptedState::Accepted),
-        Some(o) if o.ends_with("REJECTED") => Some(AcceptedState::Declined),
-        _ => None,
-    };
-
-    let mut votes = Vec::new();
-    collect_votes(&raw["had_voter_favor"], EuVoteChoice::Favor, &mut votes);
-    collect_votes(&raw["had_voter_against"], EuVoteChoice::Against, &mut votes);
-    collect_votes(
-        &raw["had_voter_abstention"],
-        EuVoteChoice::Abstention,
-        &mut votes,
-    );
-
-    let related_document_ids = raw["recorded_in_a_realization_of"]
-        .as_array()
-        .map(|docs| {
-            docs.iter()
-                .flat_map(|d| d.as_str())
-                .map(ToString::to_string)
-                .collect()
-        })
-        .unwrap_or_default();
-
-    Some(EuRollCallVote {
-        id,
-        voting_id,
-        sitting_date,
-        description,
-        outcome,
-        favor_count: raw["number_of_votes_favor"].as_u64().unwrap_or_default() as u32,
-        against_count: raw["number_of_votes_against"].as_u64().unwrap_or_default() as u32,
-        abstention_count: raw["number_of_votes_abstention"]
-            .as_u64()
-            .unwrap_or_default() as u32,
-        votes,
-        related_document_ids,
-    })
-}
-
-fn collect_votes(raw_ids: &Value, choice: EuVoteChoice, out: &mut Vec<EuDelegateVote>) {
-    let Some(ids) = raw_ids.as_array() else {
-        return;
-    };
-    out.extend(ids.iter().flat_map(|id| {
-        let delegate_id = id_to_u64(id.as_str()?)?;
-        Some(EuDelegateVote {
-            delegate_id,
-            choice,
-        })
-    }));
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::eu_parliament::votes::vot_parsers::VoteResult;
+
     use super::*;
 
     #[test]
@@ -406,16 +297,17 @@ mod tests {
 <vote listIndex="1" dlvId="946514" indexSched="168" type="RESOLUTION">
 <label>Motions for resolutions: RC-B9-0227/2024</label>
 <votings>
-<voting type="TITLE_BLOCK" votingId="169094" listIndex="0"></voting>
+<voting type="TITLE_BLOCK" votingId="169094" listIndex="0" result="ADOPTED" resultType="ROLL_CALL"></voting>
 </votings>
 </vote>
 </votes></file>"#;
 
         let entries = parse_vot_xml(xml);
+        dbg!(&entries);
         assert_eq!(entries.len(), 2);
         assert!(entries[0].label.contains("2024/0021(COD)"));
-        assert_eq!(entries[0].voting_ids, vec!["168997".to_string()]);
-        assert_eq!(entries[1].voting_ids, vec!["169094".to_string()]);
+        assert_eq!(entries[0].votings[0].voting_id, 168997);
+        assert_eq!(entries[1].votings[0].voting_id, 169094);
     }
 
     #[tokio::test]
@@ -426,7 +318,8 @@ mod tests {
         );
         assert_eq!(sitting_id, "MTG-PL-2024-01-15");
 
-        let votes = scraper.get_roll_call_votes(&sitting_id).await.unwrap();
+        // let votes = scraper.get_roll_call_votes(&sitting_id).await.unwrap();
+        let votes: Vec<EuRollCallVote> = vec![];
         assert!(!votes.is_empty());
 
         let first = &votes[0];
@@ -435,19 +328,22 @@ mod tests {
             first
                 .votes
                 .iter()
-                .filter(|v| v.choice == EuVoteChoice::Favor)
+                .filter(|v| v.choice == EuVoteChoice::For)
                 .count()
         );
-        assert!(first.outcome.is_some());
+        // assert!(first.outcome.is_some());
     }
 
     #[tokio::test]
-    async fn test_get_votes_for_proposal() {
+    async fn test_get_votes_for_proposal_exact() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
         let scraper = EuParliamentScraper::default();
 
         // 2024-0003: EGF mobilization for displaced workers, adopted 2024-04-24 by
         // roll-call vote 547 favor / 33 against / 49 abstention (see docs/eu-parliament-scraper.md)
         let votes = scraper.get_votes_for_proposal("2024-0003").await.unwrap();
+
+        dbg!(&votes);
 
         assert_eq!(votes.len(), 1);
         let vote = &votes[0];
@@ -455,10 +351,10 @@ mod tests {
             vote.sitting_date,
             NaiveDate::from_ymd_opt(2024, 4, 24).unwrap()
         );
-        assert_eq!(vote.favor_count, 547);
-        assert_eq!(vote.against_count, 33);
-        assert_eq!(vote.abstention_count, 49);
-        assert_eq!(vote.outcome, Some(AcceptedState::Accepted));
+        assert_eq!(vote.meta.favor_count, Some(547));
+        assert_eq!(vote.meta.against_count, Some(33));
+        assert_eq!(vote.meta.abstention_count, Some(49));
+        assert_eq!(vote.meta.result, VoteResult::Adopted);
     }
 
     #[tokio::test]
@@ -474,14 +370,14 @@ mod tests {
 
         assert_eq!(votes.len(), 1);
         let vote = &votes[0];
-        assert_eq!(vote.voting_id, "168997");
+        assert_eq!(vote.meta.voting_id, 168997);
         assert_eq!(
             vote.sitting_date,
             NaiveDate::from_ymd_opt(2024, 4, 25).unwrap()
         );
-        assert_eq!(vote.favor_count, 511);
-        assert_eq!(vote.against_count, 1);
-        assert_eq!(vote.abstention_count, 21);
-        assert_eq!(vote.outcome, Some(AcceptedState::Accepted));
+        assert_eq!(vote.meta.favor_count, Some(511));
+        assert_eq!(vote.meta.against_count, Some(1));
+        assert_eq!(vote.meta.abstention_count, Some(21));
+        assert_eq!(vote.meta.result, VoteResult::Adopted);
     }
 }

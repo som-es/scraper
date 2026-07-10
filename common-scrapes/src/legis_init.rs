@@ -129,6 +129,16 @@ impl core::fmt::Display for AcceptedState {
     }
 }
 
+impl AcceptedState {
+    pub fn from_result_str(s: &str) -> Self {
+        match s {
+            "ADOPTED" => AcceptedState::Accepted,
+            "REJECTED" => AcceptedState::Declined,
+            _ => AcceptedState::default(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct ProContra {
     pub pro: Vec<String>,
@@ -248,6 +258,18 @@ pub enum Voting {
     Resolution, // Entschließung
     Report,
     Law,
+}
+
+impl Voting {
+    pub fn from_type_str(s: &str) -> Option<Self> {
+        match s {
+            "AMENDMENT" => Some(Voting::Amendment),
+            "RESOLUTION" => Some(Voting::Resolution),
+            "REPORT" => Some(Voting::Report),
+            "LAW" => Some(Voting::Law),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Voting {

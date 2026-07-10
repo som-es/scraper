@@ -3,6 +3,8 @@ use std::sync::Arc;
 use reqwest::StatusCode;
 use thiserror::Error;
 
+use crate::eu_parliament::votes::ParseError;
+
 #[derive(Error, Clone, Debug)]
 pub enum ScraperError {
     /// 401
@@ -60,4 +62,7 @@ pub enum ScraperError {
 
     #[error("Parse Error")]
     ParseError,
+
+    #[error("Parse Error")]
+    ParseErrorVerbose(ParseError),
 }

@@ -37,13 +37,40 @@ where
             .await
             .map_err(|e| ScraperError::RequestError(Arc::new(e)))
     } else {
-        match res.status() {
-            StatusCode::UNAUTHORIZED => Err(ScraperError::Unauthorized),
-            StatusCode::FORBIDDEN => Err(ScraperError::Forbidden),
-            StatusCode::NOT_FOUND => Err(ScraperError::NotFound),
-            StatusCode::INTERNAL_SERVER_ERROR => Err(ScraperError::InternalServerError),
-            StatusCode::UNPROCESSABLE_ENTITY => Err(ScraperError::Unauthorized),
-            s => Err(ScraperError::StatusError(s)),
-        }
+        Err(status_error(res.status()))
+    }
+}
+
+/// Plain `GET` returning the raw response body as text, for non-JSON resources (e.g.
+/// the EU Parliament's DOCEO XML documents).
+pub async fn request_text<S: AsRef<str>>(client: &Client, url: S) -> Result<String, ScraperError> {
+    let res = client
+        .get(url.as_ref())
+        .header("user-agent", "somes/2026.1.0")
+        .send()
+        .await;
+
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return Err(ScraperError::RequestError(Arc::new(e))),
+    };
+
+    if res.status().is_success() {
+        res.text()
+            .await
+            .map_err(|e| ScraperError::RequestError(Arc::new(e)))
+    } else {
+        Err(status_error(res.status()))
+    }
+}
+
+fn status_error(status: StatusCode) -> ScraperError {
+    match status {
+        StatusCode::UNAUTHORIZED => ScraperError::Unauthorized,
+        StatusCode::FORBIDDEN => ScraperError::Forbidden,
+        StatusCode::NOT_FOUND => ScraperError::NotFound,
+        StatusCode::INTERNAL_SERVER_ERROR => ScraperError::InternalServerError,
+        StatusCode::UNPROCESSABLE_ENTITY => ScraperError::Unauthorized,
+        s => ScraperError::StatusError(s),
     }
 }

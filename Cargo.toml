@@ -28,6 +28,7 @@ tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "fs", "rt-m
 html-escape = "0.2.13"
 chrono-tz = {version="0.10.4", features=["serde"]}
 rand = "0.10.1"
+quick-xml = "0.36"
 
 [dev-dependencies]
 #tokio-macros = "1.8.2"

@@ -16,6 +16,7 @@ pub mod dates;
 pub mod decree;
 pub mod delegates;
 pub mod enactment;
+pub mod eu_parliament;
 pub mod gov_officials;
 pub mod legis_init;
 pub mod ministrial_proposals;

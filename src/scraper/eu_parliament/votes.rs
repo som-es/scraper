@@ -68,7 +68,7 @@ pub struct EuRollCallVote {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Vote {
     pub roll_call_vote: Option<EuRollCallVote>,
-    pub meta: VotingRecord,
+    pub meta: Option<VotingRecord>,
     pub sitting_date: NaiveDate,
     pub is_main: Option<bool>,
 }
@@ -141,7 +141,6 @@ impl EuParliamentScraper {
 
         let mut references = vec![format!("{year}/{inr_str}({ityp})")];
         references.extend(super::proposals::report_references(&raw_procedure));
-
         let sitting_dates = super::proposals::plenary_sitting_dates(&raw_procedure);
 
         let mut votes = Vec::new();
@@ -149,7 +148,7 @@ impl EuParliamentScraper {
             let vot_entries = match self.get_vot_entries(&term, date).await {
                 Ok(vot_entries) => vot_entries,
                 Err(e) => {
-                    log::error!("e: {e:?}");
+                    log::error!("cannot parse vot entries because of: {e:?}");
                     continue;
                 }
             };
@@ -160,29 +159,54 @@ impl EuParliamentScraper {
                 .flat_map(|entry| entry.votings.into_iter().map(|voting| voting))
                 .collect::<Vec<_>>();
 
-            if voting_records.is_empty() {
-                continue;
-            }
-
             let roll_call_votes = self
                 .get_roll_call_entries(&term, date)
                 .await
                 .unwrap_or_default();
 
-            votes.extend(voting_records.into_iter().map(|voting_record| {
-                Vote {
-                    roll_call_vote: roll_call_votes
-                        .iter()
-                        .find(|roll_call_vote| roll_call_vote.voting_id == voting_record.voting_id)
-                        .cloned(),
-                    sitting_date: date,
-                    is_main: voting_record
-                        .title
-                        .as_ref()
-                        .map(|title| MAIN_VOTE_INDICATORS.contains(&title.to_lowercase().as_str())),
-                    meta: voting_record,
-                }
-            }));
+            if voting_records.is_empty() {
+                votes.extend(
+                    roll_call_votes
+                        .into_iter()
+                        .filter(|entry| {
+                            references.iter().any(|r| {
+                                entry
+                                    .description
+                                    .as_ref()
+                                    .unwrap_or(&String::new())
+                                    .contains(r)
+                            })
+                        })
+                        .map(|roll_call_vote| Vote {
+                            is_main: roll_call_vote.description.as_ref().map(|description| {
+                                description.split(" - ").any(|part| {
+                                    MAIN_VOTE_INDICATORS.contains(
+                                        &deunicode::deunicode(&part.to_lowercase()).as_str(),
+                                    )
+                                })
+                            }),
+                            roll_call_vote: Some(roll_call_vote),
+                            meta: None,
+                            sitting_date: date,
+                        }),
+                );
+            } else {
+                votes.extend(voting_records.into_iter().map(|voting_record| {
+                    Vote {
+                        roll_call_vote: roll_call_votes
+                            .iter()
+                            .find(|roll_call_vote| {
+                                roll_call_vote.voting_id == voting_record.voting_id
+                            })
+                            .cloned(),
+                        sitting_date: date,
+                        is_main: voting_record.title.as_ref().map(|title| {
+                            MAIN_VOTE_INDICATORS.contains(&title.to_lowercase().as_str())
+                        }),
+                        meta: Some(voting_record),
+                    }
+                }));
+            }
         }
         Ok(votes)
     }
@@ -208,7 +232,6 @@ impl EuParliamentScraper {
                 let link_path =
                     english_xml_manifestation(&raw_doc).ok_or(ScraperError::ParseError)?;
                 let url = format!("https://data.europarl.europa.eu/{link_path}");
-                dbg!(&url);
                 let xml = request_text(self.client(), &url).await?;
                 if let Err(e) = disk_caching(&cache_key, &xml, self.cache_config()).await {
                     log::warn!("could not cache {cache_key}: {e:?}");
@@ -246,7 +269,7 @@ fn english_xml_manifestation(raw_doc: &Value) -> Option<String> {
         .find(|expression| {
             expression["id"]
                 .as_str()
-                .is_some_and(|id| id.ends_with("/en"))
+                .is_some_and(|id| id.ends_with("/en") || id.ends_with("/fr"))
         })?
         .get("is_embodied_by")?
         .as_array()?
@@ -351,33 +374,40 @@ mod tests {
             vote.sitting_date,
             NaiveDate::from_ymd_opt(2024, 4, 24).unwrap()
         );
-        assert_eq!(vote.meta.favor_count, Some(547));
-        assert_eq!(vote.meta.against_count, Some(33));
-        assert_eq!(vote.meta.abstention_count, Some(49));
-        assert_eq!(vote.meta.result, VoteResult::Adopted);
+        let meta = vote.meta.as_ref().unwrap();
+        assert_eq!(meta.favor_count, Some(547));
+        assert_eq!(meta.against_count, Some(33));
+        assert_eq!(meta.abstention_count, Some(49));
+        assert_eq!(meta.result, VoteResult::Adopted);
     }
 
     #[tokio::test]
     async fn test_get_votes_for_proposal_missing_plenary_vote_results_event() {
         let scraper = EuParliamentScraper::default();
 
-        // 2024-0021 ("gradual roll-out of Eudamed"): the procedure that exposed the
-        // bug in the old `inverse_consists_of`-only matching — its own `consists_of`
-        // has no `PLENARY_VOTE_RESULTS` event, only bare `PLENARY_VOTE` ones, yet it
-        // really was decided by roll-call vote 168997 on 2024-04-25 (511/1/21;
-        // confirmed via howtheyvote.eu and the DOCEO VOT/RCV XML directly).
         let votes = scraper.get_votes_for_proposal("2024-0021").await.unwrap();
 
         assert_eq!(votes.len(), 1);
         let vote = &votes[0];
-        assert_eq!(vote.meta.voting_id, 168997);
+        let meta = vote.meta.as_ref().unwrap();
+        assert_eq!(meta.voting_id, 168997);
         assert_eq!(
             vote.sitting_date,
             NaiveDate::from_ymd_opt(2024, 4, 25).unwrap()
         );
-        assert_eq!(vote.meta.favor_count, Some(511));
-        assert_eq!(vote.meta.against_count, Some(1));
-        assert_eq!(vote.meta.abstention_count, Some(21));
-        assert_eq!(vote.meta.result, VoteResult::Adopted);
+        assert_eq!(meta.favor_count, Some(511));
+        assert_eq!(meta.against_count, Some(1));
+        assert_eq!(meta.abstention_count, Some(21));
+        assert_eq!(meta.result, VoteResult::Adopted);
+    }
+
+    #[tokio::test]
+    async fn test_get_votes_for_2024_163() {
+        let scraper = EuParliamentScraper::default();
+
+        let votes = scraper.get_votes_for_proposal("2024-2006").await.unwrap();
+
+        // dbg!(votes);
+        // assert_eq!(votes.len(), 1);
     }
 }

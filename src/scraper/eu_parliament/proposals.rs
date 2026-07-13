@@ -243,10 +243,10 @@ fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
 
     let dates: Vec<NaiveDate> = events
         .iter()
+        .chain(&participations)
         .flat_map(|e| e["activity_date"].as_str())
         .flat_map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
         .collect();
-
     let created_at = dates.iter().min()?.and_hms_opt(0, 0, 0)?.and_utc();
     let updated_at = dates
         .iter()

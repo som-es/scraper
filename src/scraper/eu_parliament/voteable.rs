@@ -104,9 +104,12 @@ mod tests {
     async fn test_all_2026_procedures() {
         let scraper = EuParliamentScraper::default();
         let mut prods_with_votes = 0;
-        for year in [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026] {
+        for year in [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+            .iter()
+            .rev()
+        {
             dbg!(year);
-            let prods = scraper.list_procedure_ids(year).await.unwrap();
+            let prods = scraper.list_procedure_ids(*year).await.unwrap();
             for procedure in prods {
                 match scraper.get_voteable(&procedure).await {
                     Err(e) => {
@@ -188,5 +191,38 @@ mod tests {
             voteable.proposal.created_at.date_naive(),
             NaiveDate::from_ymd_opt(2019, 6, 27).unwrap()
         );
+    }
+
+    // 2019-2552
+    #[tokio::test]
+    async fn test_procedure_2019_2552() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let mut scraper = EuParliamentScraper::default();
+
+        scraper.cache_config = CacheConfig {
+            cache_dir: "./test-data".into(),
+            ignore_current_gp_cache: false,
+            redo_secs: u64::MAX,
+        };
+
+        let voteable = scraper.get_voteable("2019-2552").await.unwrap();
+
+        assert_eq!(voteable.proposal.gp, "2019");
+        assert!(voteable.has_votes());
+        assert_eq!(
+            voteable.proposal.created_at.date_naive(),
+            NaiveDate::from_ymd_opt(2019, 3, 13).unwrap()
+        );
+
+        let vote = voteable
+            .votes
+            .iter()
+            .find(|vote| vote.is_main == Some(true))
+            .unwrap();
+        let roll_call_vote = vote.roll_call_vote.as_ref().unwrap();
+        assert_eq!(roll_call_vote.favor_count, 435);
+        assert_eq!(roll_call_vote.against_count, 156);
+        let del_vote = &roll_call_vote.votes[0];
+        dbg!(del_vote);
     }
 }

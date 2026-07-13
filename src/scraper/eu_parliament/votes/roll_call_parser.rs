@@ -48,7 +48,7 @@ pub fn parse_roll_call_votes_xml(xml: &str) -> Result<Vec<EuRollCallVote>, Parse
         match event {
             Event::Start(e) | Event::Empty(e) => match e.name().as_ref() {
                 b"RollCallVote.Result" => {
-                    let voting_id = required_u64(&e, b"Identifier", "Identifier")?;
+                    let voting_id = required_u64(&e, b"Identifier", "Identifier").ok();
                     current = Some(EuRollCallVote {
                         voting_id,
                         description: None,
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn parses_metadata() {
         let v = parse_roll_call_vote_xml(SAMPLE).unwrap();
-        assert_eq!(v.voting_id, 168997);
+        assert_eq!(v.voting_id, Some(168997));
         assert_eq!(
             v.description.as_deref(),
             Some("C9-0010/2024 - Proposition de la Commission")

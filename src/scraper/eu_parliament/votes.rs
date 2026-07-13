@@ -57,7 +57,7 @@ pub struct EuDelegateVote {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EuRollCallVote {
-    pub voting_id: u64,
+    pub voting_id: Option<u64>,
     pub description: Option<String>,
     pub favor_count: u32,
     pub against_count: u32,
@@ -180,9 +180,13 @@ impl EuParliamentScraper {
                         .map(|roll_call_vote| Vote {
                             is_main: roll_call_vote.description.as_ref().map(|description| {
                                 description.split(" - ").any(|part| {
-                                    MAIN_VOTE_INDICATORS.contains(
-                                        &deunicode::deunicode(&part.to_lowercase()).as_str(),
-                                    )
+                                    let part = deunicode::deunicode(&part.to_lowercase());
+                                    for indicator in MAIN_VOTE_INDICATORS {
+                                        if part.contains(indicator) {
+                                            return true;
+                                        }
+                                    }
+                                    MAIN_VOTE_INDICATORS.contains(&part.as_str())
                                 })
                             }),
                             roll_call_vote: Some(roll_call_vote),
@@ -196,7 +200,7 @@ impl EuParliamentScraper {
                         roll_call_vote: roll_call_votes
                             .iter()
                             .find(|roll_call_vote| {
-                                roll_call_vote.voting_id == voting_record.voting_id
+                                roll_call_vote.voting_id == Some(voting_record.voting_id)
                             })
                             .cloned(),
                         sitting_date: date,
@@ -407,7 +411,8 @@ mod tests {
 
         let votes = scraper.get_votes_for_proposal("2024-2006").await.unwrap();
 
-        // dbg!(votes);
+        assert!(votes.iter().any(|vote| vote.is_main == Some(true)));
+        dbg!(votes);
         // assert_eq!(votes.len(), 1);
     }
 }

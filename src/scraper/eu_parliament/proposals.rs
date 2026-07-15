@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate, Utc};
 use common_scrapes::{Document, FileType, Proposal, ProposalType};
 use regex::Regex;
 use serde_json::Value;
@@ -9,6 +9,7 @@ use crate::{error::ScraperError, request::request_text};
 
 use super::{id_to_u64, last_path_segment, EuParliamentScraper};
 
+mod oeil;
 mod procedure_list_parser;
 
 pub use procedure_list_parser::ProcedureFeedEntry;
@@ -39,13 +40,32 @@ impl EuParliamentScraper {
             .collect())
     }
 
+    pub async fn list_all_procedure_ids(&self, from_year: u32) -> Result<Vec<String>, ScraperError> {
+        let current_year = Utc::now().year() as u32;
+        let mut ids: HashSet<String> = HashSet::new();
+        for year in from_year..=current_year {
+            ids.extend(self.list_oeil_procedure_ids(year).await?);
+        }
+        let mut ids: Vec<String> = ids.into_iter().collect();
+        ids.sort();
+        Ok(ids)
+    }
+
     /// Ids (e.g. `"2024-0003"`) of procedures opened in `year`. The API times out on
     /// unbounded queries, so a `year` filter is required (mirrors the API's own
     /// documented "always filter by year or processId" guidance).
-    pub async fn list_procedure_ids(&self, year: u32) -> Result<Vec<String>, ScraperError> {
+    pub async fn list_procedure_ids_by_year(&self, year: u32) -> Result<Vec<String>, ScraperError> {
         let rows = self
             .get_all_pages("procedures", &format!("year={year}"))
             .await?;
+        Ok(rows
+            .into_iter()
+            .flat_map(|row| row["process_id"].as_str().map(ToString::to_string))
+            .collect())
+    }
+
+    pub async fn list_procedure_ids(&self) -> Result<Vec<String>, ScraperError> {
+        let rows = self.get_all_pages("procedures", "").await?;
         Ok(rows
             .into_iter()
             .flat_map(|row| row["process_id"].as_str().map(ToString::to_string))
@@ -358,12 +378,30 @@ fn extract_documents_from_doc(raw: &Value) -> Vec<Document> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[tokio::test]
     async fn test_list_procedure_ids() {
         let scraper = EuParliamentScraper::default();
-        let ids = scraper.list_procedure_ids(2026).await.unwrap();
+        let ids = scraper.list_procedure_ids().await.unwrap();
+        let mut id_count = HashMap::<&str, u32>::new();
+        for id in &ids {
+            id_count
+                .entry(id.split('-').next().unwrap())
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
+        }
+        dbg!(id_count);
+        // assert!(!ids.is_empty());
+        // assert!(ids.iter().all(|id| id.starts_with("2024-")));
+    }
+
+    #[tokio::test]
+    async fn test_list_procedure_ids_by_year() {
+        let scraper = EuParliamentScraper::default();
+        let ids = scraper.list_procedure_ids_by_year(2026).await.unwrap();
         let ids_by_feed = scraper
             .list_procedures_feed_filtered_by_year(2026)
             .await
@@ -410,10 +448,110 @@ mod feed_smoke_test {
     async fn test_list_procedures_feed_live() {
         let scraper = EuParliamentScraper::default();
         let entries = scraper
-            .list_procedures_feed(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap())
+            .list_procedures_feed(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
             .await
             .unwrap();
         assert!(!entries.is_empty());
-        dbg!(&entries[0]);
+        dbg!(&entries.len());
+    }
+}
+
+#[cfg(test)]
+mod all_ids_smoke_test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_list_all_procedure_ids_union() {
+        let scraper = EuParliamentScraper::default();
+        let ids = scraper.list_all_procedure_ids(2026).await.unwrap();
+        let sorted = ids.windows(2).all(|w| w[0] < w[1]);
+        assert!(sorted, "ids must be sorted and unique");
+        assert!(ids.contains(&"2026-2792".to_string()), "known 2026 procedure present");
+        assert!(ids.iter().all(|id| id.starts_with("2026-")));
+        dbg!(ids.len(), &ids[..3.min(ids.len())]);
+    }
+}
+
+#[cfg(test)]
+mod howtheyvote_comparison {
+    use super::*;
+    use regex::Regex;
+    use std::io::Read;
+
+    const HOWTHEYVOTE_VOTES_URL: &str =
+        "https://github.com/HowTheyVote/data/releases/latest/download/votes.csv.gz";
+    const TERM_9_START_YEAR: u32 = 2019;
+    const MIN_HOWTHEYVOTE_COVERAGE: f64 = 0.98;
+
+    fn base_procedure_id(id: &str) -> String {
+        match id.split_once('-') {
+            Some((year, number)) => {
+                let digits: String = number.chars().take_while(|c| c.is_ascii_digit()).collect();
+                format!("{year}-{digits}")
+            }
+            None => id.to_string(),
+        }
+    }
+
+    async fn howtheyvote_procedure_ids(scraper: &EuParliamentScraper) -> HashSet<String> {
+        let bytes = scraper
+            .client()
+            .get(HOWTHEYVOTE_VOTES_URL)
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap();
+        let mut csv = String::new();
+        flate2::read::GzDecoder::new(&bytes[..])
+            .read_to_string(&mut csv)
+            .unwrap();
+
+        let reference = Regex::new(r"(\d{4})/(\d{4})[A-Z]?\([A-Z]+\)").unwrap();
+        reference
+            .captures_iter(&csv)
+            .filter_map(|caps| {
+                let year = caps.get(1)?.as_str();
+                let number = caps.get(2)?.as_str();
+                (year.parse::<u32>().ok()? >= TERM_9_START_YEAR)
+                    .then(|| format!("{year}-{number}"))
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn scraper_covers_howtheyvote_procedures() {
+        let scraper = EuParliamentScraper::default();
+
+        let ours: HashSet<String> = scraper
+            .list_all_procedure_ids(TERM_9_START_YEAR)
+            .await
+            .unwrap()
+            .iter()
+            .map(|id| base_procedure_id(id))
+            .collect();
+        let howtheyvote: HashSet<String> = howtheyvote_procedure_ids(&scraper)
+            .await
+            .iter()
+            .map(|id| base_procedure_id(id))
+            .collect();
+
+        let covered = howtheyvote.iter().filter(|id| ours.contains(*id)).count();
+        let coverage = covered as f64 / howtheyvote.len() as f64;
+
+        dbg!(ours.len(), howtheyvote.len(), covered, coverage);
+
+        assert!(
+            ours.len() >= howtheyvote.len(),
+            "our enumeration ({}) should be a superset of HowTheyVote's voted procedures ({})",
+            ours.len(),
+            howtheyvote.len(),
+        );
+        assert!(
+            coverage >= MIN_HOWTHEYVOTE_COVERAGE,
+            "only {covered}/{} ({coverage:.1}) of HowTheyVote procedures found in our enumeration",
+            howtheyvote.len(),
+        );
     }
 }

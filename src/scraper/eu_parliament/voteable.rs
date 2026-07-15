@@ -109,7 +109,7 @@ mod tests {
             .rev()
         {
             dbg!(year);
-            let prods = scraper.list_procedure_ids(*year).await.unwrap();
+            let prods = scraper.list_procedure_ids_by_year(*year).await.unwrap();
             dbg!(prods.len());
             for procedure in prods {
                 match scraper.get_voteable(&procedure).await {

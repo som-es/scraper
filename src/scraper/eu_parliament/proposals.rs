@@ -40,28 +40,10 @@ impl EuParliamentScraper {
             .collect())
     }
 
-    pub async fn list_all_procedure_ids(&self, from_year: u32) -> Result<Vec<String>, ScraperError> {
-        let current_year = Utc::now().year() as u32;
-        let mut ids: HashSet<String> = HashSet::new();
-        for year in from_year..=current_year {
-            ids.extend(self.list_oeil_procedure_ids(year).await?);
-        }
-        let mut ids: Vec<String> = ids.into_iter().collect();
-        ids.sort();
-        Ok(ids)
-    }
-
-    /// Ids (e.g. `"2024-0003"`) of procedures opened in `year`. The API times out on
-    /// unbounded queries, so a `year` filter is required (mirrors the API's own
-    /// documented "always filter by year or processId" guidance).
     pub async fn list_procedure_ids_by_year(&self, year: u32) -> Result<Vec<String>, ScraperError> {
-        let rows = self
-            .get_all_pages("procedures", &format!("year={year}"))
-            .await?;
-        Ok(rows
-            .into_iter()
-            .flat_map(|row| row["process_id"].as_str().map(ToString::to_string))
-            .collect())
+        let mut ids: HashSet<String> = HashSet::new();
+        ids.extend(self.list_oeil_procedure_ids(year).await?);
+        Ok(ids.into_iter().collect())
     }
 
     pub async fn list_procedure_ids(&self) -> Result<Vec<String>, ScraperError> {
@@ -463,10 +445,13 @@ mod all_ids_smoke_test {
     #[tokio::test]
     async fn test_list_all_procedure_ids_union() {
         let scraper = EuParliamentScraper::default();
-        let ids = scraper.list_all_procedure_ids(2026).await.unwrap();
+        let ids = scraper.list_procedure_ids_by_year(2026).await.unwrap();
         let sorted = ids.windows(2).all(|w| w[0] < w[1]);
         assert!(sorted, "ids must be sorted and unique");
-        assert!(ids.contains(&"2026-2792".to_string()), "known 2026 procedure present");
+        assert!(
+            ids.contains(&"2026-2792".to_string()),
+            "known 2026 procedure present"
+        );
         assert!(ids.iter().all(|id| id.starts_with("2026-")));
         dbg!(ids.len(), &ids[..3.min(ids.len())]);
     }
@@ -514,8 +499,7 @@ mod howtheyvote_comparison {
             .filter_map(|caps| {
                 let year = caps.get(1)?.as_str();
                 let number = caps.get(2)?.as_str();
-                (year.parse::<u32>().ok()? >= TERM_9_START_YEAR)
-                    .then(|| format!("{year}-{number}"))
+                (year.parse::<u32>().ok()? >= TERM_9_START_YEAR).then(|| format!("{year}-{number}"))
             })
             .collect()
     }
@@ -525,7 +509,7 @@ mod howtheyvote_comparison {
         let scraper = EuParliamentScraper::default();
 
         let ours: HashSet<String> = scraper
-            .list_all_procedure_ids(TERM_9_START_YEAR)
+            .list_procedure_ids_by_year(TERM_9_START_YEAR)
             .await
             .unwrap()
             .iter()

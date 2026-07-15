@@ -125,6 +125,7 @@ mod tests {
                         }
                     }
                 }
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             }
 
             println!("parsed prods with votes (current total): {prods_with_votes}");

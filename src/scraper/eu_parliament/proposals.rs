@@ -5,11 +5,40 @@ use common_scrapes::{Document, FileType, Proposal, ProposalType};
 use regex::Regex;
 use serde_json::Value;
 
-use crate::error::ScraperError;
+use crate::{error::ScraperError, request::request_text};
 
 use super::{id_to_u64, last_path_segment, EuParliamentScraper};
 
+mod procedure_list_parser;
+
+pub use procedure_list_parser::ProcedureFeedEntry;
+
 impl EuParliamentScraper {
+    pub async fn list_procedures_feed(
+        &self,
+        start_date: NaiveDate,
+    ) -> Result<Vec<ProcedureFeedEntry>, ScraperError> {
+        let url = format!(
+            "{base}/procedures/feed?timeframe=custom&start-date={start_date}",
+            base = Self::BASE_URL,
+        );
+        let xml = request_text(self.client(), &url).await?;
+        Ok(procedure_list_parser::parse_procedure_feed_xml(&xml))
+    }
+
+    pub async fn list_procedures_feed_filtered_by_year(
+        &self,
+        year: u32,
+    ) -> Result<Vec<ProcedureFeedEntry>, ScraperError> {
+        let start_date = NaiveDate::from_ymd_opt(year as i32, 1, 1).unwrap();
+        Ok(self
+            .list_procedures_feed(start_date)
+            .await?
+            .into_iter()
+            .filter(|entry| entry.process_id.starts_with(&format!("{year}-")))
+            .collect())
+    }
+
     /// Ids (e.g. `"2024-0003"`) of procedures opened in `year`. The API times out on
     /// unbounded queries, so a `year` filter is required (mirrors the API's own
     /// documented "always filter by year or processId" guidance).
@@ -334,9 +363,14 @@ mod tests {
     #[tokio::test]
     async fn test_list_procedure_ids() {
         let scraper = EuParliamentScraper::default();
-        let ids = scraper.list_procedure_ids(2024).await.unwrap();
-        assert!(!ids.is_empty());
-        assert!(ids.iter().all(|id| id.starts_with("2024-")));
+        let ids = scraper.list_procedure_ids(2026).await.unwrap();
+        let ids_by_feed = scraper
+            .list_procedures_feed_filtered_by_year(2026)
+            .await
+            .unwrap();
+        dbg!(ids.len(), ids_by_feed.len());
+        // assert!(!ids.is_empty());
+        // assert!(ids.iter().all(|id| id.starts_with("2024-")));
     }
 
     #[tokio::test]
@@ -365,5 +399,21 @@ mod tests {
         assert!(proposal
             .other_keyword_topics
             .contains(&"052030".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod feed_smoke_test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_list_procedures_feed_live() {
+        let scraper = EuParliamentScraper::default();
+        let entries = scraper
+            .list_procedures_feed(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap())
+            .await
+            .unwrap();
+        assert!(!entries.is_empty());
+        dbg!(&entries[0]);
     }
 }

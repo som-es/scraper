@@ -391,9 +391,10 @@ mod tests {
 
         let votes = scraper.get_votes_for_proposal("2024-0021").await.unwrap();
 
-        assert_eq!(votes.len(), 1);
-        let vote = &votes[0];
+        assert_eq!(votes.len(), 2);
+        let vote = &votes[1];
         let meta = vote.meta.as_ref().unwrap();
+        assert!(vote.is_main.unwrap());
         assert_eq!(meta.voting_id, 168997);
         assert_eq!(
             vote.sitting_date,
@@ -406,7 +407,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_votes_for_2024_163() {
+    async fn test_get_votes_for_2024_2006() {
         let scraper = EuParliamentScraper::default();
 
         let votes = scraper.get_votes_for_proposal("2024-2006").await.unwrap();
@@ -414,5 +415,56 @@ mod tests {
         assert!(votes.iter().any(|vote| vote.is_main == Some(true)));
         dbg!(votes);
         // assert_eq!(votes.len(), 1);
+    }
+    // 2026-2589
+    #[tokio::test]
+    async fn test_get_votes_for_2026_2589() {
+        let scraper = EuParliamentScraper::default();
+
+        let votes = scraper.get_votes_for_proposal("2026-2589").await.unwrap();
+        assert_eq!(votes.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_votes_for_2025_2145() {
+        let scraper = EuParliamentScraper::default();
+
+        let votes = scraper.get_votes_for_proposal("2025-2145").await.unwrap();
+        assert!(!votes.is_empty())
+    }
+
+    #[tokio::test]
+    async fn test_all_votes() {
+        let scraper = EuParliamentScraper::default();
+        let mut prods_with_votes = 0;
+        for year in [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+            .iter()
+            .rev()
+        {
+            dbg!(year);
+            let prods = scraper
+                .list_procedures_feed_filtered_by_year(*year)
+                .await
+                .unwrap();
+            dbg!(prods.len());
+            for procedure in prods {
+                match scraper.get_votes_for_proposal(&procedure.process_id).await {
+                    Err(e) => {
+                        println!("failed on procedure: {procedure:?} because of {e:?}")
+                    }
+                    Ok(e) => {
+                        if e.is_empty() {
+                            println!("procedure has no votes {procedure:?}")
+                        } else {
+                            // println!("procedure has votes {procedure:?}");
+                            prods_with_votes += 1;
+                        }
+                    }
+                }
+            }
+
+            println!("parsed prods with votes (current total): {prods_with_votes}");
+        }
+        println!("parsed prods with votes (total): {prods_with_votes}");
     }
 }

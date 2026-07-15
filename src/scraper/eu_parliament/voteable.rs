@@ -110,6 +110,7 @@ mod tests {
         {
             dbg!(year);
             let prods = scraper.list_procedure_ids(*year).await.unwrap();
+            dbg!(prods.len());
             for procedure in prods {
                 match scraper.get_voteable(&procedure).await {
                     Err(e) => {
@@ -117,17 +118,18 @@ mod tests {
                     }
                     Ok(e) => {
                         if e.votes.is_empty() {
-                            println!("procedure has no votes {procedure:?}")
+                            // println!("procedure has no votes {procedure:?}")
                         } else {
+                            println!("procedure has votes {procedure:?}");
                             prods_with_votes += 1;
                         }
                     }
                 }
             }
 
-            println!("parsed prods (current total): {prods_with_votes}");
+            println!("parsed prods with votes (current total): {prods_with_votes}");
         }
-        println!("parsed prods (total): {prods_with_votes}");
+        println!("parsed prods with votes (total): {prods_with_votes}");
     }
 
     #[tokio::test]
@@ -224,5 +226,15 @@ mod tests {
         assert_eq!(roll_call_vote.against_count, 156);
         let del_vote = &roll_call_vote.votes[0];
         dbg!(del_vote);
+    }
+    #[tokio::test]
+    async fn test_get_votes_for_2026_2589_2() {
+        let scraper = EuParliamentScraper::default();
+
+        let voteable = scraper.get_voteable("2026-2589").await.unwrap();
+        assert_eq!(
+            voteable.proposal.created_at.date_naive(),
+            NaiveDate::from_ymd_opt(2026, 2, 11).unwrap()
+        );
     }
 }

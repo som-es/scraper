@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use async_trait::async_trait;
 use common_scrapes::Party;
 
-use crate::error::ScraperError;
+use crate::{error::ScraperError, parties::Parties};
 
 use super::EuParliamentScraper;
 
@@ -35,17 +36,9 @@ fn color_for_code(code: &str) -> String {
         .unwrap_or_else(|| "#AAAAAA".to_string())
 }
 
-impl EuParliamentScraper {
-    /// Derives the currently sitting political groups and their member counts from
-    /// `meps/show-current`, rather than from `corporate-bodies` (which lists every
-    /// group formed since 1979 without indicating which ones are currently active, and
-    /// duplicates recurring groups like GUE/NGL once per term under a different
-    /// organization id).
-    ///
-    /// Unlike AT's `Party`, whose `name` (e.g. "ÖVP") and `code` (e.g. "V") are two
-    /// distinct API fields, the EU API only exposes one abbreviation per group (e.g.
-    /// "S&D"), so both `name` and `code` are set to it here.
-    pub async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
+#[async_trait]
+impl Parties for EuParliamentScraper {
+    async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
         let rows = self.get_all_pages("meps/show-current", "").await?;
 
         let mut counts: HashMap<String, u32> = HashMap::new();

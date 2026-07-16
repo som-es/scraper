@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use chrono::NaiveDate;
 use common_scrapes::{Contact, Delegate, Gender, Image, Mandate, Seat, SocialMedia};
 use reqwest::Method;
@@ -7,6 +8,7 @@ use serde_json::Value;
 
 use crate::{
     caching::{disk_caching, get_disk_cache_json},
+    delegates::{DelegateInfo, DelegateScraper},
     error::ScraperError,
     request::request,
     Scraper,
@@ -108,20 +110,22 @@ impl EuParliamentScraper {
         let raw = self.get_one_cached(&path).await?;
         let groups = self.political_group_codes().await?;
         let seats = self.current_seats().await?;
-        raw_mep_into_delegate(&raw, &groups, seats).ok_or(ScraperError::InvalidDelegateInfoError)
+        raw_mep_into_delegate(&raw, &groups, &seats).ok_or(ScraperError::InvalidDelegateInfoError)
     }
 
-    async fn current_seats(&mut self) -> Result<&HashMap<u64, u64>, ScraperError> {
-        if self.delegate_seats.is_none() {
-            let seats = self.current_seat_order(true).await?;
-            self.delegate_seats = Some(
-                seats
-                    .into_iter()
-                    .map(|seat| (seat.delegate_id, seat.seat_id))
-                    .collect(),
-            );
+    async fn current_seats(&self) -> Result<HashMap<u64, u64>, ScraperError> {
+        {
+            if self.delegate_seats.read().await.is_none() {
+                let seats = self.current_seat_order(true).await?;
+                *self.delegate_seats.write().await = Some(
+                    seats
+                        .into_iter()
+                        .map(|seat| (seat.delegate_id, seat.seat_id))
+                        .collect(),
+                );
+            }
         }
-        Ok(self.delegate_seats.as_ref().unwrap())
+        Ok(self.delegate_seats.read().await.as_ref().unwrap().clone())
     }
 
     pub async fn get_delegates(&mut self) -> Result<Vec<Delegate>, ScraperError> {
@@ -240,6 +244,54 @@ fn membership_to_mandate(membership: &Value, groups: &HashMap<String, String>) -
     })
 }
 
+#[async_trait]
+impl DelegateScraper for EuParliamentScraper {
+    const DELEGATE_FILTER_PATH: &'static str = "";
+    const DELEGATE_BS_FILTER_PATH: &'static str = "";
+
+    fn persons_payload(&self) -> Self::Payload {
+        unimplemented!()
+    }
+
+    fn person_paths(&self, persons: Value) -> Option<Vec<DelegateInfo>> {
+        Some(
+            persons
+                .as_array()?
+                .into_iter()
+                .flat_map(|row| row["id"].as_str().map(ToString::to_string))
+                .map(|path| DelegateInfo {
+                    path,
+                    gender: "".into(),
+                })
+                .collect(),
+        )
+    }
+
+    fn person_paths_bs(
+        &self,
+        _persons: Value,
+    ) -> Option<Vec<crate::delegates::BereichsprecherInfo>> {
+        None
+    }
+
+    fn person_info_into_delegate(person_info: Value) -> Option<Delegate> {
+        unimplemented!()
+    }
+
+    async fn get_delegate(&self, info: DelegateInfo) -> Result<Delegate, ScraperError> {
+        let path = format!("meps/{}", last_path_segment(&info.path));
+        let raw = self.get_one_cached(&path).await?;
+        let groups = self.political_group_codes().await?;
+        let seats = self.current_seats().await?;
+        raw_mep_into_delegate(&raw, &groups, &seats).ok_or(ScraperError::InvalidDelegateInfoError)
+    }
+
+    async fn post_persons_payload(&self) -> Result<Value, ScraperError> {
+        let rows = self.get_all_pages("meps", "").await?;
+        Ok(Value::Array(rows))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use common_scrapes::Seat;
@@ -251,7 +303,13 @@ mod tests {
     #[tokio::test]
     async fn test_get_delegate() {
         let mut scraper = EuParliamentScraper::default();
-        let delegate = scraper.get_delegate("person/1294").await.unwrap();
+        let delegate = scraper
+            .get_delegate(DelegateInfo {
+                path: "person/1294".into(),
+                gender: "".into(),
+            })
+            .await
+            .unwrap();
         assert_eq!(delegate.name, "Elio DI RUPO");
         assert_eq!(delegate.constituency.as_deref(), Some("BEL"));
         assert_eq!(delegate.gender, Gender::Male);
@@ -264,11 +322,23 @@ mod tests {
         let ids = scraper.current_mep_ids().await.unwrap();
         assert!(ids.len() > 500);
     }
+    #[tokio::test]
+    async fn test_all_mep_ids_non_empty() {
+        let scraper = EuParliamentScraper::default();
+        let ids = scraper.all_mep_ids().await.unwrap();
+        assert!(ids.len() > 3000);
+    }
 
     #[tokio::test]
     async fn test_get_delegate_andreas_schieder() {
         let mut scraper = EuParliamentScraper::default();
-        let delegate = scraper.get_delegate("person/197670").await.unwrap();
+        let delegate = scraper
+            .get_delegate(DelegateInfo {
+                path: "person/197670".into(),
+                gender: String::new(),
+            })
+            .await
+            .unwrap();
 
         scraper.cache_config = CacheConfig {
             cache_dir: "./test-data".into(),

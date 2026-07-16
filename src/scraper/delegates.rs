@@ -311,12 +311,11 @@ pub fn extract_prev_name(prev_name_info: Option<&str>) -> Option<PrevNameInfo> {
             let date_start_idx = prev_name_info.find("(bis");
             let prev_name = &prev_name_info[idx + 2..prev_name_info.len() - 1]
                 .trim_matches(char::is_whitespace);
-            let till = date_start_idx
-                .and_then(|date_start_idx| {
-                    let till_date_str = &prev_name_info[date_start_idx + 5..idx];
+            let till = date_start_idx.and_then(|date_start_idx| {
+                let till_date_str = &prev_name_info[date_start_idx + 5..idx];
 
-                    NaiveDate::parse_from_str(till_date_str, "%d.%m.%Y").ok()
-                });
+                NaiveDate::parse_from_str(till_date_str, "%d.%m.%Y").ok()
+            });
             PrevNameInfo {
                 prev_name: prev_name.to_string(),
                 till,

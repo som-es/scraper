@@ -20,24 +20,26 @@ pub mod proposals;
 pub mod voteable;
 pub mod votes;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use reqwest::{Client, Method};
 use serde_json::Value;
+use tokio::sync::RwLock;
 
 use crate::{
     caching::{disk_caching, get_disk_cache_json, CacheConfig},
     error::ScraperError,
-    eu_parliament::delegates::DelegateSeat,
     http_client,
     request::request,
+    Scraper,
 };
 
 #[derive(Debug, Clone)]
 pub struct EuParliamentScraper {
     client: Client,
     pub cache_config: CacheConfig,
-    pub delegate_seats: Option<HashMap<u64, u64>>,
+    pub delegate_seats: Arc<RwLock<Option<HashMap<u64, u64>>>>,
 }
 
 impl Default for EuParliamentScraper {
@@ -45,8 +47,34 @@ impl Default for EuParliamentScraper {
         Self {
             client: http_client().unwrap(),
             cache_config: Default::default(),
-            delegate_seats: None,
+            delegate_seats: Default::default(),
         }
+    }
+}
+
+#[async_trait]
+impl Scraper for EuParliamentScraper {
+    const BASE_URL: &'static str = "https://data.europarl.europa.eu/api/v2";
+    const JSON_SUFFIX: &'static str = "?format=application%2Fld%2Bjson";
+    const LIST_ENTRIES: &'static str = "";
+
+    type Payload = Value;
+
+    #[inline]
+    fn client(&self) -> &Client {
+        &self.client
+    }
+
+    fn cache_config(&self) -> &CacheConfig {
+        &self.cache_config
+    }
+
+    async fn get_gegenstand_info(&self, _path: &str) -> Result<Value, ScraperError> {
+        unimplemented!()
+    }
+
+    async fn cache(&self, _path: &str) -> Result<Value, ScraperError> {
+        unimplemented!()
     }
 }
 
@@ -83,7 +111,6 @@ impl EuParliamentScraper {
         let mut offset = 0usize;
         let mut all = Vec::new();
         loop {
-            dbg!(offset);
             let paged_query = if query.is_empty() {
                 format!("limit={}&offset={offset}", Self::PAGE_LIMIT)
             } else {

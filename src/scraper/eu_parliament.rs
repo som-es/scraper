@@ -20,12 +20,15 @@ pub mod proposals;
 pub mod voteable;
 pub mod votes;
 
+use std::collections::HashMap;
+
 use reqwest::{Client, Method};
 use serde_json::Value;
 
 use crate::{
     caching::{disk_caching, get_disk_cache_json, CacheConfig},
     error::ScraperError,
+    eu_parliament::delegates::DelegateSeat,
     http_client,
     request::request,
 };
@@ -34,6 +37,7 @@ use crate::{
 pub struct EuParliamentScraper {
     client: Client,
     pub cache_config: CacheConfig,
+    pub delegate_seats: Option<HashMap<u64, u64>>,
 }
 
 impl Default for EuParliamentScraper {
@@ -41,6 +45,7 @@ impl Default for EuParliamentScraper {
         Self {
             client: http_client().unwrap(),
             cache_config: Default::default(),
+            delegate_seats: None,
         }
     }
 }

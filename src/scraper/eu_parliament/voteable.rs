@@ -104,6 +104,7 @@ mod tests {
     async fn test_all_2026_procedures() {
         let scraper = EuParliamentScraper::default();
         let mut prods_with_votes = 0;
+        let mut prods_with_votes_main = 0;
         for year in [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
             .iter()
             .rev()
@@ -117,18 +118,21 @@ mod tests {
                         println!("failed on procedure: {procedure:?} because of {e:?}")
                     }
                     Ok(e) => {
+                        if e.votes.iter().any(|vote| vote.is_main.unwrap_or_default()) {
+                            println!("procedure has main votes {procedure:?}");
+                            prods_with_votes_main += 1;
+                        }
                         if e.votes.is_empty() {
                             // println!("procedure has no votes {procedure:?}")
                         } else {
-                            println!("procedure has votes {procedure:?}");
                             prods_with_votes += 1;
                         }
                     }
                 }
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                // tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             }
 
-            println!("parsed prods with votes (current total): {prods_with_votes}");
+            println!("parsed prods with votes (current total): {prods_with_votes}, current has main vote total: {prods_with_votes_main}");
         }
         println!("parsed prods with votes (total): {prods_with_votes}");
     }

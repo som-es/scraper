@@ -20,7 +20,7 @@ use super::{id_to_u64, last_path_segment, EuParliamentScraper};
 mod roll_call_parser;
 mod vot_parsers;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     Xml(String),
     Number(String),

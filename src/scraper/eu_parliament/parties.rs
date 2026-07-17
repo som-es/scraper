@@ -7,25 +7,29 @@ use crate::{error::ScraperError, parties::Parties};
 
 use super::EuParliamentScraper;
 
-/// Best-effort brand colors for the political groups active in recent parliamentary
-/// terms. The EU Open Data API has no `color` field anywhere (unlike the Austrian
-/// Parlament API, which returns an official `color` per party alongside every vote,
-/// see `extract_votes` in `legis_init/extracting.rs`), so these are hardcoded from the
-/// color conventions used in the Parliament's own charts and press kits. Treat these as
-/// approximate; update when groups are renamed or newly formed.
+/// Official colors for the EU Parliament's political groups. The EU Open Data API has no
+/// `color` field anywhere (unlike the Austrian Parlament API, which returns an official
+/// `color` per party alongside every vote, see `extract_votes` in
+/// `legis_init/extracting.rs`), so these are taken verbatim from the Parliament's own
+/// interactive hemicycle seating tool, whose data feed
+/// (`europarl.europa.eu/erpl-public/hemicycle/bru/en.json`) assigns a `color` to every
+/// group. The feed lists the current-term groups; both the old and current abbreviation
+/// for the two recurring groups are kept so lookups hit regardless of which the API
+/// returns (the API uses "PPE", the feed "EPP"). Update when groups are renamed or newly
+/// formed.
 const GROUP_COLORS: &[(&str, &str)] = &[
-    ("PPE", "#3399FF"),
-    ("S&D", "#F0001C"),
-    ("Renew", "#FFD700"),
-    ("Verts/ALE", "#3EB618"),
-    ("Greens/EFA", "#3EB618"),
-    ("ID", "#2B3856"),
-    ("PfE", "#17224D"),
-    ("ECR", "#1B9BE0"),
-    ("ESN", "#0053A5"),
-    ("GUE/NGL", "#B00000"),
-    ("The Left", "#B00000"),
-    ("NI", "#999999"),
+    ("PPE", "#003C78"),
+    ("EPP", "#003C78"),
+    ("S&D", "#C80000"),
+    ("Renew", "#FFAA00"),
+    ("Verts/ALE", "#32C800"),
+    ("Greens/EFA", "#32C800"),
+    ("PfE", "#9B20A9"),
+    ("ECR", "#0082FF"),
+    ("ESN", "#808080"),
+    ("GUE/NGL", "#460000"),
+    ("The Left", "#460000"),
+    ("NI", "#666666"),
 ];
 
 fn color_for_code(code: &str) -> String {

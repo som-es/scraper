@@ -66,3 +66,13 @@ pub enum ScraperError {
     #[error("Parse Error")]
     ParseErrorVerbose(ParseError),
 }
+
+impl PartialEq for ScraperError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::StatusError(l0), Self::StatusError(r0)) => l0 == r0,
+            (Self::ParseErrorVerbose(l0), Self::ParseErrorVerbose(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}

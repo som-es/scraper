@@ -252,6 +252,9 @@ impl DelegateScraper for EuParliamentScraper {
     fn persons_payload(&self) -> Self::Payload {
         unimplemented!()
     }
+    async fn post_persons_payload_bs(&self) -> Result<Value, ScraperError> {
+        Ok(Value::Null)
+    }
 
     fn person_paths(&self, persons: Value) -> Option<Vec<DelegateInfo>> {
         Some(
@@ -327,6 +330,7 @@ mod tests {
         let scraper = EuParliamentScraper::default();
         let ids = scraper.all_mep_ids().await.unwrap();
         assert!(ids.len() > 3000);
+        dbg!(ids.len());
     }
 
     #[tokio::test]

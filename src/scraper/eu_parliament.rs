@@ -16,6 +16,7 @@
 
 pub mod delegates;
 pub mod parties;
+pub mod plenary;
 pub mod proposals;
 pub mod voteable;
 pub mod votes;
@@ -23,6 +24,7 @@ pub mod votes;
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
+use chrono::Datelike;
 use reqwest::{Client, Method};
 use serde_json::Value;
 use tokio::sync::RwLock;
@@ -32,13 +34,14 @@ use crate::{
     error::ScraperError,
     http_client,
     request::request,
-    Scraper,
+    today, GeneralScrapeInfo, Scraper,
 };
 
 #[derive(Debug, Clone)]
 pub struct EuParliamentScraper {
     client: Client,
     pub cache_config: CacheConfig,
+    pub scrape_info: GeneralScrapeInfo,
     pub delegate_seats: Arc<RwLock<Option<HashMap<u64, u64>>>>,
 }
 
@@ -48,6 +51,11 @@ impl Default for EuParliamentScraper {
             client: http_client().unwrap(),
             cache_config: Default::default(),
             delegate_seats: Default::default(),
+            scrape_info: GeneralScrapeInfo {
+                gp: vec![today().year().to_string()],
+                council_type: vec![],
+                ..Default::default()
+            },
         }
     }
 }
@@ -75,6 +83,14 @@ impl Scraper for EuParliamentScraper {
 
     async fn cache(&self, _path: &str) -> Result<Value, ScraperError> {
         unimplemented!()
+    }
+
+    fn scrape_info(&self) -> &GeneralScrapeInfo {
+        &self.scrape_info
+    }
+
+    fn scrape_info_mut(&mut self) -> &mut GeneralScrapeInfo {
+        &mut self.scrape_info
     }
 }
 

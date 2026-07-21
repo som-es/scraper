@@ -312,7 +312,7 @@ fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
     })
 }
 
-fn extract_documents_from_doc(raw: &Value) -> Vec<Document> {
+pub(crate) fn extract_documents_from_doc(raw: &Value) -> Vec<Document> {
     let title = raw["title_dcterms"]["en"]
         .as_str()
         .unwrap_or_default()

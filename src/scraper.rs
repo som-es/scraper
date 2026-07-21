@@ -92,6 +92,9 @@ pub trait Scraper {
     }
 
     fn cache_config(&self) -> &CacheConfig;
+
+    fn scrape_info(&self) -> &GeneralScrapeInfo;
+    fn scrape_info_mut(&mut self) -> &mut GeneralScrapeInfo;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -205,5 +208,13 @@ impl Scraper for AustriaScraper {
 
     fn cache_config(&self) -> &CacheConfig {
         &self.cache_config
+    }
+
+    fn scrape_info(&self) -> &GeneralScrapeInfo {
+        &self.scrape_info
+    }
+
+    fn scrape_info_mut(&mut self) -> &mut GeneralScrapeInfo {
+        &mut self.scrape_info
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use reqwest::StatusCode;
 use thiserror::Error;
@@ -38,6 +38,9 @@ pub enum ScraperError {
 
     #[error("Encounterd invalid proposal information from API")]
     InvalidProposalInfoError,
+
+    #[error("Too many requests, retry after")]
+    TooManyRequests(Option<Duration>),
 
     #[error("Could not parse proposal information from API")]
     ProposalParseError,

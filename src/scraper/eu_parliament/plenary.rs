@@ -229,12 +229,12 @@ impl Plenar for EuParliamentScraper {
             parse_plenary_sitting(&raw).ok_or(ScraperError::PlenarGegenstandParseError)?;
 
         let mut info = sitting_to_plenar_info(&sitting);
-        let speeches = self
-            .get_sitting_speeches(sitting.date)
-            .await
-            .unwrap_or_default();
-        info.debates = self.plenary_debates(&speeches).await;
-        info.absences = self.sitting_absences(&sitting).await;
+        // let speeches = self
+        //     .get_sitting_speeches(sitting.date)
+        //     .await
+        //     .unwrap_or_default();
+        // info.debates = self.plenary_debates(&speeches).await;
+        // info.absences = self.sitting_absences(&sitting).await;
         Ok(info)
     }
 }
@@ -381,7 +381,16 @@ pub fn parse_plenary_sitting(raw: &Value) -> Option<PlenarySitting> {
         .as_str()
         .or_else(|| raw["id"].as_str().map(last_path_segment))?
         .to_string();
-    let date = NaiveDate::parse_from_str(raw["activity_date"].as_str()?, "%Y-%m-%d").ok()?;
+    let date = NaiveDate::parse_from_str(
+        raw["activity_date"].as_str().or_else(|| {
+            raw["activity_start_date"]
+                .as_str()
+                .map(|raw| raw.split('T').next())
+                .flatten()
+        })?,
+        "%Y-%m-%d",
+    )
+    .ok()?;
 
     Some(PlenarySitting {
         id,

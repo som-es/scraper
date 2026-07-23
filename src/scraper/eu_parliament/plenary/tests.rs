@@ -368,6 +368,16 @@ async fn live_get_plenary_sitting_by_date_2024_04_25() {
 }
 
 #[tokio::test]
+async fn live_get_plenary_sitting_by_date_2019_01_14() {
+    let scraper = EuParliamentScraper::default();
+    let date = NaiveDate::from_ymd_opt(2019, 1, 14).unwrap();
+    let sitting = scraper.get_plenary_sitting_by_date(date).await.unwrap();
+
+    assert_eq!(sitting.id, "MTG-PL-2019-01-14");
+    assert_eq!(sitting.date, date);
+}
+
+#[tokio::test]
 async fn live_get_sitting_speeches_2024_01_15() {
     let scraper = EuParliamentScraper::default();
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();

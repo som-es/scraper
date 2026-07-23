@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::{
     caching::CacheConfig,
     error::ScraperError,
-    plenar::{Absences, Debate, DebateInfo, Plenar, PlenarInfo},
+    plenar::{Absence, Absences, Debate, DebateInfo, Plenar, PlenarInfo},
 };
 
 use super::{
@@ -174,7 +174,14 @@ impl EuParliamentScraper {
         });
 
         Some(Absences {
-            absences: sitting.excused_ids.iter().map(u64::to_string).collect(),
+            absences: sitting
+                .excused_ids
+                .iter()
+                .map(|id| Absence {
+                    name: "".into(),
+                    id: Some(*id as u32),
+                })
+                .collect(),
             source_document,
         })
     }
@@ -234,7 +241,7 @@ impl Plenar for EuParliamentScraper {
         //     .await
         //     .unwrap_or_default();
         // info.debates = self.plenary_debates(&speeches).await;
-        // info.absences = self.sitting_absences(&sitting).await;
+        info.absences = self.sitting_absences(&sitting).await;
         Ok(info)
     }
 }

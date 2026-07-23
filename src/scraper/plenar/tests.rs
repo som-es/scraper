@@ -244,7 +244,14 @@ async fn test_absences_for_xxvii_247() {
             "Julia Seidl"
         ]
         .as_slice(),
-        &plenar_info.absences.unwrap().clone().absences
+        &plenar_info
+            .absences
+            .unwrap()
+            .clone()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>()
     );
 }
 
@@ -265,7 +272,7 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_85() {
             .clone()
             .absences
             .iter()
-            .map(|x| x.as_str())
+            .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
         vec![
             "Andreas Kollross",
@@ -291,7 +298,7 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_19() {
             .unwrap()
             .absences
             .iter()
-            .map(|x| x.as_str())
+            .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
         vec![
             "Hermann Gahr",
@@ -351,7 +358,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_78_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Marie-Christine Giuliani-Sterrer".to_string(),
             "Martin Graf".to_string(),
@@ -387,7 +401,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Giuliani-Sterrer".to_string(),
             "Herbert".to_string(),
@@ -419,7 +440,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_6_absences() {
 
     dbg!(&plenar);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Marie-Christine Giuliani-Sterrer".to_string(),
             "Werner Herbert".to_string(),
@@ -446,7 +474,14 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_12_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Moser".to_string(),
             "Schenk".to_string(),
@@ -471,7 +506,14 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_14_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Heinzl".to_string(),
             "Stefan".to_string(),
@@ -499,7 +541,14 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Bayr".to_string(),
             "Auer".to_string(),
@@ -523,7 +572,14 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Faul".to_string(),
             "Praßl".to_string(),
@@ -545,7 +601,14 @@ async fn test_get_plenar_gegenstand_xxiii_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Hagenhofer".to_string(),
             "Kräuter".to_string(),
@@ -574,7 +637,14 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Gabriela Moser".to_string(),
             "Kurt Grünewald".to_string(),
@@ -595,7 +665,14 @@ async fn test_get_plenar_gegenstand_xxi_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Fasslabend".to_string(),
             "Amon".to_string(),
@@ -620,7 +697,14 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Brinek".to_string(),
             "Frieser".to_string(),
@@ -646,7 +730,14 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_110_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Aumayr".to_string(),
             "Schaffenrath".to_string(),
@@ -669,7 +760,14 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_110_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Großruck".to_string(),
             "Wimmer".to_string(),
@@ -689,7 +787,14 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_110_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Keck".to_string(),
             "Schüssel".to_string(),
@@ -710,7 +815,14 @@ async fn test_get_plenar_gegenstand_xxvi_nrsitz_69_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Barbara Krenn".to_string(),
             "Nico Marchetti".to_string(),
@@ -733,7 +845,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_69_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Manuel Litzke".to_string(),
             "Reinhold Maier".to_string(),
@@ -761,7 +880,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_41_absences() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec!["Elisabeth Heiß".to_string(), "Reinhold Binder".to_string(),]
     );
     println!("plenar: {plenar:?}");
@@ -1935,7 +2061,14 @@ async fn test_plenar_absences_br_brsitz_827() {
         .unwrap();
 
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar
+            .absences
+            .clone()
+            .unwrap()
+            .absences
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Efgani Dönmez".to_string(),
             "Adelheid Ebner".to_string(),

@@ -4,8 +4,10 @@ use common_scrapes::{Document, FileType};
 use regex::Regex;
 
 use crate::{
-    caching::CacheConfig, filter::filter_name_extraction, plenar::Absences, unique_titles,
-    TextExtractor,
+    caching::CacheConfig,
+    filter::filter_name_extraction,
+    plenar::{Absence, Absences},
+    unique_titles, TextExtractor,
 };
 
 pub(super) async fn extract_absences(
@@ -33,7 +35,7 @@ pub(super) async fn extract_absences(
 async fn extract_absences_from_document(
     doc: &Document,
     cache_config: &CacheConfig,
-) -> Option<Vec<String>> {
+) -> Option<Vec<Absence>> {
     let mut extractor = TextExtractor::new(cache_config.clone());
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
@@ -41,7 +43,7 @@ async fn extract_absences_from_document(
     extract_absences_from_text(&text)
 }
 
-fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
+fn extract_absences_from_text(text: &str) -> Option<Vec<Absence>> {
     // remove this later -> only for testing purposes
     // if text.len() < 50000 {
     //     return None;
@@ -241,6 +243,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
     Some(
         filter_name_extraction(info.iter().map(|x| x.as_str()))
             .filter(|x| !x.is_empty())
+            .map(|name| Absence { name, id: None })
             .collect::<Vec<_>>(),
     )
 }
@@ -249,7 +252,10 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 mod tests {
     use common_scrapes::Document;
 
-    use crate::{caching::CacheConfig, plenar::absences::extract_absences_from_document};
+    use crate::{
+        caching::CacheConfig,
+        plenar::{absences::extract_absences_from_document, Absence},
+    };
 
     #[tokio::test]
     async fn test_absences_extraction_from_doc() {
@@ -265,7 +271,7 @@ mod tests {
             .await
             .unwrap();
         println!("absences: {absences:?}");
-        assert_eq!(&absences, &Vec::<String>::new());
+        assert_eq!(&absences, &Vec::<Absence>::new());
     }
 
     //
@@ -282,7 +288,14 @@ mod tests {
         let absences = extract_absences_from_document(&doc, &CacheConfig::default())
             .await
             .unwrap();
-        assert_eq!(absences, vec!["Wilhelm Molterer".to_string()]);
+
         println!("absences: {absences:?}");
+        assert_eq!(
+            absences
+                .into_iter()
+                .map(|absence| absence.name)
+                .collect::<Vec<_>>(),
+            vec!["Wilhelm Molterer".to_string()]
+        );
     }
 }

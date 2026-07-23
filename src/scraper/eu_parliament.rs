@@ -25,6 +25,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::Datelike;
+use common_scrapes::eu_hemicycle::{load_hemicycle, HemicycleLayout};
+use once_cell::sync::Lazy;
 use reqwest::{Client, Method};
 use serde_json::Value;
 use tokio::sync::RwLock;
@@ -59,6 +61,8 @@ impl Default for EuParliamentScraper {
         }
     }
 }
+
+pub static STRASBOURG_HEMICYCLE: Lazy<HemicycleLayout> = Lazy::new(|| load_hemicycle());
 
 #[async_trait]
 impl Scraper for EuParliamentScraper {

@@ -14,6 +14,21 @@ pub struct HemicycleLayout {
     pub center_px: [f64; 2],
     pub frame_deg: FrameDeg,
     pub circles: Vec<Circle>,
+    pub seats: Vec<Seat>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Seat {
+    pub seat: u32,
+    pub circle: u32,
+    pub index_in_circle: u32,
+    pub slot_in_circle_with_gaps: u32,
+    pub block_in_circle: u32,
+    pub status: String,
+    pub color: String,
+    pub x_px: f64,
+    pub y_px: f64,
+    pub angle_deg: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

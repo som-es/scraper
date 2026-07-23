@@ -10,6 +10,7 @@ use crate::{
     caching::{disk_caching, get_disk_cache_json},
     delegates::{DelegateInfo, DelegateScraper},
     error::ScraperError,
+    eu_parliament::STRASBOURG_HEMICYCLE,
     request::request,
     Scraper,
 };
@@ -203,9 +204,12 @@ fn raw_mep_into_delegate(
         constituency,
         council: Some("ep".to_string()),
         divisions: None,
-        seat: seat_id.map(|seat_id| Seat {
-            row: *seat_id as u16,
-            col: 0,
+        seat: seat_id.map(|seat_id| {
+            let seat = &STRASBOURG_HEMICYCLE.seats[*seat_id as usize - 1];
+            Seat {
+                row: seat.circle as u16,
+                col: seat.slot_in_circle_with_gaps as u16,
+            }
         }),
         contact: Contact {
             mail,

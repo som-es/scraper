@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Reference, SpeechTextInfo};
@@ -8,6 +10,7 @@ use serde_json::Value;
 use crate::{
     caching::CacheConfig,
     error::ScraperError,
+    eu_parliament::votes::reference_from_report,
     language::{Language, Text},
     plenar::{Absence, Absences, Debate, DebateInfo, Plenar, PlenarInfo},
     text_utils::remove_paran_contents,
@@ -320,16 +323,6 @@ fn speech_to_plenar_speech(speech: Speech) -> PlenarSpeech {
     }
 }
 
-fn reference_from_report(reference: &str) -> Option<Reference> {
-    let regex = Regex::new(r"^([A-Z]+)(\d+)-(\d+)/(\d{4})$").unwrap();
-    let captures = regex.captures(reference)?;
-    Some(Reference {
-        gp: captures.get(2)?.as_str().to_string(),
-        ityp: captures.get(1)?.as_str().to_string(),
-        inr: captures.get(3)?.as_str().parse().ok()?,
-    })
-}
-
 fn attendance_document_from_raw(raw: &Value) -> Option<Document> {
     let documents = extract_documents_from_doc(raw);
     let mut document = documents
@@ -345,17 +338,22 @@ fn attendance_document_from_raw(raw: &Value) -> Option<Document> {
     document.title = "attendance".to_string();
     Some(document)
 }
-
 pub fn speeches_by_agenda_item(speeches: &[Speech]) -> Vec<(String, Vec<Speech>)> {
-    let mut grouped: Vec<(String, Vec<Speech>)> = Vec::new();
+    let mut grouped: HashMap<&str, Vec<Speech>> = HashMap::new();
     for speech in speeches {
-        let key = speech.agenda_item_id.clone().unwrap_or_default();
-        match grouped.iter_mut().find(|(existing, _)| *existing == key) {
-            Some((_, bucket)) => bucket.push(speech.clone()),
-            None => grouped.push((key, vec![speech.clone()])),
-        }
+        let Some(key) = speech.agenda_item_id.as_deref() else {
+            continue;
+        };
+        grouped
+            .entry(key)
+            .or_insert_with(Vec::new)
+            .push(speech.clone());
     }
+
     grouped
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect()
 }
 
 fn parse_dt(value: &Value) -> Option<DateTime<FixedOffset>> {

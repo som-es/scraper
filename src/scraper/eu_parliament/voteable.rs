@@ -1,7 +1,10 @@
 use common_scrapes::Proposal;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{error::ScraperError, eu_parliament::votes::Vote};
+use crate::{
+    error::ScraperError,
+    eu_parliament::votes::{Vote, Votes},
+};
 
 use super::{votes::EuRollCallVote, EuParliamentScraper};
 
@@ -19,13 +22,13 @@ use super::{votes::EuRollCallVote, EuParliamentScraper};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Voteable {
     pub proposal: Proposal,
-    pub votes: Vec<Vote>,
+    pub votes: Votes,
 }
 
 impl Voteable {
     #[inline]
     pub fn has_votes(&self) -> bool {
-        !self.votes.is_empty()
+        !self.votes.votes.is_empty()
     }
 }
 
@@ -52,9 +55,9 @@ mod tests {
 
         assert_eq!(voteable.proposal.ityp, "BUD");
         assert!(voteable.has_votes());
-        assert_eq!(voteable.votes.len(), 1);
+        assert_eq!(voteable.votes.votes.len(), 1);
         assert_eq!(
-            voteable.votes[0]
+            voteable.votes.votes[0]
                 .meta
                 .as_ref()
                 .unwrap()
@@ -91,9 +94,18 @@ mod tests {
 
         assert_eq!(voteable.proposal.ityp, "INI");
         assert!(voteable.has_votes());
-        assert_eq!(voteable.votes.len(), 1);
-
-        let meta = voteable.votes[0].meta.as_ref().unwrap();
+        assert_eq!(voteable.votes.votes.len(), 1);
+        /*
+        * [
+            "2025/2211(INI)",
+            "A10-0167/2026",
+            "TA10-0270/2026",
+        ]
+        *
+        */
+        dbg!(&voteable.proposal);
+        let meta = voteable.votes.votes[0].meta.as_ref().unwrap();
+        dbg!(&meta);
         assert_eq!(meta.voting_id, 194869);
         assert_eq!(meta.favor_count, Some(366));
         assert_eq!(meta.against_count, Some(192));
@@ -118,11 +130,15 @@ mod tests {
                         println!("failed on procedure: {procedure:?} because of {e:?}")
                     }
                     Ok(e) => {
-                        if e.votes.iter().any(|vote| vote.is_main.unwrap_or_default()) {
+                        if e.votes
+                            .votes
+                            .iter()
+                            .any(|vote| vote.is_main.unwrap_or_default())
+                        {
                             println!("procedure has main votes {procedure:?}");
                             prods_with_votes_main += 1;
                         }
-                        if e.votes.is_empty() {
+                        if e.votes.votes.is_empty() {
                             // println!("procedure has no votes {procedure:?}")
                         } else {
                             prods_with_votes += 1;
@@ -222,6 +238,7 @@ mod tests {
         );
 
         let vote = voteable
+            .votes
             .votes
             .iter()
             .find(|vote| vote.is_main == Some(true))

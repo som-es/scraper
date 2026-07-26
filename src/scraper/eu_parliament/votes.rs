@@ -1,7 +1,8 @@
 use chrono::NaiveDate;
-use common_scrapes::AcceptedState;
+use common_scrapes::{AcceptedState, Reference};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -73,6 +74,23 @@ pub struct Vote {
     pub is_main: Option<bool>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Votes {
+    pub votes: Vec<Vote>,
+    pub references: Vec<Reference>,
+}
+
+pub fn reference_from_report(reference: &str) -> Option<Reference> {
+    let regex = Regex::new(r"^([A-Z]+)(\d+)-(\d+)/(\d{4})$").unwrap();
+    let captures = regex.captures(reference)?;
+    Some(Reference {
+        gp: captures.get(2)?.as_str().to_string(),
+        ityp: captures.get(1)?.as_str().to_string(),
+        inr: captures.get(3)?.as_str().parse::<u32>().ok()?
+            + captures.get(4)?.as_str().parse::<u32>().ok()? * 10000,
+    })
+}
+
 const MAIN_VOTE_INDICATORS: [&str; 42] = [
     "draft council decision",
     "projet de decision du conseil",
@@ -128,10 +146,7 @@ impl EuParliamentScraper {
         format!("MTG-PL-{}", date.format("%Y-%m-%d"))
     }
 
-    pub async fn get_votes_for_proposal(
-        &self,
-        process_id: &str,
-    ) -> Result<Vec<Vote>, ScraperError> {
+    pub async fn get_votes_for_proposal(&self, process_id: &str) -> Result<Votes, ScraperError> {
         let raw_procedure = self
             .get_one_cached(&format!("procedures/{process_id}"))
             .await?;
@@ -140,7 +155,15 @@ impl EuParliamentScraper {
         let (year, inr_str) = process_id.split_once('-').unwrap_or((process_id, ""));
 
         let mut references = vec![format!("{year}/{inr_str}({ityp})")];
-        references.extend(super::proposals::report_references(&raw_procedure));
+        let report_references = super::proposals::report_references(&raw_procedure);
+
+        let parsed_references = report_references
+            .iter()
+            .flat_map(|reference| reference_from_report(reference))
+            .collect::<Vec<_>>();
+
+        references.extend(report_references);
+        dbg!(&references);
         let sitting_dates = super::proposals::plenary_sitting_dates(&raw_procedure);
 
         let mut votes = Vec::new();
@@ -212,7 +235,10 @@ impl EuParliamentScraper {
                 }));
             }
         }
-        Ok(votes)
+        Ok(Votes {
+            votes,
+            references: parsed_references,
+        })
     }
 
     async fn get_xml_data(
@@ -372,8 +398,8 @@ mod tests {
 
         dbg!(&votes);
 
-        assert_eq!(votes.len(), 1);
-        let vote = &votes[0];
+        assert_eq!(votes.votes.len(), 1);
+        let vote = &votes.votes[0];
         assert_eq!(
             vote.sitting_date,
             NaiveDate::from_ymd_opt(2024, 4, 24).unwrap()
@@ -391,8 +417,8 @@ mod tests {
 
         let votes = scraper.get_votes_for_proposal("2024-0021").await.unwrap();
 
-        assert_eq!(votes.len(), 2);
-        let vote = &votes[1];
+        assert_eq!(votes.votes.len(), 2);
+        let vote = &votes.votes[1];
         let meta = vote.meta.as_ref().unwrap();
         assert!(vote.is_main.unwrap());
         assert_eq!(meta.voting_id, 168997);
@@ -412,7 +438,7 @@ mod tests {
 
         let votes = scraper.get_votes_for_proposal("2024-2006").await.unwrap();
 
-        assert!(votes.iter().any(|vote| vote.is_main == Some(true)));
+        assert!(votes.votes.iter().any(|vote| vote.is_main == Some(true)));
         dbg!(votes);
         // assert_eq!(votes.len(), 1);
     }
@@ -422,7 +448,7 @@ mod tests {
         let scraper = EuParliamentScraper::default();
 
         let votes = scraper.get_votes_for_proposal("2026-2589").await.unwrap();
-        assert_eq!(votes.len(), 0);
+        assert_eq!(votes.votes.len(), 0);
     }
 
     #[tokio::test]
@@ -430,7 +456,7 @@ mod tests {
         let scraper = EuParliamentScraper::default();
 
         let votes = scraper.get_votes_for_proposal("2025-2145").await.unwrap();
-        assert!(!votes.is_empty())
+        assert!(!votes.votes.is_empty())
     }
 
     #[tokio::test]
@@ -453,7 +479,7 @@ mod tests {
                         println!("failed on procedure: {procedure:?} because of {e:?}")
                     }
                     Ok(e) => {
-                        if e.is_empty() {
+                        if e.votes.is_empty() {
                             println!("procedure has no votes {procedure:?}")
                         } else {
                             // println!("procedure has votes {procedure:?}");

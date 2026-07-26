@@ -257,7 +257,11 @@ fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
     let gp = participations
         .iter()
         .find_map(|p| p["parliamentary_term"].as_str())
-        .map(|term| last_path_segment(term).to_string())
+        .map(|term| {
+            last_path_segment(term)
+                .trim_start_matches("ep-")
+                .to_string()
+        })
         .unwrap_or_else(|| year.to_string());
 
     let issuer_ids = participations

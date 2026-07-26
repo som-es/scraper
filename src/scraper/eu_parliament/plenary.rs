@@ -8,7 +8,9 @@ use serde_json::Value;
 use crate::{
     caching::CacheConfig,
     error::ScraperError,
+    language::{Language, Text},
     plenar::{Absence, Absences, Debate, DebateInfo, Plenar, PlenarInfo},
+    text_utils::remove_paran_contents,
 };
 
 use super::{
@@ -46,6 +48,9 @@ pub struct Speech {
     pub verbatim_doc_id: Option<String>,
     pub original_language: Option<String>,
     pub agenda_item_id: Option<String>,
+    pub numbering: u64,
+    pub speech_texts: Vec<Text>,
+    pub ty: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,7 +102,10 @@ impl EuParliamentScraper {
 
     pub async fn get_sitting_speeches(&self, date: NaiveDate) -> Result<Vec<Speech>, ScraperError> {
         let rows = self
-            .get_all_pages("speeches", &format!("sitting-date={date}"))
+            .get_all_pages_cached(
+                "speeches",
+                &format!("sitting-date={date}&include-output=xml_fragment"),
+            )
             .await?;
         Ok(rows.iter().flat_map(parse_speech).collect())
     }
@@ -135,7 +143,10 @@ impl EuParliamentScraper {
             };
             debates.push(Debate {
                 info: DebateInfo { about, references },
-                speeches: item_speeches.iter().map(speech_to_plenar_speech).collect(),
+                speeches: item_speeches
+                    .into_iter()
+                    .map(speech_to_plenar_speech)
+                    .collect(),
             });
         }
         debates
@@ -236,11 +247,11 @@ impl Plenar for EuParliamentScraper {
             parse_plenary_sitting(&raw).ok_or(ScraperError::PlenarGegenstandParseError)?;
 
         let mut info = sitting_to_plenar_info(&sitting);
-        // let speeches = self
-        //     .get_sitting_speeches(sitting.date)
-        //     .await
-        //     .unwrap_or_default();
-        // info.debates = self.plenary_debates(&speeches).await;
+        let speeches = self
+            .get_sitting_speeches(sitting.date)
+            .await
+            .unwrap_or_default();
+        info.debates = self.plenary_debates(&speeches).await;
         info.absences = self.sitting_absences(&sitting).await;
         Ok(info)
     }
@@ -276,30 +287,23 @@ fn sitting_to_plenar_info(sitting: &PlenarySitting) -> PlenarInfo {
     }
 }
 
-fn speech_to_plenar_speech(speech: &Speech) -> PlenarSpeech {
+fn speech_to_plenar_speech(speech: Speech) -> PlenarSpeech {
     let duration_in_seconds = match (speech.start, speech.end) {
         (Some(start), Some(end)) => u32::try_from((end - start).num_seconds()).ok(),
         _ => None,
     };
 
     PlenarSpeech {
-        ty: speech.role.clone().unwrap_or_default(),
         duration_in_seconds,
         start: speech.start.map(|start| start.time()),
         speech: common_scrapes::Speech {
             delegate_id: speech.speaker_id.unwrap_or_default(),
             delegate_display_name: String::new(),
             opinion: Opinion::None,
-            spoken_text_html_urls: speech
-                .verbatim_doc_id
-                .iter()
-                .map(|doc_id| SpeechTextInfo {
-                    site_start: None,
-                    site_end: None,
-                    document_url: format!("{}/documents/{doc_id}", EuParliamentScraper::BASE_URL),
-                })
-                .collect(),
+            spoken_text_html_urls: vec![],
+            speech_texts: Some(speech.speech_texts),
         },
+        ty: speech.ty.unwrap_or_else(|| "none".into()),
     }
 }
 
@@ -455,6 +459,8 @@ pub fn parse_speech(raw: &Value) -> Option<Speech> {
         .as_array()
         .and_then(|records| records.first())
         .unwrap_or(recorded);
+
+    let numbering = record.get("numbering")?.as_u64()?;
     let verbatim_doc_id = record["id"]
         .as_str()
         .or_else(|| record.as_str())
@@ -464,6 +470,34 @@ pub fn parse_speech(raw: &Value) -> Option<Speech> {
         .and_then(|langs| langs.first())
         .and_then(|lang| lang.as_str())
         .map(|lang| last_path_segment(lang).to_string());
+
+    let mut ty = None;
+    let xml_fragments = record.get("api:xmlFragment");
+    let speech_texts = xml_fragments.map(|xml_fragment| {
+        Language::ALL
+            .into_iter()
+            .flat_map(|language| {
+                let xml_text = xml_fragment.get(language.as_str())?.as_str()?;
+                let (removed_content, text) = remove_paran_contents(&xml_text, '<', '>');
+                let is_oral_statment = removed_content
+                    .iter()
+                    .any(|content| content.content.contains("oralStatements"));
+
+                let is_written_statement = removed_content
+                    .iter()
+                    .any(|content| content.content.contains("writtenStatements"));
+
+                if is_oral_statment {
+                    ty = Some("wm")
+                }
+                if is_written_statement {
+                    ty = Some("ws")
+                }
+
+                Some(Text { language, text })
+            })
+            .collect::<Vec<_>>()
+    });
 
     let agenda_item_id = raw["inverse_consists_of"]
         .as_array()
@@ -483,6 +517,9 @@ pub fn parse_speech(raw: &Value) -> Option<Speech> {
         verbatim_doc_id,
         original_language,
         agenda_item_id,
+        speech_texts: speech_texts.unwrap_or_default(),
+        numbering,
+        ty: ty.map(|ty| ty.to_string()),
     })
 }
 

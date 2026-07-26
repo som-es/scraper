@@ -1351,6 +1351,7 @@ async fn test_speech_herbert_scheibner() {
         delegate_id: 1604,
         delegate_display_name: "Herbert Scheibner (B)".into(),
         opinion: Opinion::Against,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(96),
             site_end: None,
@@ -1477,6 +1478,7 @@ async fn test_plenar_speech_diesner_martina() {
         delegate_id: 16218,
         delegate_display_name: "Martina Diesner-Wais (V)".into(),
         opinion: Opinion::Infavor,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: None,
             site_end: None,
@@ -1514,6 +1516,7 @@ async fn test_plenar_speech_paul_stich() {
             delegate_id: 30707,
             delegate_display_name: "Paul Stich (S)".into(),
             opinion: Opinion::Infavor,
+            speech_texts: None,
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: None,
                 site_end: None,
@@ -1581,6 +1584,7 @@ async fn test_plenar_speech_dieter_brosz_nrsitz_117() {
     let speech = Speech {
         delegate_id: 8239,
         delegate_display_name: "Dieter Brosz, Msc (G)".into(),
+        speech_texts: None,
         opinion: Opinion::Against,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(15),
@@ -1836,6 +1840,7 @@ async fn test_elisabeth_gehrer_speech() {
         delegate_id: 3131,
         delegate_display_name: "BM Elisabeth Gehrer (V)".into(),
         opinion: Opinion::Other("Regierungsbank".into()),
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(29),
             site_end: Some(31),
@@ -1904,6 +1909,7 @@ async fn test_speech_fritz_neugebauer() {
         delegate_id: 3604,
         delegate_display_name: "Fritz Neugebauer (V)".into(),
         opinion: Opinion::Infavor,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(46),
             site_end: Some(48),
@@ -1963,6 +1969,7 @@ async fn test_speech_beate_schasching() {
         delegate_id: 8181,
         delegate_display_name: "Beate Schasching (S)".into(),
         opinion: Opinion::Infavor,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(48),
             site_end: Some(49),

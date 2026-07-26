@@ -1,7 +1,7 @@
 use chrono::NaiveTime;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::Opinion;
+use crate::{language::Text, Opinion};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct PlenarSpeech {
@@ -24,4 +24,5 @@ pub struct Speech {
     pub delegate_display_name: String,
     pub opinion: Opinion,
     pub spoken_text_html_urls: Vec<SpeechTextInfo>,
+    pub speech_texts: Option<Vec<Text>>,
 }

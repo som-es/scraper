@@ -13,3 +13,4 @@ pub use speeches::*;
 mod dates;
 
 pub mod eu_hemicycle;
+pub mod language;

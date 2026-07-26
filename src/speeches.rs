@@ -99,6 +99,7 @@ pub fn extract_speech(speech: &Value) -> Option<Speech> {
         delegate_display_name,
         opinion,
         spoken_text_html_urls,
+        speech_texts: None,
     })
 }
 

@@ -288,6 +288,7 @@ impl LegislativeInitiatives for AustriaScraper {
                         delegate_display_name: speech.delegate_display_name,
                         opinion: speech.opinion.invert(),
                         spoken_text_html_urls: speech.spoken_text_html_urls,
+                        speech_texts: None,
                     })
                     .collect();
             }

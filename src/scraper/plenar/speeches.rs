@@ -110,6 +110,7 @@ pub(super) fn extract_speeches(past_debates: &[Value]) -> Vec<(DebateInfo, Vec<P
                                 delegate_display_name: String::new(),
                                 opinion: Opinion::None,
                                 spoken_text_html_urls: vec![],
+                                speech_texts: None,
                             },
                             ty,
                             duration_in_seconds,
@@ -141,6 +142,7 @@ mod tests {
             delegate_id: 51569,
             delegate_display_name: "Edith Mühlberghuber (F)".into(),
             opinion: Against,
+            speech_texts: None,
             spoken_text_html_urls: vec![
                 SpeechTextInfo {
                     site_start: Some(
@@ -191,7 +193,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_speech_fit_bmff_susanne_raab() {
-        let speech =  PlenarSpeech {ty:"rb".into(),duration_in_seconds:Some(242,),speech:Speech{delegate_id:6486,delegate_display_name:"BM MMag. Dr. Susanne Raab (V)".into(),opinion:Other("Regierungsbank".into(),),spoken_text_html_urls:vec![SpeechTextInfo{site_start:Some(281,),site_end:Some(283,),document_url:"https://www.parlament.gv.at/dokument/XXVII/NRSITZ/241/fnameorig_1629737.html#RU_310851".into(),},],}, start: None };
+        let speech =  PlenarSpeech {
+            ty:"rb".into(),duration_in_seconds:Some(242,),speech:Speech{
+
+                speech_texts: None,
+                delegate_id:6486,delegate_display_name:"BM MMag. Dr. Susanne Raab (V)".into(),opinion:Other("Regierungsbank".into(),),spoken_text_html_urls:vec![SpeechTextInfo{site_start:Some(281,),site_end:Some(283,),document_url:"https://www.parlament.gv.at/dokument/XXVII/NRSITZ/241/fnameorig_1629737.html#RU_310851".into(),},],}, start: None };
 
         let mut extractor = TextExtractor::default();
         extractor.cache_config = CacheConfig {
@@ -223,6 +229,7 @@ mod tests {
             delegate_id: 14844,
             delegate_display_name: "Dr. Christoph Matznetter (S)".into(),
             opinion: Against,
+            speech_texts: None,
             spoken_text_html_urls: vec![
                 SpeechTextInfo {
                     site_start: Some(
@@ -260,6 +267,7 @@ mod tests {
             delegate_id: 1979,
             delegate_display_name: "Kira Grünberg (V)".into(),
             opinion: Infavor,
+            speech_texts: None,
             spoken_text_html_urls: vec![
                 SpeechTextInfo {
                     site_start: Some(
@@ -293,6 +301,7 @@ mod tests {
             delegate_id: 35908,
             delegate_display_name: "Katharina Kucharowits (S)".into(),
             opinion: Against,
+            speech_texts: None,
             spoken_text_html_urls: vec![
                 SpeechTextInfo {
                     site_start: Some(
@@ -333,6 +342,7 @@ mod tests {
             delegate_id: 5685,
             delegate_display_name: "Mag. Martina von Künsberg Sarre (N)".into(),
             opinion: Against,
+            speech_texts: None,
             spoken_text_html_urls: vec![
                 SpeechTextInfo {
                     site_start: Some(
@@ -365,6 +375,7 @@ mod tests {
             delegate_id: 5685,
             delegate_display_name: "August Wöginger".into(),
             opinion: Against,
+            speech_texts: None,
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(253),
                 site_end: Some(254),
@@ -654,6 +665,7 @@ mod tests {
             delegate_id: 5685,
             delegate_display_name: "Markus Marterbauer".into(),
             opinion: Against,
+            speech_texts: None,
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: Some(253),
                 site_end: Some(254),

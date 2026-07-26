@@ -1,8 +1,8 @@
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
-use crate::eu_parliament::EuParliamentScraper;
 use crate::error::ScraperError;
+use crate::eu_parliament::EuParliamentScraper;
 use crate::request::request_text;
 
 const OEIL_EXPORT_URL: &str = "https://oeil.secure.europarl.europa.eu/oeil/en/search/export/XML";

@@ -39,6 +39,11 @@ use crate::{
     today, GeneralScrapeInfo, Scraper,
 };
 
+const LANGUAGES: [&str; 24] = [
+    "es", "sl", "en", "de", "hu", "ro", "pt", "sv", "da", "fr", "pl", "et", "nl", "el", "hr", "lv",
+    "it", "fi", "cs", "lt", "ga", "mt", "bg", "sk",
+];
+
 #[derive(Debug, Clone)]
 pub struct EuParliamentScraper {
     client: Client,
@@ -147,9 +152,32 @@ impl EuParliamentScraper {
         Ok(all)
     }
 
+    pub async fn get_all_pages_cached(
+        &self,
+        path: &str,
+        query: &str,
+    ) -> Result<Vec<Value>, ScraperError> {
+        let cache_key = format!("/{path}/{query}");
+        if let Some(Value::Array(cached)) =
+            get_disk_cache_json(&cache_key, self.cache_config()).await
+        {
+            return Ok(cached);
+        }
+        let value = Value::Array(self.get_all_pages(path, query).await?);
+        if let Err(e) = disk_caching(&cache_key, value.to_string(), self.cache_config()).await {
+            log::warn!("could not cache {cache_key}: {e:?}");
+        }
+        let Value::Array(value) = value else { panic!() };
+        Ok(value)
+    }
+
     /// GETs a single-resource `path` and returns the first element of `data`.
     pub async fn get_one(&self, path: &str) -> Result<Value, ScraperError> {
-        let mut data = self.get_data(path, "").await?;
+        self.get_one_query(path, "").await
+    }
+
+    pub async fn get_one_query(&self, path: &str, query: &str) -> Result<Value, ScraperError> {
+        let mut data = self.get_data(path, query).await?;
         if data.is_empty() {
             return Err(ScraperError::NotFound);
         }

@@ -225,6 +225,10 @@ fn group_speeches_by_agenda_item_2024_01_15() {
             verbatim_doc_id: None,
             original_language: None,
             agenda_item_id: Some("MTG-PL-2024-01-15-PVCRE-ITM-14".into()),
+
+            numbering: 0,
+            speech_texts: vec![],
+            ty: None,
         },
         Speech {
             id: "MTG-PL-2024-01-15-OTH-2".into(),
@@ -238,6 +242,10 @@ fn group_speeches_by_agenda_item_2024_01_15() {
             verbatim_doc_id: None,
             original_language: None,
             agenda_item_id: Some("MTG-PL-2024-01-15-PVCRE-ITM-14".into()),
+
+            numbering: 0,
+            speech_texts: vec![],
+            ty: None,
         },
         Speech {
             id: "MTG-PL-2024-01-15-OTH-3".into(),
@@ -251,6 +259,9 @@ fn group_speeches_by_agenda_item_2024_01_15() {
             verbatim_doc_id: None,
             original_language: None,
             agenda_item_id: Some("MTG-PL-2024-01-15-PVCRE-ITM-1".into()),
+            numbering: 0,
+            speech_texts: vec![],
+            ty: None,
         },
     ];
 
@@ -304,9 +315,9 @@ fn report_reference_maps_into_common_reference() {
 #[test]
 fn speech_maps_into_common_plenar_speech() {
     let speech = parse_speech(&json(SPEECH_2024_01_15_OTH_10850000)).unwrap();
-    let mapped = speech_to_plenar_speech(&speech);
+    let mapped = speech_to_plenar_speech(speech.clone());
 
-    assert_eq!(mapped.ty, "SPEAKER");
+    assert_eq!(mapped.ty, "wm");
     assert_eq!(mapped.speech.delegate_id, 238639);
     assert_eq!(mapped.duration_in_seconds, Some(102));
     assert_eq!(mapped.speech.spoken_text_html_urls.len(), 1);
@@ -338,6 +349,8 @@ async fn live_get_plenar_2024_01_15() {
         common_scrapes::FileType::DigitalPDF
     );
     assert!(absences.source_document.link.ends_with("_en.pdf"));
+
+    dbg!(&info.debates[0]);
 }
 
 #[tokio::test]

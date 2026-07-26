@@ -225,7 +225,7 @@ fn group_speeches_by_agenda_item_2024_01_15() {
             verbatim_doc_id: None,
             original_language: None,
             agenda_item_id: Some("MTG-PL-2024-01-15-PVCRE-ITM-14".into()),
-
+            is_part_of: None,
             numbering: 0,
             speech_texts: vec![],
             ty: None,
@@ -242,10 +242,10 @@ fn group_speeches_by_agenda_item_2024_01_15() {
             verbatim_doc_id: None,
             original_language: None,
             agenda_item_id: Some("MTG-PL-2024-01-15-PVCRE-ITM-14".into()),
-
             numbering: 0,
             speech_texts: vec![],
             ty: None,
+            is_part_of: None,
         },
         Speech {
             id: "MTG-PL-2024-01-15-OTH-3".into(),
@@ -256,6 +256,7 @@ fn group_speeches_by_agenda_item_2024_01_15() {
             role: None,
             start: None,
             end: None,
+            is_part_of: None,
             verbatim_doc_id: None,
             original_language: None,
             agenda_item_id: Some("MTG-PL-2024-01-15-PVCRE-ITM-1".into()),
@@ -344,13 +345,26 @@ async fn live_get_plenar_2024_01_15() {
 
     let absences = info.absences.unwrap();
     assert!(!absences.absences.is_empty());
+
     assert_eq!(
         absences.source_document.ftype,
         common_scrapes::FileType::DigitalPDF
     );
     assert!(absences.source_document.link.ends_with("_en.pdf"));
 
-    dbg!(&info.debates[0]);
+    let debate = &info.debates[0];
+    let ps = &debate.speeches[0];
+    assert_eq!(ps.ty, "wm".to_string());
+    assert_eq!(
+        &ps.speech.spoken_text_html_urls[0],
+        &SpeechTextInfo {
+            site_start: None,
+            site_end: None,
+            document_url:
+                "https://www.europarl.europa.eu/doceo/document/CRE-9-2024-01-15-ITM-010_EN.html"
+                    .into()
+        }
+    );
 }
 
 #[tokio::test]

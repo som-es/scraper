@@ -39,6 +39,7 @@ pub struct PlenarySitting {
 pub struct Speech {
     pub id: String,
     pub sitting_date: NaiveDate,
+    pub is_part_of: Option<String>,
     pub title: Option<String>,
     pub speaker_id: Option<u64>,
     pub speaker_group: Option<String>,
@@ -293,6 +294,18 @@ fn speech_to_plenar_speech(speech: Speech) -> PlenarSpeech {
         _ => None,
     };
 
+    const DOC_URL: &str = "https://www.europarl.europa.eu/doceo/document/";
+
+    let spoken_text_html_urls = speech
+        .is_part_of
+        .map(|is_part_of| SpeechTextInfo {
+            document_url: format!("{DOC_URL}{is_part_of}_EN.html"), // TODO: mind language
+            site_start: None,
+            site_end: None,
+        })
+        .into_iter()
+        .collect::<Vec<_>>();
+
     PlenarSpeech {
         duration_in_seconds,
         start: speech.start.map(|start| start.time()),
@@ -300,7 +313,7 @@ fn speech_to_plenar_speech(speech: Speech) -> PlenarSpeech {
             delegate_id: speech.speaker_id.unwrap_or_default(),
             delegate_display_name: String::new(),
             opinion: Opinion::None,
-            spoken_text_html_urls: vec![],
+            spoken_text_html_urls,
             speech_texts: Some(speech.speech_texts),
         },
         ty: speech.ty.unwrap_or_else(|| "none".into()),
@@ -498,6 +511,10 @@ pub fn parse_speech(raw: &Value) -> Option<Speech> {
             })
             .collect::<Vec<_>>()
     });
+    let is_part_of = record["is_part_of"]
+        .as_str()
+        .or_else(|| record.as_str())
+        .map(|id| last_path_segment(id).to_string());
 
     let agenda_item_id = raw["inverse_consists_of"]
         .as_array()
@@ -507,6 +524,7 @@ pub fn parse_speech(raw: &Value) -> Option<Speech> {
 
     Some(Speech {
         id,
+        is_part_of,
         sitting_date,
         title: english_label(raw),
         speaker_id,

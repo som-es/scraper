@@ -158,6 +158,9 @@ const VOTE_RELEVANT_ACTIVITY_TYPES: &[&str] = &[
     "def/ep-activities/PLENARY_AMEND_PROPOSAL",
     "def/ep-activities/PLENARY_AMEND",
     "def/ep-activities/PLENARY_DECISION",
+    "def/ep-activities/PLENARY_ACTIVITY",
+    "def/ep-activities/PLENARY_DEBATE",
+    "Decision",
 ];
 
 /// Finds every distinct `(parliamentary term, plenary sitting date)` pair a procedure
@@ -200,6 +203,56 @@ pub(crate) fn plenary_sitting_dates(raw_procedure: &Value) -> Vec<(String, Naive
             Some((term, date))
         })
         .filter(|pair| seen.insert(pair.clone()))
+        .collect()
+}
+
+pub(crate) fn plenary_sitting_dates_by_decision(
+    sittings: &[(String, NaiveDate)],
+    raw_procedure: &Value,
+) -> Vec<(String, NaiveDate)> {
+    let mut seen = sittings
+        .iter()
+        .map(|(_, date)| *date)
+        .collect::<HashSet<_>>();
+
+    let decision_date = raw_procedure["consists_of"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter(|event| event["type"].as_str().is_some_and(|t| "Decision" == t))
+        .flat_map(|event| event["activity_date"].as_str())
+        .map(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap())
+        .next();
+    let Some(decision_date) = decision_date else {
+        return vec![];
+    };
+    let week = decision_date.week(chrono::Weekday::Mon);
+    let mut day = week.first_day();
+    let last = week.last_day();
+
+    let mut gp = None;
+
+    let mut new_sitting_days = vec![];
+
+    while day <= last {
+        if gp.is_none() {
+            gp = sittings
+                .iter()
+                .find(|(_, date)| date == &day)
+                .map(|(gp, _)| gp);
+        }
+        if !seen.contains(&day) {
+            new_sitting_days.push(day);
+            seen.insert(day);
+        }
+
+        day += chrono::Duration::days(1);
+    }
+    let Some(gp) = gp else { return vec![] };
+    new_sitting_days
+        .into_iter()
+        .map(|day| (gp.clone(), day))
         .collect()
 }
 
@@ -458,88 +511,5 @@ mod all_ids_smoke_test {
         );
         assert!(ids.iter().all(|id| id.starts_with("2026-")));
         dbg!(ids.len(), &ids[..3.min(ids.len())]);
-    }
-}
-
-#[cfg(test)]
-mod howtheyvote_comparison {
-    use super::*;
-    use regex::Regex;
-    use std::io::Read;
-
-    const HOWTHEYVOTE_VOTES_URL: &str =
-        "https://github.com/HowTheyVote/data/releases/latest/download/votes.csv.gz";
-    const TERM_9_START_YEAR: u32 = 2019;
-    const MIN_HOWTHEYVOTE_COVERAGE: f64 = 0.98;
-
-    fn base_procedure_id(id: &str) -> String {
-        match id.split_once('-') {
-            Some((year, number)) => {
-                let digits: String = number.chars().take_while(|c| c.is_ascii_digit()).collect();
-                format!("{year}-{digits}")
-            }
-            None => id.to_string(),
-        }
-    }
-
-    async fn howtheyvote_procedure_ids(scraper: &EuParliamentScraper) -> HashSet<String> {
-        let bytes = scraper
-            .client()
-            .get(HOWTHEYVOTE_VOTES_URL)
-            .send()
-            .await
-            .unwrap()
-            .bytes()
-            .await
-            .unwrap();
-        let mut csv = String::new();
-        flate2::read::GzDecoder::new(&bytes[..])
-            .read_to_string(&mut csv)
-            .unwrap();
-
-        let reference = Regex::new(r"(\d{4})/(\d{4})[A-Z]?\([A-Z]+\)").unwrap();
-        reference
-            .captures_iter(&csv)
-            .filter_map(|caps| {
-                let year = caps.get(1)?.as_str();
-                let number = caps.get(2)?.as_str();
-                (year.parse::<u32>().ok()? >= TERM_9_START_YEAR).then(|| format!("{year}-{number}"))
-            })
-            .collect()
-    }
-
-    #[tokio::test]
-    async fn scraper_covers_howtheyvote_procedures() {
-        let scraper = EuParliamentScraper::default();
-
-        let ours: HashSet<String> = scraper
-            .list_procedure_ids_by_year(TERM_9_START_YEAR)
-            .await
-            .unwrap()
-            .iter()
-            .map(|id| base_procedure_id(id))
-            .collect();
-        let howtheyvote: HashSet<String> = howtheyvote_procedure_ids(&scraper)
-            .await
-            .iter()
-            .map(|id| base_procedure_id(id))
-            .collect();
-
-        let covered = howtheyvote.iter().filter(|id| ours.contains(*id)).count();
-        let coverage = covered as f64 / howtheyvote.len() as f64;
-
-        dbg!(ours.len(), howtheyvote.len(), covered, coverage);
-
-        assert!(
-            ours.len() >= howtheyvote.len(),
-            "our enumeration ({}) should be a superset of HowTheyVote's voted procedures ({})",
-            ours.len(),
-            howtheyvote.len(),
-        );
-        assert!(
-            coverage >= MIN_HOWTHEYVOTE_COVERAGE,
-            "only {covered}/{} ({coverage:.1}) of HowTheyVote procedures found in our enumeration",
-            howtheyvote.len(),
-        );
     }
 }

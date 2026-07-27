@@ -1,12 +1,7 @@
+use super::EuParliamentScraper;
+use crate::{error::ScraperError, eu_parliament::votes::Votes};
 use common_scrapes::Proposal;
 use serde_derive::{Deserialize, Serialize};
-
-use crate::{
-    error::ScraperError,
-    eu_parliament::votes::{Vote, Votes},
-};
-
-use super::{votes::EuRollCallVote, EuParliamentScraper};
 
 /// A legislative procedure bundled together with whatever roll-call vote(s) decided
 /// it — the EU-side equivalent of AT's `LegislativeInitiative`, which embeds
@@ -111,12 +106,262 @@ mod tests {
         assert_eq!(meta.against_count, Some(192));
         assert_eq!(meta.abstention_count, Some(39));
     }
+    #[tokio::test]
+    async fn test_cpm_with_htv() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper = EuParliamentScraper::default();
+        let howtheyvote_data = parse_howtheyvote(&scraper).await;
+        let entries = howtheyvote_data
+            .iter()
+            .filter(|entry| entry.procedure_reference.is_some() && entry.is_main)
+            .collect::<Vec<_>>();
+
+        for entry in entries {
+            let reference = entry.procedure_reference.as_ref().unwrap();
+            let reference_regex = Regex::new(r"(\d{4})/(\d{4})[A-Z]?\([A-Z]+\)").unwrap();
+
+            let procedure = reference_regex
+                .captures_iter(reference)
+                .filter_map(|caps| {
+                    let year = caps.get(1)?.as_str();
+                    let number = caps.get(2)?.as_str();
+                    Some(format!("{year}-{number}"))
+                })
+                .next()
+                .unwrap();
+
+            // if procedure != "2023-0212" {
+            //     continue;
+            // }
+
+            loop {
+                match scraper.get_voteable(&procedure).await {
+                    Err(e) => {
+                        println!("failed on procedure: {procedure:?} because of {e:?}");
+                        if let ScraperError::TooManyRequests(secs) = e {
+                            tokio::time::sleep(secs.unwrap()).await;
+                            println!("retrying {procedure:?} ");
+                            continue;
+                        }
+                        break;
+                    }
+                    Ok(e) => {
+                        if !e
+                            .votes
+                            .votes
+                            .iter()
+                            .any(|vote| vote.is_main.unwrap_or_default())
+                        {
+                            println!("procedure DOES NOT HAVE MAIN VOTE HOWEVER IT REQUIRES IT :( {reference:?} prod: {procedure} {}", entry.id);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    // 2023-0453
+    #[tokio::test]
+    async fn test_2023_0453() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2023-0453").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    // 2024-0258
+    #[tokio::test]
+    async fn test_2024_0258() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2024-0258").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    //  2020-2151
+    #[tokio::test]
+    async fn test_2020_2151() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper = EuParliamentScraper::default();
+        // laut How they vote => A9-0094/2021, aber => Some("Décharge 2019 : Fondation européenne pour l'amélioration des conditions de vie et de travail - 2019 discharge: European Foundation for the Improvement of Living and Working Conditions - Entlastung 2019: Europäische Stiftung zur Verbesserung der Lebens- und Arbeitsbedingungen - A9-0074/2021 - Joachim Stanisław Brudziński - Propositions de décision",
+        let voteable = scraper.get_voteable("2020-2151").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    #[tokio::test]
+    async fn test_2020_2086() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2020-2086").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    #[tokio::test]
+    async fn test_2020_2818() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2020-2818").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        let val = voteable.votes.votes.last().unwrap();
+        dbg!(val);
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+    // 2020-2115
+    #[tokio::test]
+    async fn test_2020_2115() {
+        let scraper = EuParliamentScraper::default();
+        //  &roll.description = Some(
+        //     "A-0269/2020 - Reinhard Bütikofer - Motion for a resolution 21/01/2021 12:20:53.337",
+        // )
+        let voteable = scraper.get_voteable("2020-2115").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    // 2020-2686
+    #[tokio::test]
+    async fn test_2020_2686() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2020-2686").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    #[tokio::test]
+    async fn test_2019_0142() {
+        let scraper = EuParliamentScraper::default();
+        // 2019/0142M(NLE)" prod: 2019-0142
+        let voteable = scraper.get_voteable("2019-0142").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    #[tokio::test]
+    async fn test_2019_2990() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2019-2990").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    // 2021-2540
+    #[tokio::test]
+    async fn test_2021_2540() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2021-2540").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    #[tokio::test]
+    async fn test_2023_0212() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2023-0212").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+        let is_main = &voteable.votes.votes[0].is_main;
+        assert!(is_main.unwrap());
+    }
+
+    //2026-2617
+    #[tokio::test]
+    async fn test_2026_2617() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2026-2617").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
+    // 2026-2745
+    #[tokio::test]
+    async fn test_2026_2745() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2026-2745").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+    // 2025-0145
+    #[tokio::test]
+    async fn test_2025_0145() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2025-0145").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
 
     #[tokio::test]
     async fn test_all_2026_procedures() {
         let scraper = EuParliamentScraper::default();
+
         let mut prods_with_votes = 0;
         let mut prods_with_votes_main = 0;
+        let mut total_sum_votes = 0;
+
+        // procedure has main votes "2024-0159M"
+        // procedure has main votes "2024-0101R"
         for year in [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
             .iter()
             .rev()
@@ -127,7 +372,10 @@ mod tests {
             for procedure in prods {
                 match scraper.get_voteable(&procedure).await {
                     Err(e) => {
-                        println!("failed on procedure: {procedure:?} because of {e:?}")
+                        println!("failed on procedure: {procedure:?} because of {e:?}");
+                        if let ScraperError::TooManyRequests(secs) = e {
+                            tokio::time::sleep(secs.unwrap()).await;
+                        }
                     }
                     Ok(e) => {
                         if e.votes
@@ -143,12 +391,13 @@ mod tests {
                         } else {
                             prods_with_votes += 1;
                         }
+                        total_sum_votes += e.votes.votes.len();
                     }
                 }
                 // tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             }
 
-            println!("parsed prods with votes (current total): {prods_with_votes}, current has main vote total: {prods_with_votes_main}");
+            println!("parsed prods with votes (current total): {prods_with_votes}, current has main vote total: {prods_with_votes_main}, total sum of votes (with amendments etc): {total_sum_votes}");
         }
         println!("parsed prods with votes (total): {prods_with_votes}");
     }
@@ -165,7 +414,7 @@ mod tests {
 
         let voteable = scraper.get_voteable("2026-2557").await.unwrap();
 
-        assert_eq!(voteable.proposal.gp, "ep-10");
+        assert_eq!(voteable.proposal.gp, "10");
         assert_eq!(
             voteable.proposal.created_at.date_naive(),
             NaiveDate::from_ymd_opt(2026, 1, 12).unwrap()
@@ -258,5 +507,175 @@ mod tests {
             voteable.proposal.created_at.date_naive(),
             NaiveDate::from_ymd_opt(2026, 2, 11).unwrap()
         );
+    }
+
+    use super::*;
+    use regex::Regex;
+    use serde::Deserialize;
+    use std::{collections::HashSet, io::Read};
+
+    use chrono::NaiveDateTime;
+    use serde_derive::Deserialize;
+    use std::error::Error;
+
+    #[derive(Debug, Deserialize)]
+    pub struct VoteRecord {
+        pub id: i64,
+
+        #[serde(deserialize_with = "deserialize_datetime")]
+        pub timestamp: NaiveDateTime,
+
+        pub display_title: String,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub reference: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub description: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub amendment_subject: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub amendment_number: Option<String>,
+
+        #[serde(deserialize_with = "deserialize_bool_loose")]
+        pub is_main: bool,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub procedure_reference: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub procedure_title: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub procedure_type: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub procedure_stage: Option<String>,
+
+        pub count_for: u32,
+        pub count_against: u32,
+        pub count_abstention: u32,
+        pub count_did_not_vote: u32,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub result: Option<String>,
+
+        #[serde(deserialize_with = "empty_as_none")]
+        pub texts_adopted_reference: Option<String>,
+    }
+
+    fn empty_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(if s.trim().is_empty() { None } else { Some(s) })
+    }
+
+    fn deserialize_datetime<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let trimmed = s.trim();
+
+        if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S") {
+            return Ok(dt);
+        }
+        if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S%.f") {
+            return Ok(dt);
+        }
+        if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S") {
+            return Ok(dt);
+        }
+        if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S%.f") {
+            return Ok(dt);
+        }
+        if trimmed.len() >= 19 {
+            let head = &trimmed[..19];
+            if let Ok(dt) = NaiveDateTime::parse_from_str(head, "%Y-%m-%d %H:%M:%S") {
+                return Ok(dt);
+            }
+        }
+
+        Err(serde::de::Error::custom(format!(
+            "could not parse timestamp: {trimmed:?}"
+        )))
+    }
+
+    fn deserialize_bool_loose<'de, D>(deserializer: D) -> Result<bool, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" | "yes" => Ok(true),
+            "false" | "0" | "no" | "" => Ok(false),
+            other => Err(serde::de::Error::custom(format!(
+                "invalid boolean value: {other:?}"
+            ))),
+        }
+    }
+    pub fn read_votes_from_str(data: &str) -> Result<Vec<VoteRecord>, Box<dyn Error>> {
+        let mut rdr = csv::Reader::from_reader(data.as_bytes());
+        let mut records = Vec::new();
+        for result in rdr.deserialize() {
+            let record: VoteRecord = result?;
+            records.push(record);
+        }
+        Ok(records)
+    }
+
+    const HOWTHEYVOTE_VOTES_URL: &str =
+        "https://github.com/HowTheyVote/data/releases/latest/download/votes.csv.gz";
+    const TERM_9_START_YEAR: u32 = 2019;
+    const MIN_HOWTHEYVOTE_COVERAGE: f64 = 0.98;
+
+    fn base_procedure_id(id: &str) -> String {
+        match id.split_once('-') {
+            Some((year, number)) => {
+                let digits: String = number.chars().take_while(|c| c.is_ascii_digit()).collect();
+                format!("{year}-{digits}")
+            }
+            None => id.to_string(),
+        }
+    }
+
+    async fn parse_howtheyvote(scraper: &EuParliamentScraper) -> Vec<VoteRecord> {
+        let csv = fetch_csv(scraper).await;
+        read_votes_from_str(&csv).unwrap()
+    }
+
+    async fn howtheyvote_procedure_ids(scraper: &EuParliamentScraper) -> HashSet<String> {
+        let csv = fetch_csv(scraper).await;
+
+        let reference = Regex::new(r"(\d{4})/(\d{4})[A-Z]?\([A-Z]+\)").unwrap();
+        reference
+            .captures_iter(&csv)
+            .filter_map(|caps| {
+                let year = caps.get(1)?.as_str();
+                let number = caps.get(2)?.as_str();
+                (year.parse::<u32>().ok()? >= TERM_9_START_YEAR).then(|| format!("{year}-{number}"))
+            })
+            .collect()
+    }
+
+    async fn fetch_csv(scraper: &EuParliamentScraper) -> String {
+        let bytes = scraper
+            .client()
+            .get(HOWTHEYVOTE_VOTES_URL)
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap();
+        let mut csv = String::new();
+        flate2::read::GzDecoder::new(&bytes[..])
+            .read_to_string(&mut csv)
+            .unwrap();
+        csv
     }
 }

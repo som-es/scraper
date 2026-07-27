@@ -1,13 +1,11 @@
 use chrono::NaiveDate;
-use common_scrapes::{AcceptedState, Reference};
-use quick_xml::events::Event;
-use quick_xml::reader::Reader;
+use common_scrapes::Reference;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    caching::{disk_caching, get_disk_cache, get_disk_cache_json},
+    caching::{disk_caching, get_disk_cache},
     error::ScraperError,
     eu_parliament::votes::{
         roll_call_parser::parse_roll_call_votes_xml,
@@ -16,7 +14,7 @@ use crate::{
     request::request_text,
 };
 
-use super::{id_to_u64, last_path_segment, EuParliamentScraper};
+use super::{last_path_segment, EuParliamentScraper};
 
 mod roll_call_parser;
 mod vot_parsers;
@@ -91,7 +89,7 @@ pub fn reference_from_report(reference: &str) -> Option<Reference> {
     })
 }
 
-const MAIN_VOTE_INDICATORS: [&str; 42] = [
+const MAIN_VOTE_INDICATORS: [&str; 44] = [
     "draft council decision",
     "projet de decision du conseil",
     "projet de reglement du conseil",
@@ -126,10 +124,12 @@ const MAIN_VOTE_INDICATORS: [&str; 42] = [
     "proposition de la commission et amendements",
     "proposition de la commission au conseil",
     "provisional agreement",
+    "proposal for a regulation",
     "accord provisoire",
     "accord provisoire (proposition de la commission - non modifiee)",
     "final vote",
     "decision d'engager des negociations interinstitutionnelles",
+    "decision to enter into interinstitutional negotiations",
     "projet de decision du conseil europeen",
     "projet de decision",
     "demande de decision d'urgence",
@@ -163,14 +163,23 @@ impl EuParliamentScraper {
             .collect::<Vec<_>>();
 
         references.extend(report_references);
-        dbg!(&references);
-        let sitting_dates = super::proposals::plenary_sitting_dates(&raw_procedure);
+
+        let mut sitting_dates = super::proposals::plenary_sitting_dates(&raw_procedure);
+        sitting_dates.extend(super::proposals::plenary_sitting_dates_by_decision(
+            &sitting_dates,
+            &raw_procedure,
+        ));
+
+        // dbg!(&sitting_dates);
 
         let mut votes = Vec::new();
         for (term, date) in sitting_dates {
             let vot_entries = match self.get_vot_entries(&term, date).await {
                 Ok(vot_entries) => vot_entries,
                 Err(e) => {
+                    if let ScraperError::TooManyRequests(_) = e {
+                        return Err(e.into());
+                    }
                     log::error!("cannot parse vot entries because of: {e:?}");
                     continue;
                 }
@@ -178,6 +187,10 @@ impl EuParliamentScraper {
 
             let voting_records = vot_entries
                 .into_iter()
+                .map(|mut entry| {
+                    entry.label = entry.label.replace('‑', "-");
+                    entry
+                })
                 .filter(|entry| references.iter().any(|r| entry.label.contains(r)))
                 .flat_map(|entry| entry.votings.into_iter().map(|voting| voting))
                 .collect::<Vec<_>>();
@@ -191,6 +204,14 @@ impl EuParliamentScraper {
                 votes.extend(
                     roll_call_votes
                         .into_iter()
+                        .map(|mut entry| {
+                            entry.description =
+                                entry.description.map(|desc| desc.replace('‑', "-"));
+                            entry
+                        })
+                        .inspect(|entry| {
+                            // dbg!(&entry.description);
+                        })
                         .filter(|entry| {
                             references.iter().any(|r| {
                                 entry
@@ -201,17 +222,10 @@ impl EuParliamentScraper {
                             })
                         })
                         .map(|roll_call_vote| Vote {
-                            is_main: roll_call_vote.description.as_ref().map(|description| {
-                                description.split(" - ").any(|part| {
-                                    let part = deunicode::deunicode(&part.to_lowercase());
-                                    for indicator in MAIN_VOTE_INDICATORS {
-                                        if part.contains(indicator) {
-                                            return true;
-                                        }
-                                    }
-                                    MAIN_VOTE_INDICATORS.contains(&part.as_str())
-                                })
-                            }),
+                            is_main: roll_call_vote
+                                .description
+                                .as_ref()
+                                .map(|description| has_main_indicators(description)),
                             roll_call_vote: Some(roll_call_vote),
                             meta: None,
                             sitting_date: date,
@@ -219,18 +233,34 @@ impl EuParliamentScraper {
                 );
             } else {
                 votes.extend(voting_records.into_iter().map(|voting_record| {
+                    let roll_call_vote = roll_call_votes
+                        .iter()
+                        .find(|roll_call_vote| {
+                            roll_call_vote.voting_id == Some(voting_record.voting_id)
+                        })
+                        .cloned();
                     Vote {
-                        roll_call_vote: roll_call_votes
-                            .iter()
-                            .find(|roll_call_vote| {
-                                roll_call_vote.voting_id == Some(voting_record.voting_id)
-                            })
-                            .cloned(),
                         sitting_date: date,
-                        is_main: voting_record.title.as_ref().map(|title| {
-                            MAIN_VOTE_INDICATORS.contains(&title.to_lowercase().as_str())
-                        }),
+                        is_main: {
+                            let from_vote: Option<bool> = roll_call_vote
+                                .as_ref()
+                                .and_then(|vote| vote.description.as_ref())
+                                .map(|desc: &String| has_main_indicators(&desc));
+
+                            let from_title: Option<bool> =
+                                voting_record.title.as_ref().map(|title| {
+                                    MAIN_VOTE_INDICATORS.contains(
+                                        &deunicode::deunicode(title).to_lowercase().as_str(),
+                                    )
+                                });
+
+                            match (from_vote, from_title) {
+                                (None, None) => None,
+                                (a, b) => Some(a.unwrap_or(false) || b.unwrap_or(false)),
+                            }
+                        },
                         meta: Some(voting_record),
+                        roll_call_vote,
                     }
                 }));
             }
@@ -258,7 +288,15 @@ impl EuParliamentScraper {
             Some(cached) => cached,
             None => {
                 // let url = format!("{}{doc_id}.xml", Self::VOTE_BASE_URL);
-                let raw_doc = self.get_one_cached(&format!("documents/{doc_id}")).await?;
+                let raw_doc = match self.get_one_cached(&format!("documents/{doc_id}")).await {
+                    Ok(doc) => doc,
+                    Err(e) => {
+                        if e == ScraperError::NotFound {
+                            let _ = disk_caching(&cache_key, "", self.cache_config()).await;
+                        }
+                        return Err(e.into());
+                    }
+                };
                 let link_path =
                     english_xml_manifestation(&raw_doc).ok_or(ScraperError::ParseError)?;
                 let url = format!("https://data.europarl.europa.eu/{link_path}");
@@ -290,6 +328,18 @@ impl EuParliamentScraper {
         let xml = self.get_xml_data(term, date, VoteFile::RollCall).await?;
         parse_roll_call_votes_xml(&xml).map_err(|e| ScraperError::ParseErrorVerbose(e))
     }
+}
+
+fn has_main_indicators(description: &str) -> bool {
+    description.split(" - ").any(|part| {
+        let part = deunicode::deunicode(&part.to_lowercase());
+        for indicator in MAIN_VOTE_INDICATORS {
+            if part.contains(indicator) {
+                return true;
+            }
+        }
+        MAIN_VOTE_INDICATORS.contains(&part.as_str())
+    })
 }
 
 fn english_xml_manifestation(raw_doc: &Value) -> Option<String> {

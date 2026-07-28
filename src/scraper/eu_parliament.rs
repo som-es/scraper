@@ -24,7 +24,7 @@ pub mod votes;
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use chrono::Datelike;
+use chrono::{Datelike, NaiveDate};
 use common_scrapes::eu_hemicycle::{load_hemicycle, HemicycleLayout};
 use once_cell::sync::Lazy;
 use reqwest::{Client, Method};
@@ -39,9 +39,28 @@ use crate::{
     today, GeneralScrapeInfo, Scraper,
 };
 
-const LANGUAGES: [&str; 24] = [
-    "es", "sl", "en", "de", "hu", "ro", "pt", "sv", "da", "fr", "pl", "et", "nl", "el", "hr", "lv",
-    "it", "fi", "cs", "lt", "ga", "mt", "bg", "sk",
+pub struct EuGp {
+    gp: &'static str,
+    start_date: NaiveDate,
+    end_date: Option<NaiveDate>,
+}
+
+const GPS: [EuGp; 3] = [
+    EuGp {
+        gp: "10",
+        start_date: NaiveDate::from_ymd_opt(2024, 7, 16).unwrap(),
+        end_date: None,
+    },
+    EuGp {
+        gp: "9",
+        start_date: NaiveDate::from_ymd_opt(2019, 7, 2).unwrap(),
+        end_date: Some(NaiveDate::from_ymd_opt(2024, 7, 15).unwrap()),
+    },
+    EuGp {
+        gp: "10",
+        start_date: NaiveDate::from_ymd_opt(2014, 7, 1).unwrap(),
+        end_date: Some(NaiveDate::from_ymd_opt(2019, 7, 1).unwrap()),
+    },
 ];
 
 #[derive(Debug, Clone)]

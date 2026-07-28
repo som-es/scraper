@@ -1,12 +1,13 @@
 use super::EuParliamentScraper;
 use crate::{
-    error::ScraperError, eu_parliament::votes::Votes, legis_init::LegislativeInitiatives,
-    proposals::ProposalScraper, GegenstandPaths,
+    error::ScraperError,
+    eu_parliament::votes::{vot_parsers::VoteType, Votes},
+    legis_init::LegislativeInitiatives,
+    proposals::ProposalScraper,
 };
 use async_trait::async_trait;
 use common_scrapes::{
-    AcceptedState::{self, Accepted},
-    DelegateRef, HiddenVotes, LegislativeInitiative, NamedVoteProContra, Proposal, VoteStage,
+    AcceptedState, DelegateRef, HiddenVotes, LegislativeInitiative, NamedVoteProContra, Proposal,
     VotedByName,
 };
 use serde_derive::{Deserialize, Serialize};
@@ -163,22 +164,39 @@ impl LegislativeInitiatives for EuParliamentScraper {
             }),
             references: Some(voteable.votes.references),
             status: None,
-            is_law: todo!(),
-            law_accepted: todo!(),
+            is_law: false,
+            law_accepted: None,
             is_voteable_on: true,
             is_urgent: false,
-            voting: todo!(),
+            voting: main_vote
+                .and_then(|vote| vote.meta.as_ref().and_then(|meta| meta.vote_type.as_ref()))
+                .and_then(|vote_type: &VoteType| match vote_type {
+                    VoteType::Report => Some(common_scrapes::Voting::Report),
+                    VoteType::Resolution => Some(common_scrapes::Voting::Resolution),
+                    VoteType::Proposal => Some(common_scrapes::Voting::Law),
+                    _ => None,
+                }),
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, NaiveDate};
+    use chrono::NaiveDate;
 
     use crate::caching::CacheConfig;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_eu_get_legis_init() {
+        let scraper = EuParliamentScraper::default();
+        let legis_init = scraper.get_legis_init("2024-0003").await.unwrap();
+
+        assert_eq!(legis_init.proposal.ityp, "BUD");
+        assert_eq!(legis_init.proposal.inr, 20240003);
+        dbg!(legis_init);
+    }
 
     #[tokio::test]
     async fn test_get_voteable_with_vote() {

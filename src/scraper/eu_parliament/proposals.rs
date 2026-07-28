@@ -8,9 +8,10 @@ use serde_json::Value::{self, Array};
 
 use crate::{
     error::ScraperError,
+    eu_parliament::GPS,
     proposals::{ProposalScraper, ProposalsPayload},
     request::request_text,
-    GegenstandPaths,
+    today, GegenstandPaths,
 };
 
 use super::{id_to_u64, last_path_segment, EuParliamentScraper};
@@ -312,18 +313,6 @@ fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
         .cloned()
         .unwrap_or_default();
 
-    // parliamentary term, roughly analogous to AT's `gp` (e.g. "XXVII"); falls back to
-    // the process id's year when no participation/event carries a term reference yet.
-    let gp = participations
-        .iter()
-        .find_map(|p| p["parliamentary_term"].as_str())
-        .map(|term| {
-            last_path_segment(term)
-                .trim_start_matches("ep-")
-                .to_string()
-        })
-        .unwrap_or_else(|| year.to_string());
-
     let issuer_ids = participations
         .iter()
         .filter(|p| p["participation_role"].as_str() == Some("def/ep-roles/RAPPORTEUR"))
@@ -343,6 +332,27 @@ fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
         .flat_map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
         .collect();
     let created_at = dates.iter().min()?.and_hms_opt(0, 0, 0)?.and_utc();
+
+    // parliamentary term, roughly analogous to AT's `gp` (e.g. "XXVII"); falls back to
+    // the process id's year when no participation/event carries a term reference yet.
+    let gp = participations
+        .iter()
+        .find_map(|p| p["parliamentary_term"].as_str())
+        .map(|term| {
+            last_path_segment(term)
+                .trim_start_matches("ep-")
+                .to_string()
+        })
+        .or_else(|| {
+            let res = GPS.iter().find(|gp| {
+                let start = gp.start_date;
+                let end = gp.end_date.unwrap_or(today());
+
+                created_at.date_naive() >= start && created_at.date_naive() <= end
+            });
+            res.map(|gp| gp.gp.to_string())
+        })?;
+
     let updated_at = dates
         .iter()
         .max()
@@ -506,6 +516,15 @@ mod tests {
         dbg!(ids.len(), ids_by_feed.len());
         // assert!(!ids.is_empty());
         // assert!(ids.iter().all(|id| id.starts_with("2024-")));
+        for id in ids {
+            dbg!(&id);
+            match scraper.get_proposal(&id).await {
+                Ok(prop) => {
+                    dbg!(prop.gp);
+                }
+                Err(e) => println!("e: {e:?}"),
+            };
+        }
     }
 
     #[tokio::test]

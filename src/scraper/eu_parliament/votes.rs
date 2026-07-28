@@ -17,7 +17,7 @@ use crate::{
 use super::{last_path_segment, EuParliamentScraper};
 
 mod roll_call_parser;
-mod vot_parsers;
+pub mod vot_parsers;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {

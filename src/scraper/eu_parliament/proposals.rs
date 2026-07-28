@@ -1,11 +1,17 @@
 use std::collections::HashSet;
 
+use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate, Utc};
 use common_scrapes::{Document, FileType, Proposal, ProposalType};
 use regex::Regex;
-use serde_json::Value;
+use serde_json::Value::{self, Array};
 
-use crate::{error::ScraperError, request::request_text};
+use crate::{
+    error::ScraperError,
+    proposals::{ProposalScraper, ProposalsPayload},
+    request::request_text,
+    GegenstandPaths,
+};
 
 use super::{id_to_u64, last_path_segment, EuParliamentScraper};
 
@@ -160,7 +166,6 @@ const VOTE_RELEVANT_ACTIVITY_TYPES: &[&str] = &[
     "def/ep-activities/PLENARY_DECISION",
     "def/ep-activities/PLENARY_ACTIVITY",
     "def/ep-activities/PLENARY_DEBATE",
-    "Decision",
 ];
 
 /// Finds every distinct `(parliamentary term, plenary sitting date)` pair a procedure
@@ -415,9 +420,60 @@ pub(crate) fn extract_documents_from_doc(raw: &Value) -> Vec<Document> {
         .collect()
 }
 
+#[async_trait]
+impl ProposalScraper for EuParliamentScraper {
+    const FILTER_PATH: &'static str = "";
+    const TO_DELEGATES_IDX: &'static str = "";
+
+    async fn post_proposals_payload(
+        &self,
+        searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
+        self.list_procedure_ids_by_year(self.scrape_info.gp[0].parse().unwrap())
+            .await
+            .map(|data| serde_json::to_value(data).unwrap())
+    }
+
+    async fn post_proposals_payload_by_di(
+        &self,
+        proposal_payload: ProposalsPayload,
+    ) -> Result<Value, ScraperError> {
+        todo!()
+    }
+
+    fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
+        todo!()
+    }
+
+    fn proposal_paths(&self, proposals: Value) -> Result<Vec<String>, ScraperError> {
+        let Value::Array(data) = proposals else {
+            panic!();
+        };
+        Ok(data
+            .into_iter()
+            .map(|path| {
+                let Value::String(path) = path else {
+                    panic!();
+                };
+                path
+            })
+            .collect())
+    }
+
+    fn payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload {
+        todo!()
+    }
+
+    async fn get_proposal(&self, proposal_path: &str) -> Result<Proposal, ScraperError> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+
+    use async_trait::async_trait;
 
     use super::*;
 

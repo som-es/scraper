@@ -1,5 +1,6 @@
 use super::EuParliamentScraper;
-use crate::{error::ScraperError, eu_parliament::votes::Votes};
+use crate::{error::ScraperError, eu_parliament::votes::Votes, legis_init::LegislativeInitiatives};
+use async_trait::async_trait;
 use common_scrapes::Proposal;
 use serde_derive::{Deserialize, Serialize};
 
@@ -34,6 +35,9 @@ impl EuParliamentScraper {
         Ok(Voteable { proposal, votes })
     }
 }
+
+// #[async_trait]
+// impl LegislativeInitiatives for EuParliamentScraper {}
 
 #[cfg(test)]
 mod tests {

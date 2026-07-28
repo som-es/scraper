@@ -255,7 +255,11 @@ pub fn extract_pro_contra_party_codes_from_string(pro_contra_str: &str) -> Optio
     let contra = convert_party_code_list_to_vec_open_ended(&pro_contra_str[contra_start + 8..]);
     let contra = contra.into_iter().filter(|x| !x.is_empty()).collect();
 
-    Some(ProContra { pro, contra })
+    Some(ProContra {
+        pro,
+        contra,
+        abstained: vec![],
+    })
 }
 
 #[cfg(test)]

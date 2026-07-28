@@ -140,9 +140,24 @@ impl AcceptedState {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+pub struct DelegateRef {
+    pub name: String,
+    pub id: Option<u32>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+pub struct NamedVoteProContra {
+    pub pro: Vec<DelegateRef>,
+    pub contra: Vec<DelegateRef>,
+    pub abstained: Vec<DelegateRef>,
+    pub no_vote: Vec<DelegateRef>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct ProContra {
     pub pro: Vec<String>,
     pub contra: Vec<String>,
+    pub abstained: Vec<String>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -225,8 +240,10 @@ pub struct HiddenVotes {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub struct VotedByName {
-    pub delegates_pro_contra: Option<ProContra>,
+    pub delegates_pro_contra: Option<NamedVoteProContra>,
     pub vote_sum: usize,
+    pub abstained_count: Option<usize>,
+    pub no_vote_count: Option<usize>,
     pub pro_count: usize,
     pub contra_count: usize,
     pub invalid_count: usize,

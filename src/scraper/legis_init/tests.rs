@@ -3044,7 +3044,7 @@ async fn test_named_vote_xxviii_a_372() {
     }
 
     for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
-        assert!(pro_contra.contra.iter().any(|d| d.name == contra_checks));
+        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3066,7 +3066,7 @@ async fn test_named_vote_xxviii_a_372_by_document_link() {
     }
 
     for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
-        assert!(pro_contra.contra.iter().any(|d| d.name == contra_checks));
+        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3128,7 +3128,7 @@ async fn test_named_vote_xxviii_a_353() {
     }
 
     for contra_checks in ["Tomaselli", "Stögmüller", "Kaniak", "Lausch"] {
-        assert!(pro_contra.contra.iter().any(|d| d.name == contra_checks));
+        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3178,7 +3178,7 @@ async fn test_named_vote_xxviii_i_136() {
         "Zanger",
         "Zorba",
     ] {
-        assert!(pro_contra.contra.iter().any(|d| d.name == contra_checks));
+        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3695,7 +3695,7 @@ async fn test_named_vote_xxvi_uea_144() {
             .unwrap()
             .pro
             .iter()
-            .any(|d| d.name == pro_checks));
+            .any(|d| d.name == *pro_checks));
     }
     for contra_checks in CONTRA_VOTES {
         assert!(named_vote
@@ -3704,7 +3704,7 @@ async fn test_named_vote_xxvi_uea_144() {
             .unwrap()
             .contra
             .iter()
-            .any(|d| d.name == contra_checks));
+            .any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3811,7 +3811,8 @@ async fn test_named_vote_xxv_uea_414() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -3823,7 +3824,8 @@ async fn test_named_vote_xxv_uea_414() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -3935,7 +3937,8 @@ async fn test_named_vote_xxi_i_1183() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -3947,7 +3950,8 @@ async fn test_named_vote_xxi_i_1183() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -4060,7 +4064,8 @@ async fn test_named_vote_xxi_i_624() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -4072,7 +4077,8 @@ async fn test_named_vote_xxi_i_624() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -4184,7 +4190,8 @@ async fn test_named_vote_xxi_a_412() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -4196,7 +4203,8 @@ async fn test_named_vote_xxi_a_412() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -4308,7 +4316,8 @@ async fn test_named_vote_xxi_i_311() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -4320,7 +4329,8 @@ async fn test_named_vote_xxi_i_311() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -4431,7 +4441,8 @@ async fn test_named_vote_xxi_i_181() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -4443,7 +4454,8 @@ async fn test_named_vote_xxi_i_181() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -4552,7 +4564,8 @@ async fn test_named_vote_xxiii_uea_288() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -4564,7 +4577,8 @@ async fn test_named_vote_xxiii_uea_288() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );
@@ -4673,7 +4687,8 @@ async fn test_named_vote_xxiii_uea_26() {
                 .as_ref()
                 .unwrap()
                 .pro
-                .contains(&pro_checks.to_string()),
+                .iter()
+                .any(|d| d.name == pro_checks),
             "Missing Pro: {}",
             pro_checks
         );
@@ -4685,7 +4700,8 @@ async fn test_named_vote_xxiii_uea_26() {
                 .as_ref()
                 .unwrap()
                 .contra
-                .contains(&contra_checks.to_string()),
+                .iter()
+                .any(|d| d.name == *contra_checks),
             "Missing Contra: {}",
             contra_checks
         );

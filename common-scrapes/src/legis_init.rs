@@ -116,6 +116,7 @@ pub enum AcceptedState {
     #[default]
     Declined,
     PreDeclined,
+    Unknown,
 }
 
 impl core::fmt::Display for AcceptedState {
@@ -124,6 +125,7 @@ impl core::fmt::Display for AcceptedState {
             AcceptedState::Accepted => 'a',
             AcceptedState::Declined => 'd',
             AcceptedState::PreDeclined => 'p',
+            AcceptedState::Unknown => 'u',
         };
         write!(f, "{res}")
     }
@@ -145,11 +147,11 @@ pub struct DelegateRef {
     pub id: Option<u32>,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize, Default)]
 pub struct NamedVoteProContra {
     pub pro: Vec<DelegateRef>,
     pub contra: Vec<DelegateRef>,
-    pub abstained: Vec<DelegateRef>,
+    pub abstention: Vec<DelegateRef>,
     pub no_vote: Vec<DelegateRef>,
 }
 
@@ -242,7 +244,7 @@ pub struct HiddenVotes {
 pub struct VotedByName {
     pub delegates_pro_contra: Option<NamedVoteProContra>,
     pub vote_sum: usize,
-    pub abstained_count: Option<usize>,
+    pub abstention_count: Option<usize>,
     pub no_vote_count: Option<usize>,
     pub pro_count: usize,
     pub contra_count: usize,

@@ -295,8 +295,10 @@ fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
     let process_id = raw["process_id"].as_str()?.to_string();
     let ityp = last_path_segment(raw["process_type"].as_str()?).to_string();
 
-    let (year, inr_str) = process_id.split_once('-')?;
-    let inr = inr_str.trim_start_matches('0').parse::<u64>().unwrap_or(0);
+    let (year, nr_str) = process_id.split_once('-')?;
+    let nr = nr_str.trim_start_matches('0').parse::<u64>().unwrap_or(0);
+    let year = year.parse::<u64>().unwrap_or(0);
+    let inr = year * 10000 + nr;
 
     let title = raw["process_title"]["en"]
         .as_str()
@@ -427,7 +429,7 @@ impl ProposalScraper for EuParliamentScraper {
 
     async fn post_proposals_payload(
         &self,
-        searched_doktyps: Option<&[&str]>,
+        _searched_doktyps: Option<&[&str]>,
     ) -> Result<Value, ScraperError> {
         self.list_procedure_ids_by_year(self.scrape_info.gp[0].parse().unwrap())
             .await
@@ -436,13 +438,13 @@ impl ProposalScraper for EuParliamentScraper {
 
     async fn post_proposals_payload_by_di(
         &self,
-        proposal_payload: ProposalsPayload,
+        _proposal_payload: ProposalsPayload,
     ) -> Result<Value, ScraperError> {
-        todo!()
+        unimplemented!()
     }
 
     fn raw_proposal_into_proposal(raw_proposal: Value) -> Option<Proposal> {
-        todo!()
+        unimplemented!()
     }
 
     fn proposal_paths(&self, proposals: Value) -> Result<Vec<String>, ScraperError> {
@@ -461,11 +463,11 @@ impl ProposalScraper for EuParliamentScraper {
     }
 
     fn payload(&self, searched_doktyps: Option<&[&str]>) -> Self::Payload {
-        todo!()
+        unimplemented!()
     }
 
     async fn get_proposal(&self, proposal_path: &str) -> Result<Proposal, ScraperError> {
-        todo!()
+        self.get_proposal(proposal_path).await
     }
 }
 

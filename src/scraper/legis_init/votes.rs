@@ -259,7 +259,7 @@ pub async fn extract_most_fitting_votes(
                 pro_count,
                 contra_count,
                 invalid_count,
-                abstained_count: None,
+                abstention_count: None,
                 no_vote_count: None,
             });
             // println!("hidden_votes: {hidden_votes:?}");
@@ -365,7 +365,7 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<NamedVoteProContra>
             .into_iter()
             .map(|name| DelegateRef { name, id: None })
             .collect(),
-        abstained: vec![],
+        abstention: vec![],
         no_vote: vec![],
     })
 }

@@ -1,8 +1,16 @@
 use super::EuParliamentScraper;
-use crate::{error::ScraperError, eu_parliament::votes::Votes, legis_init::LegislativeInitiatives};
+use crate::{
+    error::ScraperError, eu_parliament::votes::Votes, legis_init::LegislativeInitiatives,
+    proposals::ProposalScraper, GegenstandPaths,
+};
 use async_trait::async_trait;
-use common_scrapes::Proposal;
+use common_scrapes::{
+    AcceptedState::{self, Accepted},
+    DelegateRef, HiddenVotes, LegislativeInitiative, NamedVoteProContra, Proposal, VoteStage,
+    VotedByName,
+};
 use serde_derive::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// A legislative procedure bundled together with whatever roll-call vote(s) decided
 /// it — the EU-side equivalent of AT's `LegislativeInitiative`, which embeds
@@ -36,8 +44,133 @@ impl EuParliamentScraper {
     }
 }
 
-// #[async_trait]
-// impl LegislativeInitiatives for EuParliamentScraper {}
+#[async_trait]
+impl LegislativeInitiatives for EuParliamentScraper {
+    #[inline]
+    async fn post_legis_payload(
+        &self,
+        searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
+        self.post_proposals_payload(searched_doktyps).await
+    }
+
+    async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative> {
+        unimplemented!()
+    }
+
+    fn legis_paths(&self, initiatives: Value) -> Result<Vec<String>, ScraperError> {
+        self.proposal_paths(initiatives)
+    }
+
+    async fn get_legis_init(
+        &self,
+        proposal_path: &str,
+    ) -> Result<LegislativeInitiative, ScraperError> {
+        let proposal_path = proposal_path.to_string();
+        let voteable = self.get_voteable(&proposal_path).await?;
+        let main_vote = voteable
+            .votes
+            .votes
+            .iter()
+            .find(|vote| vote.is_main.unwrap_or_default());
+        Ok(LegislativeInitiative {
+            proposal: voteable.proposal.clone(),
+            id: voteable.proposal.id,
+            ityp: voteable.proposal.ityp,
+            doktyp: "".into(),
+            inr: voteable.proposal.inr,
+            title: voteable.proposal.title.clone(),
+            description: voteable.proposal.title,
+            emphasis: None,
+            gp: voteable.proposal.gp, // TODO: find proper GP (consider via votes/sitting dates doc)
+            votes: vec![],
+            accepted: if main_vote.is_some() {
+                Some(AcceptedState::Unknown)
+            } else {
+                None
+            },
+            documents: voteable.proposal.documents,
+            related_delegates: vec![],
+            nr_plenary_activity_date: voteable
+                .proposal
+                .updated_at
+                .map(|date| date.date_naive())
+                .unwrap_or(voteable.proposal.created_at.date_naive()),
+            br_plenary_activity_date: None,
+            vote_date: main_vote.map(|vote| vote.sitting_date),
+            speeches: vec![],
+            topics: vec![],
+            eurovoc_topics: vec![],
+            other_keyword_topics: vec![],
+            created_at: voteable.proposal.created_at,
+            updated_at: voteable.proposal.updated_at,
+            requires_simple_majority: true,
+            hidden_votes_info: main_vote
+                .map(|vote| HiddenVotes {
+                    vote_stage: None,
+                    pro_contra_parties: None,
+                    voted_by_name: true,
+                    voted_by_name_data: vote.roll_call_vote.as_ref().map(|roll_call_vote| {
+                        let mut pro_contra = NamedVoteProContra::default();
+                        for vote in &roll_call_vote.votes {
+                            match vote.choice {
+                                super::votes::EuVoteChoice::For => {
+                                    pro_contra.pro.push(DelegateRef {
+                                        name: "".into(),
+                                        id: Some(vote.delegate_id as u32),
+                                    })
+                                }
+                                super::votes::EuVoteChoice::Against => {
+                                    pro_contra.contra.push(DelegateRef {
+                                        name: "".into(),
+                                        id: Some(vote.delegate_id as u32),
+                                    })
+                                }
+                                super::votes::EuVoteChoice::Abstention => {
+                                    pro_contra.abstention.push(DelegateRef {
+                                        name: "".into(),
+                                        id: Some(vote.delegate_id as u32),
+                                    })
+                                }
+                            }
+                        }
+                        VotedByName {
+                            delegates_pro_contra: Some(pro_contra),
+                            vote_sum: (roll_call_vote.abstention_count
+                                + roll_call_vote.favor_count
+                                + roll_call_vote.against_count)
+                                as usize,
+                            abstention_count: Some(roll_call_vote.abstention_count as usize),
+                            no_vote_count: None,
+                            pro_count: roll_call_vote.favor_count as usize,
+                            contra_count: roll_call_vote.against_count as usize,
+                            invalid_count: 0,
+                        }
+                    }),
+                    was_declined: None,
+                    voted_at_date: Some(vote.sitting_date),
+                    voted_unanimously: false,
+                })
+                .unwrap_or_default(),
+            br_hidden_votes_info: None,
+            br_plenary_session: None,
+            plenary_session: main_vote.map(|vote| {
+                vote.sitting_date
+                    .format("%Y%m%d")
+                    .to_string()
+                    .parse::<u64>()
+                    .unwrap_or(0)
+            }),
+            references: Some(voteable.votes.references),
+            status: None,
+            is_law: todo!(),
+            law_accepted: todo!(),
+            is_voteable_on: true,
+            is_urgent: false,
+            voting: todo!(),
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {

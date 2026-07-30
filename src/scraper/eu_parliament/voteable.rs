@@ -68,7 +68,13 @@ impl LegislativeInitiatives for EuParliamentScraper {
         proposal_path: &str,
     ) -> Result<LegislativeInitiative, ScraperError> {
         let proposal_path = proposal_path.to_string();
-        let voteable = self.get_voteable(&proposal_path).await?;
+        let mut voteable = self.get_voteable(&proposal_path).await?;
+
+        voteable
+            .votes
+            .votes
+            .sort_by(|a, b| b.sitting_date.cmp(&a.sitting_date));
+
         let main_vote = voteable
             .votes
             .votes
@@ -196,6 +202,17 @@ mod tests {
     use crate::caching::CacheConfig;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_2025_0429_legis_init() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_legis_init("2025-0429").await.unwrap();
+        dbg!(&voteable.title);
+        dbg!(&voteable.documents);
+        let voted_by_name = voteable.hidden_votes_info;
+        // dbg!(&voted_by_name);
+    }
+
     #[tokio::test]
     async fn test_2025_0385_legis_init() {
         let scraper = EuParliamentScraper::default();

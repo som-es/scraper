@@ -508,7 +508,10 @@ mod tests {
     #[tokio::test]
     async fn test_list_procedure_ids_by_year() {
         let scraper = EuParliamentScraper::default();
-        let ids = scraper.list_procedure_ids_by_year(2026).await.unwrap();
+        let ids = scraper.list_procedure_ids_by_year(2025).await.unwrap();
+
+        assert!(ids.contains(&"2025-0429".to_string()));
+
         let ids_by_feed = scraper
             .list_procedures_feed_filtered_by_year(2026)
             .await

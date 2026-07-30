@@ -74,6 +74,15 @@ impl LegislativeInitiatives for EuParliamentScraper {
             .votes
             .iter()
             .find(|vote| vote.is_main.unwrap_or_default());
+        if let Some(Some(meta)) = main_vote.map(|vote| &vote.meta) {
+            if meta.abstention_count.is_none()
+                || meta.against_count.is_none()
+                || meta.against_count.is_none()
+            {
+                return Err(ScraperError::NoVoteFound);
+            }
+        }
+
         Ok(LegislativeInitiative {
             proposal: voteable.proposal.clone(),
             id: voteable.proposal.id,
@@ -187,6 +196,13 @@ mod tests {
     use crate::caching::CacheConfig;
 
     use super::*;
+    #[tokio::test]
+    async fn test_2025_0385_legis_init() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_legis_init("2025-0385").await.unwrap();
+        let voted_by_name = voteable.hidden_votes_info;
+        dbg!(&voted_by_name);
+    }
 
     #[tokio::test]
     async fn test_eu_get_legis_init() {
@@ -315,6 +331,22 @@ mod tests {
             }
         }
     }
+
+    // 2025-0429
+    #[tokio::test]
+    async fn test_2025_0429() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2025-0429").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+    }
+
     // 2023-0453
     #[tokio::test]
     async fn test_2023_0453() {
@@ -467,6 +499,29 @@ mod tests {
         assert!(!voteable.votes.votes.is_empty());
         let is_main = &voteable.votes.votes[0].is_main;
         assert!(is_main.unwrap());
+
+        let docs = &voteable.proposal.documents;
+        dbg!(docs);
+    }
+    // 2025-0385
+    #[tokio::test]
+    async fn test_2025_0385() {
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2025-0385").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
+
+        let votes = voteable
+            .votes
+            .votes
+            .iter()
+            .find(|vote| vote.is_main.unwrap());
+        dbg!(&votes);
     }
 
     //2026-2617

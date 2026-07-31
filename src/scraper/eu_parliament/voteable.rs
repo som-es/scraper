@@ -306,14 +306,20 @@ mod tests {
 
         for entry in entries {
             let reference = entry.procedure_reference.as_ref().unwrap();
-            let reference_regex = Regex::new(r"(\d{4})/(\d{4})[A-Z]?\([A-Z]+\)").unwrap();
+            let reference_regex = Regex::new(r"(\d{4})/(\d{4})([A-Z]?)?\([A-Z]+\)").unwrap();
 
             let procedure = reference_regex
                 .captures_iter(reference)
                 .filter_map(|caps| {
                     let year = caps.get(1)?.as_str();
                     let number = caps.get(2)?.as_str();
-                    Some(format!("{year}-{number}"))
+                    let mut prod_id = format!("{year}-{number}");
+                    if let Some(ch) = caps.get(3) {
+                        if !ch.is_empty() {
+                            prod_id.push(ch.as_str().chars().next().unwrap());
+                        }
+                    }
+                    Some(prod_id)
                 })
                 .next()
                 .unwrap();
@@ -347,6 +353,21 @@ mod tests {
                 }
             }
         }
+    }
+
+    // 2020/0157M
+    #[tokio::test]
+    async fn test_2020_0157m() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper = EuParliamentScraper::default();
+        let voteable = scraper.get_voteable("2020-0157M").await.unwrap();
+        assert!(!voteable.votes.votes.is_empty());
+
+        assert!(voteable
+            .votes
+            .votes
+            .iter()
+            .any(|vote| vote.is_main.unwrap_or_default()));
     }
 
     // 2025-0429
@@ -887,6 +908,49 @@ mod tests {
                 (year.parse::<u32>().ok()? >= TERM_9_START_YEAR).then(|| format!("{year}-{number}"))
             })
             .collect()
+    }
+
+    #[tokio::test]
+    async fn test_cmp_prods_ids() {
+        let scraper = EuParliamentScraper::default();
+
+        let howtheyvote_data = parse_howtheyvote(&scraper).await;
+
+        let reference = Regex::new(r"(\d{4})/(\d{4})[A-Z]?\([A-Z]+\)").unwrap();
+        let entries = howtheyvote_data
+            .iter()
+            .filter(|entry| entry.procedure_reference.is_some() && entry.is_main)
+            .collect::<Vec<_>>();
+        let prods = entries
+            .into_iter()
+            .flat_map(|entry| {
+                let prod = entry.procedure_reference.as_ref()?;
+                Some(
+                    reference
+                        .captures_iter(&prod)
+                        .filter_map(|caps| {
+                            let year = caps.get(1)?.as_str();
+                            let number = caps.get(2)?.as_str();
+                            (year.parse::<u32>().ok()).map(|year| format!("{year}-{number}"))
+                        })
+                        .collect::<HashSet<_>>(),
+                )
+            })
+            .flatten()
+            .collect::<HashSet<_>>();
+
+        let mut set = HashSet::new();
+        for year in [
+            2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026,
+        ] {
+            dbg!(year);
+            let ids = scraper.list_procedure_ids_by_year(year).await.unwrap();
+            set.extend(ids);
+        }
+
+        let diffs = prods.difference(&set).collect::<Vec<_>>();
+        dbg!(&diffs);
+        dbg!(diffs.len());
     }
 
     async fn fetch_csv(scraper: &EuParliamentScraper) -> String {

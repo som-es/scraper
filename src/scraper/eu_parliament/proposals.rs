@@ -294,10 +294,18 @@ pub(crate) fn report_references(raw_procedure: &Value) -> Vec<String> {
 
 fn raw_procedure_into_proposal(raw: &Value) -> Option<Proposal> {
     let process_id = raw["process_id"].as_str()?.to_string();
-    let ityp = last_path_segment(raw["process_type"].as_str()?).to_string();
+    let mut ityp = last_path_segment(raw["process_type"].as_str()?).to_string();
 
     let (year, nr_str) = process_id.split_once('-')?;
-    let nr = nr_str.trim_start_matches('0').parse::<u64>().unwrap_or(0);
+    let has_char_at_end = nr_str.find(|c: char| !c.is_ascii_digit());
+    let nr_str = match has_char_at_end {
+        Some(idx) => {
+            ityp.push(nr_str[idx..].chars().next().unwrap());
+            &nr_str[..idx]
+        }
+        None => nr_str,
+    };
+    let nr = nr_str.trim_start_matches('0').parse::<u64>().ok()?;
     let year = year.parse::<u64>().unwrap_or(0);
     let inr = year * 10000 + nr;
 

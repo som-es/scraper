@@ -256,7 +256,11 @@ impl Plenar for EuParliamentScraper {
             .await
             .unwrap_or_default();
         info.debates = self.plenary_debates(&speeches).await;
-        info.absences = self.sitting_absences(&sitting).await;
+        info.absences = self
+            .sitting_absences(&sitting)
+            .await
+            .map(|absences| vec![absences])
+            .unwrap_or_default();
         Ok(info)
     }
 }
@@ -287,7 +291,7 @@ fn sitting_to_plenar_info(sitting: &PlenarySitting) -> PlenarInfo {
         updated_at,
         call_to_orders: vec![],
         gp: sitting.term.clone().unwrap_or_default(),
-        absences: None,
+        absences: vec![],
     }
 }
 

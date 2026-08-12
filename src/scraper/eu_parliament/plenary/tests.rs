@@ -421,6 +421,24 @@ async fn live_get_plenary_sitting_by_date_2026_07_09() {
 }
 
 #[tokio::test]
+async fn live_get_plenary_sitting_by_date_2026_07_06() {
+    let scraper = EuParliamentScraper::default();
+    let plenar_info = scraper.get_plenar("MTG-PL-2026-07-06").await.unwrap();
+
+    // find refenrence "A10-0167/2026",
+    for debate in &plenar_info.debates {
+        if debate.info.about.contains("Air passenger") {
+            dbg!(debate);
+        }
+    }
+    // assert!(plenar_info.debates.iter().any(|debate| debate
+    //     .info
+    //     .references
+    //     .iter()
+    //     .any(|val| val..contains("A10-0167/2026"))));
+}
+
+#[tokio::test]
 async fn live_get_sitting_speeches_2024_01_15() {
     let scraper = EuParliamentScraper::default();
     let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();

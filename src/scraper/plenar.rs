@@ -54,7 +54,7 @@ pub struct PlenarInfo {
     pub updated_at: Option<DateTime<Utc>>,
     pub call_to_orders: Vec<CallToOrderInfo>,
     pub gp: String,
-    pub absences: Option<Absences>,
+    pub absences: Vec<Absences>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

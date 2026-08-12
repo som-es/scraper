@@ -13,7 +13,8 @@ use crate::{
 pub(super) async fn extract_absences(
     documents: &[Document],
     cache_config: &CacheConfig,
-) -> Option<Absences> {
+) -> Vec<Absences> {
+    let mut all_absences = vec![];
     for document in documents {
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
@@ -23,13 +24,13 @@ pub(super) async fn extract_absences(
             else {
                 continue;
             };
-            return Some(Absences {
+            all_absences.push(Absences {
                 absences: extracted_absences,
                 source_document: document.clone(),
             });
         }
     }
-    None
+    all_absences
 }
 
 async fn extract_absences_from_document(

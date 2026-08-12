@@ -482,6 +482,18 @@ mod tests {
         assert_eq!(meta.result, VoteResult::Adopted);
     }
 
+    // 2025-2211
+    #[tokio::test]
+    async fn test_get_votes_and_refs_for_2025_2211() {
+        let scraper = EuParliamentScraper::default();
+
+        let votes = scraper.get_votes_for_proposal("2025-2211").await.unwrap();
+
+        assert!(votes.votes.iter().any(|vote| vote.is_main == Some(true)));
+        dbg!(votes);
+        // assert_eq!(votes.len(), 1);
+    }
+
     #[tokio::test]
     async fn test_get_votes_for_2024_2006() {
         let scraper = EuParliamentScraper::default();

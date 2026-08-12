@@ -289,7 +289,7 @@ fn sitting_maps_into_common_plenar_info() {
             .unwrap()
             .with_timezone(&chrono::Utc)
     );
-    assert!(info.absences.is_none());
+    assert!(info.absences.is_empty());
 }
 
 #[test]
@@ -343,7 +343,9 @@ async fn live_get_plenar_2024_01_15() {
         .iter()
         .any(|debate| debate.speeches.iter().any(|s| s.speech.delegate_id != 0)));
 
-    let absences = info.absences.unwrap();
+    assert_eq!(info.absences.len(), 1);
+
+    let absences = &info.absences[0];
     assert!(!absences.absences.is_empty());
 
     assert_eq!(

@@ -189,14 +189,14 @@ impl EuParliamentScraper {
         });
 
         Some(Absences {
-            absences: sitting
+            absences: vec![sitting
                 .excused_ids
                 .iter()
                 .map(|id| Absence {
                     name: "".into(),
                     id: Some(*id as u32),
                 })
-                .collect(),
+                .collect()],
             source_document,
         })
     }

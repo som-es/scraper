@@ -65,7 +65,7 @@ pub struct Absence {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Absences {
-    pub absences: Vec<Absence>,
+    pub absences: Vec<Vec<Absence>>,
     pub source_document: Document,
 }
 
@@ -205,11 +205,11 @@ impl Plenar for AustriaScraper {
             }
         }
         let documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
-        let absences_documents = praesidium_documents
-            .iter()
-            .chain(&documents)
-            .cloned()
-            .collect::<Vec<_>>();
+
+        let mut absences_documents = praesidium_documents;
+        if absences_documents.is_empty() {
+            absences_documents.extend(documents.iter().cloned())
+        }
 
         let absences = extract_absences(&absences_documents, cache_config).await;
         log::info!("!!!!!!! absences: {absences:?}");

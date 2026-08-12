@@ -36,20 +36,21 @@ pub(super) async fn extract_absences(
 async fn extract_absences_from_document(
     doc: &Document,
     cache_config: &CacheConfig,
-) -> Option<Vec<Absence>> {
+) -> Option<Vec<Vec<Absence>>> {
     let mut extractor = TextExtractor::new(cache_config.clone());
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
-    extract_absences_from_text(&text)
+    let mut input_text = text.as_str();
+    let mut all_absences = vec![];
+    while let Some((start_idx, absences)) = extract_absences_from_text(&input_text) {
+        input_text = &input_text[start_idx..];
+        all_absences.push(absences)
+    }
+    Some(all_absences)
 }
 
-fn extract_absences_from_text(text: &str) -> Option<Vec<Absence>> {
-    // remove this later -> only for testing purposes
-    // if text.len() < 50000 {
-    //     return None;
-    // }
-
+fn extract_absences_from_text(text: &str) -> Option<(usize, Vec<Absence>)> {
     let text = &text.replace('\u{a0}', " ");
     let text = text.replace('\u{ad}', "");
     let titles = unique_titles();
@@ -80,7 +81,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<Absence>> {
 
     // open_ended_absence.replace(&["Hi", "Bi"], " ");
 
-    let info = &open_ended_absence[..open_ended_absence
+    let end_idx = open_ended_absence
         .find(".\n")
         .unwrap_or(usize::MAX)
         .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
@@ -106,7 +107,8 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<Absence>> {
             open_ended_absence
                 .find(". (s. auch S. 32)")
                 .unwrap_or(open_ended_absence.len()),
-        )];
+        );
+    let info = &open_ended_absence[..end_idx];
 
     log::info!(
         "-------------
@@ -241,12 +243,13 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<Absence>> {
         // .map(|x| x.collect::<String>())
         .collect::<Vec<_>>();
 
-    Some(
+    Some((
+        start_idx,
         filter_name_extraction(info.iter().map(|x| x.as_str()))
             .filter(|x| !x.is_empty())
             .map(|name| Absence { name, id: None })
             .collect::<Vec<_>>(),
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -272,7 +275,7 @@ mod tests {
             .await
             .unwrap();
         println!("absences: {absences:?}");
-        assert_eq!(&absences, &Vec::<Absence>::new());
+        assert_eq!(&absences, &Vec::<Vec<Absence>>::new());
     }
 
     //
@@ -292,7 +295,8 @@ mod tests {
 
         println!("absences: {absences:?}");
         assert_eq!(
-            absences
+            absences[0]
+                .clone()
                 .into_iter()
                 .map(|absence| absence.name)
                 .collect::<Vec<_>>(),

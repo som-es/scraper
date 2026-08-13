@@ -270,6 +270,67 @@ async fn test_absences_count_matching() {
         }
     }
 }
+
+#[tokio::test]
+async fn test_absences_for_xxviii_91() {
+    use common_scrapes::{Document, FileType};
+    use super::{Absence, Absences};
+
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXVIII/NRSITZ/91")
+        .await
+        .unwrap();
+    assert_eq!(
+        plenar_info.absences,
+        vec![
+            Absences {
+                absences: vec![
+                    Absence { name: "Peter Schmiedlechner".into(), id: None },
+                    Absence { name: "Gudrun Kugler".into(), id: None },
+                    Absence { name: "Klaus Lindinger".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "stenographisches".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/91/A_-_14_36_32_00994403.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2026, 7, 8).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence { name: "Barbara Kolm".into(), id: None },
+                    Absence { name: "Peter Schmiedlechner".into(), id: None },
+                    Absence { name: "Klaus Lindinger".into(), id: None },
+                    Absence { name: "Leonore Gewessler".into(), id: None },
+                    Absence { name: "Barbara Neßler".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "stenographisches".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/91/B_-_09_05_12_00998086.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2026, 7, 9).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence { name: "Barbara Kolm".into(), id: None },
+                    Absence { name: "Peter Schmiedlechner".into(), id: None },
+                    Absence { name: "Sebastian Schwaighofer".into(), id: None },
+                    Absence { name: "Johanna Jachs".into(), id: None },
+                    Absence { name: "Klaus Lindinger".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "stenographisches".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/91/C_-_09_05_09_01001351.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2026, 7, 10).unwrap(),
+            },
+        ]
+    );
+}
+
 #[tokio::test]
 async fn test_absences_for_xxvii_247() {
     let scraper = AustriaScraper::default();
@@ -280,7 +341,6 @@ async fn test_absences_for_xxvii_247() {
 
     dbg!(&plenar_info.absences);
     assert_eq!(plenar_info.absences.len(), 1);
-    assert_eq!(plenar_info.absences[0].absences.len(), 1);
     assert_eq!(
         plenar_info.plenary_dates,
         vec![NaiveDate::from_ymd_opt(2023, 12, 15).unwrap()]
@@ -308,7 +368,8 @@ async fn test_absences_for_xxvii_247() {
             "Julia Seidl"
         ]
         .as_slice(),
-        &plenar_info.absences[0].absences[0]
+        &plenar_info.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -325,12 +386,12 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_85() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.plenary_dates.len(), 1);
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     println!("plenar: {plenar:?}");
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .iter()
             .map(|x| x.name.as_str())
@@ -353,11 +414,10 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_19() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     println!("plenar: {plenar:?}");
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .iter()
             .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
@@ -419,10 +479,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_78_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -462,10 +521,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -500,11 +558,10 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_6_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     dbg!(&plenar);
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -535,10 +592,9 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_12_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -567,10 +623,9 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_14_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -602,10 +657,9 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -633,10 +687,9 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -662,10 +715,9 @@ async fn test_get_plenar_gegenstand_xxiii_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -698,10 +750,9 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -726,10 +777,9 @@ async fn test_get_plenar_gegenstand_xxi_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -758,10 +808,9 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_30_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -791,10 +840,9 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_110_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -822,9 +870,9 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_110_absences() {
 
     dbg!(&plenar.absences[0].absences);
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -848,10 +896,9 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_110_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -876,10 +923,9 @@ async fn test_get_plenar_gegenstand_xxvi_nrsitz_69_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -906,10 +952,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_69_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -941,10 +986,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_41_absences() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)
@@ -2129,10 +2173,9 @@ async fn test_plenar_absences_br_brsitz_827() {
         .unwrap();
 
     assert_eq!(plenar.absences.len(), 1);
-    assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0]
+        plenar.absences[0]
+            .absences
             .clone()
             .into_iter()
             .map(|absence| absence.name)

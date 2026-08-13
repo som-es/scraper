@@ -346,7 +346,6 @@ async fn live_get_plenar_2024_01_15() {
     assert_eq!(info.absences.len(), 1);
 
     let absences = &info.absences[0];
-    assert_eq!(absences.absences.len(), 1);
     assert!(!absences.absences.is_empty());
 
     assert_eq!(

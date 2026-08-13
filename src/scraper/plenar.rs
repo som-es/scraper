@@ -225,6 +225,8 @@ impl Plenar for AustriaScraper {
         let mut absences = extract_absences(&absences_documents, cache_config).await;
 
         let absences = if absences.is_empty() {
+            vec![]
+        } else {
             if single_doc {
                 let res = std::mem::take(absences.first_mut().unwrap());
 
@@ -273,10 +275,7 @@ impl Plenar for AustriaScraper {
                     vec![]
                 }
             }
-        } else {
-            vec![]
         };
-
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);

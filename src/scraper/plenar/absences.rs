@@ -47,12 +47,19 @@ async fn extract_absences_from_document(
     let text = clean_absence_text(&text);
 
     let mut input_text = text.as_str();
-    let mut all_absences: Vec<HashSet<Absence>> = vec![];
+    let mut all_absences: Vec<Vec<Absence>> = vec![];
     while let Some(absence_extraction) = extract_absences_from_text(&input_text) {
         input_text = &input_text[absence_extraction.end_of_absence_marker_idx..];
         if absence_extraction.added_afterwards {
             if let Some(last_absences) = all_absences.last_mut() {
-                last_absences.extend(absence_extraction.absences);
+                let snapshot = last_absences.clone();
+                last_absences.extend(
+                    absence_extraction
+                        .absences
+                        .iter()
+                        .filter(|absence| !snapshot.contains(&absence))
+                        .cloned(),
+                );
             }
         } else {
             all_absences.push(absence_extraction.absences.into_iter().collect())

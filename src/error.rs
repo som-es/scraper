@@ -68,6 +68,8 @@ pub enum ScraperError {
 
     #[error("Parse Error")]
     ParseErrorVerbose(ParseError),
+    #[error("Other")]
+    Other(String),
 }
 
 impl PartialEq for ScraperError {

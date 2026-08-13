@@ -292,6 +292,7 @@ fn sitting_to_plenar_info(sitting: &PlenarySitting) -> PlenarInfo {
         call_to_orders: vec![],
         gp: sitting.term.clone().unwrap_or_default(),
         absences: vec![],
+        plenary_dates: vec![sitting.date],
     }
 }
 

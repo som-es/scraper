@@ -45,7 +45,7 @@ pub struct EuGp {
     end_date: Option<NaiveDate>,
 }
 
-const GPS: [EuGp; 3] = [
+const GPS: [EuGp; 4] = [
     EuGp {
         gp: "10",
         start_date: NaiveDate::from_ymd_opt(2024, 7, 16).unwrap(),
@@ -57,9 +57,14 @@ const GPS: [EuGp; 3] = [
         end_date: Some(NaiveDate::from_ymd_opt(2024, 7, 15).unwrap()),
     },
     EuGp {
-        gp: "10",
+        gp: "8",
         start_date: NaiveDate::from_ymd_opt(2014, 7, 1).unwrap(),
         end_date: Some(NaiveDate::from_ymd_opt(2019, 7, 1).unwrap()),
+    },
+    EuGp {
+        gp: "7",
+        start_date: NaiveDate::from_ymd_opt(2009, 7, 14).unwrap(),
+        end_date: Some(NaiveDate::from_ymd_opt(2014, 6, 30).unwrap()),
     },
 ];
 

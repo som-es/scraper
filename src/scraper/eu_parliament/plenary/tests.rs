@@ -309,7 +309,7 @@ fn report_reference_maps_into_common_reference() {
     let reference = reference_from_report("A9-0050/2023").unwrap();
     assert_eq!(reference.ityp, "A");
     assert_eq!(reference.gp, "9");
-    assert_eq!(reference.inr, 50);
+    assert_eq!(reference.inr, 20230050);
     assert!(reference_from_report("not-a-ref").is_none());
 }
 

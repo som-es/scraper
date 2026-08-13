@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use common_scrapes::{Document, PlenarSpeech, Reference};
 use serde_json::{json, Value};
 
@@ -55,6 +55,7 @@ pub struct PlenarInfo {
     pub call_to_orders: Vec<CallToOrderInfo>,
     pub gp: String,
     pub absences: Vec<Absences>,
+    pub plenary_dates: Vec<NaiveDate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -212,7 +213,6 @@ impl Plenar for AustriaScraper {
         }
 
         let absences = extract_absences(&absences_documents, cache_config).await;
-        log::info!("!!!!!!! absences: {absences:?}");
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
@@ -235,6 +235,7 @@ impl Plenar for AustriaScraper {
             },
             gp: gp_code,
             absences,
+            plenary_dates: extract_session_days(&raw_plenar),
         })
     }
 }
@@ -260,4 +261,20 @@ fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>>
         raw_praesidium["protocol"]["data"]["links"].as_array()?,
         AustriaScraper::BASE_URL,
     )
+}
+
+fn extract_session_days(raw_plenar: &Value) -> Vec<NaiveDate> {
+    raw_plenar["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.get("current_session"))
+        .filter_map(|cs| cs.get("parts"))
+        .filter_map(|parts| parts.as_array())
+        .flatten()
+        .filter_map(|part| part.get("date"))
+        .filter_map(|date| date.as_str())
+        .filter_map(|s| s.split('T').next())
+        .filter_map(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .collect()
 }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use chrono::NaiveDate;
 use common_scrapes::{Document, FileType};
 use regex::Regex;
 
@@ -13,6 +14,7 @@ use crate::{
 pub(super) async fn extract_absences(
     documents: &[Document],
     cache_config: &CacheConfig,
+    // plenary_dates: &[NaiveDate],
 ) -> Vec<Absences> {
     let mut all_absences = vec![];
     for document in documents {
@@ -41,26 +43,42 @@ async fn extract_absences_from_document(
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
+
+    let text = clean_absence_text(&text);
+
     let mut input_text = text.as_str();
-    let mut all_absences = vec![];
-    while let Some((start_idx, absences)) = extract_absences_from_text(&input_text) {
-        input_text = &input_text[start_idx..];
-        all_absences.push(absences)
+    let mut all_absences: Vec<HashSet<Absence>> = vec![];
+    while let Some(absence_extraction) = extract_absences_from_text(&input_text) {
+        input_text = &input_text[absence_extraction.end_of_absence_marker_idx..];
+        if absence_extraction.added_afterwards {
+            if let Some(last_absences) = all_absences.last_mut() {
+                last_absences.extend(absence_extraction.absences);
+            }
+        } else {
+            all_absences.push(absence_extraction.absences.into_iter().collect())
+        }
     }
-    Some(all_absences)
+    if all_absences.is_empty() {
+        None
+    } else {
+        Some(
+            all_absences
+                .into_iter()
+                .map(|absences| absences.into_iter().collect())
+                .collect(),
+        )
+    }
 }
 
-fn extract_absences_from_text(text: &str) -> Option<(usize, Vec<Absence>)> {
-    let text = &text.replace('\u{a0}', " ");
-    let text = text.replace('\u{ad}', "");
-    let titles = unique_titles();
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AbsenceExtraction {
+    absences: Vec<Absence>,
+    added_afterwards: bool,
+    end_of_absence_marker_idx: usize,
+}
 
-    let text = text
-        .split_inclusive(char::is_whitespace)
-        .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
-        .filter(|x| !(x.contains(".") && x.len() <= 3))
-        .collect::<String>();
-
+fn extract_absences_from_text(text: &str) -> Option<AbsenceExtraction> {
+    let text = clean_absence_text(text);
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
     let absence_match = absence_marker_regex.find(&text)?;
 
@@ -110,6 +128,7 @@ fn extract_absences_from_text(text: &str) -> Option<(usize, Vec<Absence>)> {
         );
     let info = &open_ended_absence[..end_idx];
 
+    let added_afterwards = info.contains("bereits verkündet");
     log::info!(
         "-------------
     info: {info:?}"
@@ -243,13 +262,27 @@ fn extract_absences_from_text(text: &str) -> Option<(usize, Vec<Absence>)> {
         // .map(|x| x.collect::<String>())
         .collect::<Vec<_>>();
 
-    Some((
-        start_idx,
-        filter_name_extraction(info.iter().map(|x| x.as_str()))
+    Some(AbsenceExtraction {
+        absences: filter_name_extraction(info.iter().map(|x| x.as_str()))
             .filter(|x| !x.is_empty())
             .map(|name| Absence { name, id: None })
             .collect::<Vec<_>>(),
-    ))
+        added_afterwards,
+        end_of_absence_marker_idx: absence_match.end() + 1,
+    })
+}
+
+fn clean_absence_text(text: &str) -> String {
+    let text = &text.replace('\u{a0}', " ");
+    let text = text.replace('\u{ad}', "");
+    let titles = unique_titles();
+
+    let text = text
+        .split_inclusive(char::is_whitespace)
+        .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
+        .filter(|x| !(x.contains(".") && x.len() <= 3))
+        .collect::<String>();
+    text
 }
 
 #[cfg(test)]
@@ -275,7 +308,7 @@ mod tests {
             .await
             .unwrap();
         println!("absences: {absences:?}");
-        assert_eq!(&absences, &Vec::<Vec<Absence>>::new());
+        assert_eq!(&absences, &vec![vec![]]);
     }
 
     //

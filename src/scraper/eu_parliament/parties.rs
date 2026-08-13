@@ -1,9 +1,14 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use common_scrapes::Party;
+use chrono::NaiveDate;
+use common_scrapes::{Mandate, Party};
 
-use crate::{error::ScraperError, parties::Parties};
+use crate::{
+    error::ScraperError,
+    eu_parliament::{EuGp, GPS},
+    parties::{DelegateMandate, Parties},
+};
 
 use super::EuParliamentScraper;
 
@@ -30,6 +35,8 @@ const GROUP_COLORS: &[(&str, &str)] = &[
     ("GUE/NGL", "#460000"),
     ("The Left", "#460000"),
     ("NI", "#666666"),
+    ("EFD", "#24B9B9"),
+    ("ALDE", "#FFCC00"),
 ];
 
 fn color_for_code(code: &str) -> String {
@@ -42,14 +49,50 @@ fn color_for_code(code: &str) -> String {
 
 #[async_trait]
 impl Parties for EuParliamentScraper {
-    async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
-        let rows = self.get_all_pages("meps/show-current", "").await?;
+    async fn get_parties(&self, delegates: &[DelegateMandate]) -> Result<Vec<Party>, ScraperError> {
+        let gp_code = self
+            .scrape_info
+            .gp
+            .first()
+            .ok_or_else(|| ScraperError::Other("no legislative period configured".into()))?;
+
+        let period = GPS
+            .iter()
+            .find(|p| p.gp == gp_code.as_str())
+            .ok_or_else(|| ScraperError::Other(format!("unknown legislative period: {gp_code}")))?;
+
+        let period_start = period.start_date;
+        let period_end = period.end_date.unwrap_or(NaiveDate::MAX);
 
         let mut counts: HashMap<String, u32> = HashMap::new();
-        for row in &rows {
-            let Some(code) = row["api:political-group"].as_str() else {
+
+        for delegate in delegates {
+            let overlapping: Vec<&Mandate> = delegate
+                .mandates
+                .iter()
+                .filter(|m| {
+                    let m_end = m.end.unwrap_or(NaiveDate::MAX);
+                    m.start <= period_end && m_end >= period_start
+                })
+                .collect();
+
+            if overlapping.is_empty() {
+                continue;
+            }
+
+            let mandate = overlapping
+                .iter()
+                .find(|m| {
+                    m.start <= period_start && m.end.unwrap_or(NaiveDate::MAX) >= period_start
+                })
+                .copied()
+                .or_else(|| overlapping.iter().max_by_key(|m| m.start).copied())
+                .unwrap();
+
+            let Some(code) = mandate.party.as_deref().or(delegate.party.as_deref()) else {
                 continue;
             };
+
             *counts.entry(code.to_string()).or_default() += 1;
         }
 
@@ -72,7 +115,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_parties() {
         let scraper = EuParliamentScraper::default();
-        let mut parties = scraper.get_parties().await.unwrap();
+        let mut parties = scraper.get_parties(&vec![]).await.unwrap();
         parties.sort_by(|a, b| b.fraction.cmp(&a.fraction));
 
         // group composition/order changes over time, only assert on stable shape

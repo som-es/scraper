@@ -129,7 +129,7 @@ impl EuParliamentScraper {
         Ok(self.delegate_seats.read().await.as_ref().unwrap().clone())
     }
 
-    pub async fn get_delegates(&mut self) -> Result<Vec<Delegate>, ScraperError> {
+    pub async fn get_delegates(&self) -> Result<Vec<Delegate>, ScraperError> {
         let ids = self.current_mep_ids().await?;
         let groups = self.political_group_codes().await?;
         let seats = self.current_seats().await?.clone();

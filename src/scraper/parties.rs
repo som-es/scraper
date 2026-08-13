@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use async_trait::async_trait;
-use common_scrapes::Party;
+use common_scrapes::{Mandate, Party};
 
 use crate::{
     error::ScraperError,
@@ -9,14 +9,23 @@ use crate::{
     AustriaScraper, Scraper,
 };
 
+pub struct DelegateMandate {
+    pub delegate_id: u32,
+    pub mandates: Vec<Mandate>,
+    pub party: Option<String>,
+}
+
 #[async_trait]
 pub trait Parties: Scraper + Send {
-    async fn get_parties(&self) -> Result<Vec<Party>, ScraperError>;
+    async fn get_parties(&self, delegates: &[DelegateMandate]) -> Result<Vec<Party>, ScraperError>;
 }
 
 #[async_trait]
 impl Parties for AustriaScraper {
-    async fn get_parties(&self) -> Result<Vec<Party>, ScraperError> {
+    async fn get_parties(
+        &self,
+        _delegates: &[DelegateMandate],
+    ) -> Result<Vec<Party>, ScraperError> {
         /*let raw_enactment_paths = self.post_enactment_payload().await?;
         let enactment_paths = self
             .enactment_paths(raw_enactment_paths)
@@ -93,7 +102,7 @@ mod tests {
         };
         scraper.scrape_info.gp = vec!["XXVII".to_string()];
 
-        let mut parties = scraper.get_parties().await.unwrap();
+        let mut parties = scraper.get_parties(&vec![]).await.unwrap();
         parties.sort_by(|a, b| b.fraction.cmp(&a.fraction).then(b.name.cmp(&a.name)));
         assert_eq!(
             parties,
@@ -147,7 +156,7 @@ mod tests {
         };
         scraper.scrape_info.gp = vec!["XXIII".to_string()];
 
-        let mut parties = scraper.get_parties().await.unwrap();
+        let mut parties = scraper.get_parties(&vec![]).await.unwrap();
         parties.sort_by(|a, b| b.fraction.cmp(&a.fraction).then(b.name.cmp(&a.name)));
         assert_eq!(
             parties,
@@ -201,7 +210,7 @@ mod tests {
         };
         for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
-            let parties = scraper.get_parties().await.unwrap();
+            let parties = scraper.get_parties(&vec![]).await.unwrap();
             println!("gp: {gp}, parties: {parties:?}");
         }
     }

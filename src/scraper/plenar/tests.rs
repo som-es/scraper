@@ -1,7 +1,7 @@
 pub mod test_data;
 use std::{collections::HashSet, str::FromStr};
 
-use chrono::NaiveTime;
+use chrono::{NaiveDate, NaiveTime};
 use common_scrapes::{Opinion, Reference, Speech, SpeechTextInfo};
 
 use crate::{
@@ -215,6 +215,42 @@ async fn test_look_all_plenar_gegenstand_paths() {
 }
 
 #[tokio::test]
+// #[ignore]
+async fn test_absences_count_matching() {
+    for gp in [
+        "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+    ] {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec![gp.to_string()];
+
+        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+
+        let paths = scraper
+            .plenar_paths(plenar_infos)
+            .expect("Failed to get paths");
+        for path in paths {
+            let plenar_info = scraper.get_plenar(&path).await.unwrap();
+            if plenar_info.plenary_dates.len() == 0 {
+                dbg!(&path);
+            }
+            // assert!(plenar_info.plenary_dates.len() >= 1);
+            if plenar_info.absences.len() > 1 {
+                if plenar_info.plenary_dates.len() != plenar_info.absences.len() {
+                    println!("full or single absence doc: does not match for {path}")
+                }
+                // plenar_infos.
+            } else if plenar_info.absences.len() == 1 {
+                let abs = &plenar_info.absences[0].absences;
+                if plenar_info.plenary_dates.len() != abs.len() {
+                    println!("full or single absence doc: does not match for {path}")
+                }
+            } else {
+            }
+            for absence in plenar_info.absences {}
+        }
+    }
+}
+#[tokio::test]
 async fn test_absences_for_xxvii_247() {
     let scraper = AustriaScraper::default();
     let plenar_info = scraper
@@ -225,6 +261,10 @@ async fn test_absences_for_xxvii_247() {
     dbg!(&plenar_info.absences);
     assert_eq!(plenar_info.absences.len(), 1);
     assert_eq!(plenar_info.absences[0].absences.len(), 1);
+    assert_eq!(
+        plenar_info.plenary_dates,
+        vec![NaiveDate::from_ymd_opt(2023, 12, 15).unwrap()]
+    );
 
     assert_eq!(plenar_info.council, "NR");
     assert_eq!(
@@ -248,7 +288,9 @@ async fn test_absences_for_xxvii_247() {
             "Julia Seidl"
         ]
         .as_slice(),
-        &plenar_info.absences[0].absences[0].clone().into_iter()
+        &plenar_info.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>()
     );
@@ -268,7 +310,9 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_85() {
 
     println!("plenar: {plenar:?}");
     assert_eq!(
-        plenar.absences[0].absences[0].clone().iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .iter()
             .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
         vec![
@@ -293,7 +337,8 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_19() {
 
     println!("plenar: {plenar:?}");
     assert_eq!(
-        plenar.absences[0].absences[0].iter()
+        plenar.absences[0].absences[0]
+            .iter()
             .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
         vec![
@@ -357,7 +402,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_78_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -398,7 +445,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -435,7 +484,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_6_absences() {
 
     dbg!(&plenar);
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -467,7 +518,9 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_12_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -497,7 +550,9 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_14_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -530,7 +585,9 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_30_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -559,7 +616,9 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_30_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -586,7 +645,9 @@ async fn test_get_plenar_gegenstand_xxiii_nrsitz_30_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -620,7 +681,9 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_30_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -646,7 +709,9 @@ async fn test_get_plenar_gegenstand_xxi_nrsitz_30_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -676,7 +741,9 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_30_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -707,7 +774,9 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_110_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -731,11 +800,13 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_110_absences() {
         .await
         .unwrap();
 
+    dbg!(&plenar.absences[0].absences);
     assert_eq!(plenar.absences.len(), 1);
     assert_eq!(plenar.absences[0].absences.len(), 1);
-
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -760,7 +831,9 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_110_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -786,7 +859,9 @@ async fn test_get_plenar_gegenstand_xxvi_nrsitz_69_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -814,7 +889,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_69_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![
@@ -847,7 +924,9 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_41_absences() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec!["Elisabeth Heiß".to_string(), "Reinhold Binder".to_string(),]
@@ -2033,7 +2112,9 @@ async fn test_plenar_absences_br_brsitz_827() {
     assert_eq!(plenar.absences[0].absences.len(), 1);
 
     assert_eq!(
-        plenar.absences[0].absences[0].clone().into_iter()
+        plenar.absences[0].absences[0]
+            .clone()
+            .into_iter()
             .map(|absence| absence.name)
             .collect::<Vec<_>>(),
         vec![

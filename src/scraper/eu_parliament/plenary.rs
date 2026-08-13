@@ -12,7 +12,7 @@ use crate::{
     error::ScraperError,
     eu_parliament::votes::reference_from_report,
     language::{Language, Text},
-    plenar::{Absence, Absences, Debate, DebateInfo, Plenar, PlenarInfo},
+    plenar::{Absence, Absences, Debate, DebateInfo, InnerAbsences, Plenar, PlenarInfo},
     text_utils::remove_paran_contents,
 };
 
@@ -189,15 +189,16 @@ impl EuParliamentScraper {
         });
 
         Some(Absences {
-            absences: vec![sitting
+            absences: sitting
                 .excused_ids
                 .iter()
                 .map(|id| Absence {
                     name: "".into(),
                     id: Some(*id as u32),
                 })
-                .collect()],
+                .collect(),
             source_document,
+            date: sitting.date,
         })
     }
 }

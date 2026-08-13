@@ -7,7 +7,7 @@ use regex::Regex;
 use crate::{
     caching::CacheConfig,
     filter::filter_name_extraction,
-    plenar::{Absence, Absences},
+    plenar::{Absence, InnerAbsences},
     unique_titles, TextExtractor,
 };
 
@@ -15,7 +15,7 @@ pub(super) async fn extract_absences(
     documents: &[Document],
     cache_config: &CacheConfig,
     // plenary_dates: &[NaiveDate],
-) -> Vec<Absences> {
+) -> Vec<InnerAbsences> {
     let mut all_absences = vec![];
     for document in documents {
         if document.ftype == FileType::HTML
@@ -26,7 +26,7 @@ pub(super) async fn extract_absences(
             else {
                 continue;
             };
-            all_absences.push(Absences {
+            all_absences.push(InnerAbsences {
                 absences: extracted_absences,
                 source_document: document.clone(),
             });

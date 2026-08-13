@@ -215,6 +215,26 @@ async fn test_look_all_plenar_gegenstand_paths() {
 }
 
 #[tokio::test]
+async fn test_absences_for_xxvii_32() {
+    // /gegenstand/XXVII/NRSITZ/32
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXVII/NRSITZ/32")
+        .await
+        .unwrap();
+}
+
+// /gegenstand/XXVI/NRSITZ/76
+#[tokio::test]
+async fn test_absences_for_xxvi_76() {
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXVI/NRSITZ/76")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 // #[ignore]
 async fn test_absences_count_matching() {
     for gp in [

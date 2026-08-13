@@ -58,16 +58,23 @@ pub struct PlenarInfo {
     pub plenary_dates: Vec<NaiveDate>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Absence {
     pub name: String,
     pub id: Option<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Absences {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct InnerAbsences {
     pub absences: Vec<Vec<Absence>>,
     pub source_document: Document,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Absences {
+    pub absences: Vec<Absence>,
+    pub source_document: Document,
+    pub date: NaiveDate,
 }
 
 impl LastUpdated for PlenarInfo {
@@ -205,14 +212,41 @@ impl Plenar for AustriaScraper {
                 }
             }
         }
+        let plenary_dates = extract_session_days(&raw_plenar);
         let documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
 
         let mut absences_documents = praesidium_documents;
+        let mut single_doc = false;
         if absences_documents.is_empty() {
+            single_doc = true;
             absences_documents.extend(documents.iter().cloned())
         }
 
         let absences = extract_absences(&absences_documents, cache_config).await;
+
+        if absences.is_empty() {
+            if single_doc {
+                let res = std::mem::take(absences.first_mut().unwrap());
+
+                if res.absences.len() == plenary_dates.len() {
+                    res.absences
+                        .into_iter()
+                        .zip(plenary_dates)
+                        .map(|(absences, date)| Absences {
+                            absences,
+                            source_document: res.source_document.clone(),
+                            date,
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
 
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
@@ -235,7 +269,7 @@ impl Plenar for AustriaScraper {
             },
             gp: gp_code,
             absences,
-            plenary_dates: extract_session_days(&raw_plenar),
+            plenary_dates,
         })
     }
 }

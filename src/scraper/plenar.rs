@@ -222,27 +222,56 @@ impl Plenar for AustriaScraper {
             absences_documents.extend(documents.iter().cloned())
         }
 
-        let absences = extract_absences(&absences_documents, cache_config).await;
+        let mut absences = extract_absences(&absences_documents, cache_config).await;
 
-        if absences.is_empty() {
+        let absences = if absences.is_empty() {
             if single_doc {
                 let res = std::mem::take(absences.first_mut().unwrap());
 
                 if res.absences.len() == plenary_dates.len() {
                     res.absences
                         .into_iter()
-                        .zip(plenary_dates)
+                        .zip(&plenary_dates)
                         .map(|(absences, date)| Absences {
                             absences,
                             source_document: res.source_document.clone(),
-                            date,
+                            date: *date,
                         })
                         .collect()
+                } else if !res.absences.is_empty() {
+                    vec![Absences {
+                        absences: res.absences[0].clone(),
+                        source_document: res.source_document.clone(),
+                        date: plenary_dates[0],
+                    }]
                 } else {
                     vec![]
                 }
             } else {
-                vec![]
+                if absences.len() == plenary_dates.len() {
+                    absences
+                        .into_iter()
+                        .zip(&plenary_dates)
+                        .map(|(absence, date)| Absences {
+                            absences: absence.absences[0].clone(),
+                            source_document: absence.source_document,
+                            date: *date,
+                        })
+                        .collect()
+                } else if !absences.is_empty() {
+                    let absence = std::mem::take(absences.first_mut().unwrap());
+                    if absence.absences.is_empty() {
+                        vec![]
+                    } else {
+                        vec![Absences {
+                            absences: absence.absences[0].clone(),
+                            source_document: absence.source_document.clone(),
+                            date: plenary_dates[0],
+                        }]
+                    }
+                } else {
+                    vec![]
+                }
             }
         } else {
             vec![]

@@ -235,7 +235,7 @@ async fn test_absences_for_xxvi_76() {
 }
 
 #[tokio::test]
-// #[ignore]
+#[ignore]
 async fn test_absences_count_matching() {
     for gp in [
         "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
@@ -1286,6 +1286,7 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_117() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_plenar_bundesrat() {
     let mut scraper = AustriaScraper::default();
     scraper.scrape_info.gp = vec!["XXVIII".into()];

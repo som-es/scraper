@@ -355,6 +355,70 @@ async fn test_absences_for_xxiv_91() {
     );
 
     dbg!(&plenar_info.plenary_dates, &plenar_info.absences);
+    [
+        Absences {
+            absences: [
+                Absence {
+                    name: "Katzian",
+                    id: None,
+                },
+                Absence {
+                    name: "Hofer",
+                    id: None,
+                },
+                Absence {
+                    name: "Ursula Haubner",
+                    id: None,
+                },
+            ],
+            source_document: Document {
+                title: "Stenographisches Protokoll der 91. Sitzung",
+                link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html",
+                ftype: HTML,
+            },
+            date: 2010 - 12 - 21,
+        },
+        Absences {
+            absences: [
+                Absence {
+                    name: "Katzian",
+                    id: None,
+                },
+                Absence {
+                    name: "Schüssel",
+                    id: None,
+                },
+                Absence {
+                    name: "Hofer",
+                    id: None,
+                },
+            ],
+            source_document: Document {
+                title: "Stenographisches Protokoll der 91. Sitzung",
+                link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html",
+                ftype: HTML,
+            },
+            date: 2010 - 12 - 21,
+        },
+        Absences {
+            absences: [
+                Absence {
+                    name: "Katzian",
+                    id: None,
+                },
+                Absence {
+                    name: "Hofer",
+                    id: None,
+                },
+            ],
+            source_document: Document {
+                title: "Stenographisches Protokoll der 91. Sitzung",
+                link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html",
+                ftype: HTML,
+            },
+            date: 2010 - 12 - 22,
+        },
+    ]
 }
 
 #[tokio::test]

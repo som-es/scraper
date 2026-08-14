@@ -332,6 +332,86 @@ async fn test_absences_for_xxviii_91() {
 }
 
 #[tokio::test]
+async fn test_absences_for_xxiv_132() {
+    use super::{Absence, Absences};
+    use common_scrapes::{Document, FileType};
+
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXIV/NRSITZ/132")
+        .await
+        .unwrap();
+    assert_eq!(
+        &plenar_info.plenary_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2011, 11, 16).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 17).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 18).unwrap(),
+        ]
+    );
+    assert_eq!(
+        &plenar_info.agenda_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2011, 11, 16).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 17).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 18).unwrap(),
+        ]
+    );
+
+    assert_eq!(
+        plenar_info.absences,
+        vec![
+            Absences {
+                absences: vec![
+                    Absence { name: "Grillitsch".into(), id: None },
+                    Absence { name: "Großruck".into(), id: None },
+                    Absence { name: "Hofer".into(), id: None },
+                    Absence { name: "Hagen".into(), id: None },
+                    Absence { name: "Bellen".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 132. Sitzung".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/132/fnameorig_241985.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2011, 11, 16).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence { name: "Grillitsch".into(), id: None },
+                    Absence { name: "Großruck".into(), id: None },
+                    Absence { name: "Hofer".into(), id: None },
+                    Absence { name: "Musiol".into(), id: None },
+                    Absence { name: "Lugar".into(), id: None },
+                    Absence { name: "Bellen".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 132. Sitzung".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/132/fnameorig_241985.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2011, 11, 17).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence { name: "Grillitsch".into(), id: None },
+                    Absence { name: "Großruck".into(), id: None },
+                    Absence { name: "Tadler".into(), id: None },
+                    Absence { name: "Hofer".into(), id: None },
+                    Absence { name: "Bellen".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 132. Sitzung".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/132/fnameorig_241985.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2011, 11, 18).unwrap(),
+            },
+        ]
+    );
+}
+
+#[tokio::test]
 async fn test_absences_for_xxiv_91() {
     use super::{Absence, Absences};
     use common_scrapes::{Document, FileType};

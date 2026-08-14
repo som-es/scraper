@@ -333,6 +333,9 @@ async fn test_absences_for_xxviii_91() {
 
 #[tokio::test]
 async fn test_absences_for_xxiv_91() {
+    use super::{Absence, Absences};
+    use common_scrapes::{Document, FileType};
+
     let scraper = AustriaScraper::default();
     let plenar_info = scraper
         .get_plenar("/gegenstand/XXIV/NRSITZ/91")
@@ -354,71 +357,49 @@ async fn test_absences_for_xxiv_91() {
         ]
     );
 
-    dbg!(&plenar_info.plenary_dates, &plenar_info.absences);
-    [
-        Absences {
-            absences: [
-                Absence {
-                    name: "Katzian",
-                    id: None,
+    assert_eq!(
+        plenar_info.absences,
+        vec![
+            Absences {
+                absences: vec![
+                    Absence { name: "Katzian".into(), id: None },
+                    Absence { name: "Hofer".into(), id: None },
+                    Absence { name: "Ursula Haubner".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 91. Sitzung".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html".into(),
+                    ftype: FileType::HTML,
                 },
-                Absence {
-                    name: "Hofer",
-                    id: None,
-                },
-                Absence {
-                    name: "Ursula Haubner",
-                    id: None,
-                },
-            ],
-            source_document: Document {
-                title: "Stenographisches Protokoll der 91. Sitzung",
-                link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html",
-                ftype: HTML,
+                date: NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
             },
-            date: 2010 - 12 - 21,
-        },
-        Absences {
-            absences: [
-                Absence {
-                    name: "Katzian",
-                    id: None,
+            Absences {
+                absences: vec![
+                    Absence { name: "Katzian".into(), id: None },
+                    Absence { name: "Schüssel".into(), id: None },
+                    Absence { name: "Hofer".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 91. Sitzung".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html".into(),
+                    ftype: FileType::HTML,
                 },
-                Absence {
-                    name: "Schüssel",
-                    id: None,
-                },
-                Absence {
-                    name: "Hofer",
-                    id: None,
-                },
-            ],
-            source_document: Document {
-                title: "Stenographisches Protokoll der 91. Sitzung",
-                link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html",
-                ftype: HTML,
+                date: NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
             },
-            date: 2010 - 12 - 21,
-        },
-        Absences {
-            absences: [
-                Absence {
-                    name: "Katzian",
-                    id: None,
+            Absences {
+                absences: vec![
+                    Absence { name: "Katzian".into(), id: None },
+                    Absence { name: "Hofer".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 91. Sitzung".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html".into(),
+                    ftype: FileType::HTML,
                 },
-                Absence {
-                    name: "Hofer",
-                    id: None,
-                },
-            ],
-            source_document: Document {
-                title: "Stenographisches Protokoll der 91. Sitzung",
-                link: "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html",
-                ftype: HTML,
+                date: NaiveDate::from_ymd_opt(2010, 12, 22).unwrap(),
             },
-            date: 2010 - 12 - 22,
-        },
-    ]
+        ]
+    );
 }
 
 #[tokio::test]

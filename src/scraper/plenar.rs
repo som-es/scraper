@@ -224,7 +224,7 @@ impl Plenar for AustriaScraper {
             absences_documents.extend(documents.iter().cloned())
         }
 
-        let mut absences = extract_absences(&absences_documents, cache_config).await;
+        let absences = extract_absences(&absences_documents, cache_config).await;
 
         let absences_dates = if agenda_dates.len() > plenary_dates.len() {
             agenda_dates.clone()
@@ -232,58 +232,7 @@ impl Plenar for AustriaScraper {
             plenary_dates.clone()
         };
 
-        let absences = if absences.is_empty() {
-            vec![]
-        } else {
-            if single_doc {
-                let res = std::mem::take(absences.first_mut().unwrap());
-
-                if res.absences.len() == absences_dates.len() {
-                    res.absences
-                        .into_iter()
-                        .zip(&absences_dates)
-                        .map(|(absences, date)| Absences {
-                            absences,
-                            source_document: res.source_document.clone(),
-                            date: *date,
-                        })
-                        .collect()
-                } else if !res.absences.is_empty() {
-                    vec![Absences {
-                        absences: res.absences[0].clone(),
-                        source_document: res.source_document.clone(),
-                        date: absences_dates[0],
-                    }]
-                } else {
-                    vec![]
-                }
-            } else {
-                if absences.len() == absences_dates.len() {
-                    absences
-                        .into_iter()
-                        .zip(&absences_dates)
-                        .map(|(absence, date)| Absences {
-                            absences: absence.absences[0].clone(),
-                            source_document: absence.source_document,
-                            date: *date,
-                        })
-                        .collect()
-                } else if !absences.is_empty() {
-                    let absence = std::mem::take(absences.first_mut().unwrap());
-                    if absence.absences.is_empty() {
-                        vec![]
-                    } else {
-                        vec![Absences {
-                            absences: absence.absences[0].clone(),
-                            source_document: absence.source_document.clone(),
-                            date: absences_dates[0],
-                        }]
-                    }
-                } else {
-                    vec![]
-                }
-            }
-        };
+        let absences = extract_plenary_absences(absences, single_doc, &absences_dates);
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);
@@ -363,4 +312,63 @@ fn extract_tagesordnung_dates(raw_plenar: &Value) -> Vec<NaiveDate> {
         .filter_map(|title| title.strip_prefix("Tagesordnung vom"))
         .filter_map(|rest| NaiveDate::parse_from_str(rest.trim(), "%d.%m.%Y").ok())
         .collect()
+}
+
+fn extract_plenary_absences(
+    mut absences: Vec<InnerAbsences>,
+    single_doc: bool,
+    absences_dates: &[NaiveDate],
+) -> Vec<Absences> {
+    if absences.is_empty() {
+        vec![]
+    } else {
+        if single_doc {
+            let res = std::mem::take(absences.first_mut().unwrap());
+
+            if res.absences.len() == absences_dates.len() {
+                res.absences
+                    .into_iter()
+                    .zip(absences_dates)
+                    .map(|(absences, date)| Absences {
+                        absences,
+                        source_document: res.source_document.clone(),
+                        date: *date,
+                    })
+                    .collect()
+            } else if !res.absences.is_empty() {
+                vec![Absences {
+                    absences: res.absences[0].clone(),
+                    source_document: res.source_document.clone(),
+                    date: absences_dates[0],
+                }]
+            } else {
+                vec![]
+            }
+        } else {
+            if absences.len() == absences_dates.len() {
+                absences
+                    .into_iter()
+                    .zip(absences_dates)
+                    .map(|(absence, date)| Absences {
+                        absences: absence.absences[0].clone(),
+                        source_document: absence.source_document,
+                        date: *date,
+                    })
+                    .collect()
+            } else if !absences.is_empty() {
+                let absence = std::mem::take(absences.first_mut().unwrap());
+                if absence.absences.is_empty() {
+                    vec![]
+                } else {
+                    vec![Absences {
+                        absences: absence.absences[0].clone(),
+                        source_document: absence.source_document.clone(),
+                        date: absences_dates[0],
+                    }]
+                }
+            } else {
+                vec![]
+            }
+        }
+    }
 }

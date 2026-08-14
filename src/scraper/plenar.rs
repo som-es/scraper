@@ -56,6 +56,7 @@ pub struct PlenarInfo {
     pub gp: String,
     pub absences: Vec<Absences>,
     pub plenary_dates: Vec<NaiveDate>,
+    pub agenda_dates: Vec<NaiveDate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -212,6 +213,7 @@ impl Plenar for AustriaScraper {
                 }
             }
         }
+        let agenda_dates = extract_tagesordnung_dates(&raw_plenar);
         let plenary_dates = extract_session_days(&raw_plenar);
         let documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
 
@@ -298,6 +300,7 @@ impl Plenar for AustriaScraper {
             gp: gp_code,
             absences,
             plenary_dates,
+            agenda_dates,
         })
     }
 }
@@ -338,5 +341,20 @@ fn extract_session_days(raw_plenar: &Value) -> Vec<NaiveDate> {
         .filter_map(|date| date.as_str())
         .filter_map(|s| s.split('T').next())
         .filter_map(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .collect()
+}
+
+fn extract_tagesordnung_dates(raw_plenar: &Value) -> Vec<NaiveDate> {
+    raw_plenar["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.get("agenda"))
+        .filter_map(|agenda| agenda.as_array())
+        .flatten()
+        .filter_map(|item| item.get("title"))
+        .filter_map(|title| title.as_str())
+        .filter_map(|title| title.strip_prefix("Tagesordnung vom"))
+        .filter_map(|rest| NaiveDate::parse_from_str(rest.trim(), "%d.%m.%Y").ok())
         .collect()
 }

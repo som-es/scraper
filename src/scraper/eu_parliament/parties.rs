@@ -6,7 +6,7 @@ use common_scrapes::{Mandate, Party};
 
 use crate::{
     error::ScraperError,
-    eu_parliament::{EuGp, GPS},
+    eu_parliament::GPS,
     parties::{DelegateMandate, Parties},
 };
 

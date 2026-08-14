@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
-use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, Reference, SpeechTextInfo};
+use common_scrapes::{Document, FileType, Opinion, PlenarSpeech, SpeechTextInfo};
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
@@ -12,7 +12,7 @@ use crate::{
     error::ScraperError,
     eu_parliament::votes::reference_from_report,
     language::{Language, Text},
-    plenar::{Absence, Absences, Debate, DebateInfo, InnerAbsences, Plenar, PlenarInfo},
+    plenar::{Absence, Absences, Debate, DebateInfo, Plenar, PlenarInfo},
     text_utils::remove_paran_contents,
 };
 
@@ -294,6 +294,7 @@ fn sitting_to_plenar_info(sitting: &PlenarySitting) -> PlenarInfo {
         gp: sitting.term.clone().unwrap_or_default(),
         absences: vec![],
         plenary_dates: vec![sitting.date],
+        agenda_dates: vec![sitting.date],
     }
 }
 

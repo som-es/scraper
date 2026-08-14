@@ -273,8 +273,8 @@ async fn test_absences_count_matching() {
 
 #[tokio::test]
 async fn test_absences_for_xxviii_91() {
-    use common_scrapes::{Document, FileType};
     use super::{Absence, Absences};
+    use common_scrapes::{Document, FileType};
 
     let scraper = AustriaScraper::default();
     let plenar_info = scraper
@@ -329,6 +329,32 @@ async fn test_absences_for_xxviii_91() {
             },
         ]
     );
+}
+
+#[tokio::test]
+async fn test_absences_for_xxiv_91() {
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXIV/NRSITZ/91")
+        .await
+        .unwrap();
+    assert_eq!(
+        &plenar_info.plenary_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            NaiveDate::from_ymd_opt(2010, 12, 22).unwrap(),
+        ]
+    );
+    assert_eq!(
+        &plenar_info.agenda_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            NaiveDate::from_ymd_opt(2010, 12, 22).unwrap(),
+        ]
+    );
+
+    dbg!(&plenar_info.plenary_dates, &plenar_info.absences);
 }
 
 #[tokio::test]

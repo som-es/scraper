@@ -226,16 +226,22 @@ impl Plenar for AustriaScraper {
 
         let mut absences = extract_absences(&absences_documents, cache_config).await;
 
+        let absences_dates = if agenda_dates.len() > plenary_dates.len() {
+            agenda_dates.clone()
+        } else {
+            plenary_dates.clone()
+        };
+
         let absences = if absences.is_empty() {
             vec![]
         } else {
             if single_doc {
                 let res = std::mem::take(absences.first_mut().unwrap());
 
-                if res.absences.len() == plenary_dates.len() {
+                if res.absences.len() == absences_dates.len() {
                     res.absences
                         .into_iter()
-                        .zip(&plenary_dates)
+                        .zip(&absences_dates)
                         .map(|(absences, date)| Absences {
                             absences,
                             source_document: res.source_document.clone(),
@@ -246,16 +252,16 @@ impl Plenar for AustriaScraper {
                     vec![Absences {
                         absences: res.absences[0].clone(),
                         source_document: res.source_document.clone(),
-                        date: plenary_dates[0],
+                        date: absences_dates[0],
                     }]
                 } else {
                     vec![]
                 }
             } else {
-                if absences.len() == plenary_dates.len() {
+                if absences.len() == absences_dates.len() {
                     absences
                         .into_iter()
-                        .zip(&plenary_dates)
+                        .zip(&absences_dates)
                         .map(|(absence, date)| Absences {
                             absences: absence.absences[0].clone(),
                             source_document: absence.source_document,
@@ -270,7 +276,7 @@ impl Plenar for AustriaScraper {
                         vec![Absences {
                             absences: absence.absences[0].clone(),
                             source_document: absence.source_document.clone(),
-                            date: plenary_dates[0],
+                            date: absences_dates[0],
                         }]
                     }
                 } else {

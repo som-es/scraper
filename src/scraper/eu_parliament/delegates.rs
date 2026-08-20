@@ -48,7 +48,6 @@ impl EuParliamentScraper {
         let parliament = if strasbourg_hemicyle { "str" } else { "bru" };
         let url =
             format!("https://www.europarl.europa.eu/erpl-public/hemicycle/{parliament}/en.json");
-        // let res = request(Method::GET, self.client(), (), url).await.unwrap();
         let content = solve_aws_waf_challenge(&url, WAF_TIMEOUT).await.unwrap();
         let res = match content {
             crate::waf::Content::Token(_tk) => {
@@ -376,6 +375,10 @@ mod tests {
         assert!(delegate.mandates.len() == 1);
         assert_eq!(delegate.mandates[0].party.as_deref(), Some("Renew"));
         assert!(delegate.mandates[0].end.is_none());
+
+        let binding = scraper.delegate_seats.read().await;
+        let read = binding.as_ref().unwrap();
+        assert!(!read.is_empty())
     }
 
     #[tokio::test]

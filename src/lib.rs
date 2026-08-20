@@ -13,6 +13,7 @@ mod scraper;
 mod speeches;
 mod text_extractor;
 pub mod text_utils;
+pub mod waf;
 
 pub use text_extractor::*;
 

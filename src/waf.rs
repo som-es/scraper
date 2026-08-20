@@ -9,7 +9,7 @@ use tokio::time::sleep;
 
 use crate::error::ScraperError;
 
-const WAF_TIMEOUT: Duration = Duration::from_secs(10);
+pub const WAF_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub enum Content {
     Token(String),
@@ -22,7 +22,10 @@ impl From<chromiumoxide::error::CdpError> for ScraperError {
     }
 }
 
-pub async fn solve_aws_waf_challenge(url: &str, timeout: Duration) -> Result<Content, ScraperError> {
+pub async fn solve_aws_waf_challenge(
+    url: &str,
+    timeout: Duration,
+) -> Result<Content, ScraperError> {
     let config = BrowserConfig::builder()
         .no_sandbox()
         .build()
@@ -70,7 +73,10 @@ async fn solve_waf_challenge(
 
     loop {
         if Instant::now() >= deadline {
-            let text = page.content().await.map_err(|e| ScraperError::Other(format!("Could not get page content: {e}")))?;
+            let text = page
+                .content()
+                .await
+                .map_err(|e| ScraperError::Other(format!("Could not get page content: {e}")))?;
             return Ok(Content::Text(text));
         }
 

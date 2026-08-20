@@ -29,6 +29,7 @@ where
     }
 
     let res = req.send().await;
+    dbg!(&res);
 
     let res = match res {
         Ok(res) => res,

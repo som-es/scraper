@@ -763,7 +763,6 @@ mod tests {
     use std::{collections::HashSet, io::Read};
 
     use chrono::NaiveDateTime;
-    use serde_derive::Deserialize;
     use std::error::Error;
 
     #[derive(Debug, Deserialize)]

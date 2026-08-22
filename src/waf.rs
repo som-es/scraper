@@ -9,7 +9,7 @@ use tokio::time::sleep;
 
 use crate::error::ScraperError;
 
-pub const WAF_TIMEOUT: Duration = Duration::from_secs(10);
+pub const WAF_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub enum Content {
     Token(String),

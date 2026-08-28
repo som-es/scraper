@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use common_scrapes::{Document, PlenarSpeech, Reference};
 use serde_json::{json, Value};
 
@@ -54,13 +54,28 @@ pub struct PlenarInfo {
     pub updated_at: Option<DateTime<Utc>>,
     pub call_to_orders: Vec<CallToOrderInfo>,
     pub gp: String,
-    pub absences: Option<Absences>,
+    pub absences: Vec<Absences>,
+    pub plenary_dates: Vec<NaiveDate>,
+    pub agenda_dates: Vec<NaiveDate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct Absence {
+    pub name: String,
+    pub id: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct InnerAbsences {
+    pub absences: Vec<Vec<Absence>>,
+    pub source_document: Document,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Absences {
-    pub absences: Vec<String>,
+    pub absences: Vec<Absence>,
     pub source_document: Document,
+    pub date: NaiveDate,
 }
 
 impl LastUpdated for PlenarInfo {
@@ -198,16 +213,26 @@ impl Plenar for AustriaScraper {
                 }
             }
         }
+        let agenda_dates = extract_tagesordnung_dates(&raw_plenar);
+        let plenary_dates = extract_session_days(&raw_plenar);
         let documents = documents(&raw_documents, AustriaScraper::BASE_URL).unwrap_or_default();
-        let absences_documents = praesidium_documents
-            .iter()
-            .chain(&documents)
-            .cloned()
-            .collect::<Vec<_>>();
+
+        let mut absences_documents = praesidium_documents;
+        let mut single_doc = false;
+        if absences_documents.is_empty() {
+            single_doc = true;
+            absences_documents.extend(documents.iter().cloned())
+        }
 
         let absences = extract_absences(&absences_documents, cache_config).await;
-        log::info!("!!!!!!! absences: {absences:?}");
 
+        let absences_dates = if agenda_dates.len() > plenary_dates.len() {
+            agenda_dates.clone()
+        } else {
+            plenary_dates.clone()
+        };
+
+        let absences = extract_plenary_absences(absences, single_doc, &absences_dates);
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);
@@ -229,6 +254,8 @@ impl Plenar for AustriaScraper {
             },
             gp: gp_code,
             absences,
+            plenary_dates,
+            agenda_dates,
         })
     }
 }
@@ -254,4 +281,94 @@ fn extract_praesidium_documents(raw_praesidium: &Value) -> Option<Vec<Document>>
         raw_praesidium["protocol"]["data"]["links"].as_array()?,
         AustriaScraper::BASE_URL,
     )
+}
+
+fn extract_session_days(raw_plenar: &Value) -> Vec<NaiveDate> {
+    raw_plenar["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.get("current_session"))
+        .filter_map(|cs| cs.get("parts"))
+        .filter_map(|parts| parts.as_array())
+        .flatten()
+        .filter_map(|part| part.get("date"))
+        .filter_map(|date| date.as_str())
+        .filter_map(|s| s.split('T').next())
+        .filter_map(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .collect()
+}
+
+fn extract_tagesordnung_dates(raw_plenar: &Value) -> Vec<NaiveDate> {
+    raw_plenar["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.get("agenda"))
+        .filter_map(|agenda| agenda.as_array())
+        .flatten()
+        .filter_map(|item| item.get("title"))
+        .filter_map(|title| title.as_str())
+        .filter_map(|title| title.strip_prefix("Tagesordnung vom"))
+        .filter_map(|rest| NaiveDate::parse_from_str(rest.trim(), "%d.%m.%Y").ok())
+        .collect()
+}
+
+fn extract_plenary_absences(
+    mut absences: Vec<InnerAbsences>,
+    single_doc: bool,
+    absences_dates: &[NaiveDate],
+) -> Vec<Absences> {
+    if absences.is_empty() {
+        vec![]
+    } else {
+        if single_doc {
+            let res = std::mem::take(absences.first_mut().unwrap());
+
+            if res.absences.len() == absences_dates.len() {
+                res.absences
+                    .into_iter()
+                    .zip(absences_dates)
+                    .map(|(absences, date)| Absences {
+                        absences,
+                        source_document: res.source_document.clone(),
+                        date: *date,
+                    })
+                    .collect()
+            } else if !res.absences.is_empty() {
+                vec![Absences {
+                    absences: res.absences[0].clone(),
+                    source_document: res.source_document.clone(),
+                    date: absences_dates[0],
+                }]
+            } else {
+                vec![]
+            }
+        } else {
+            if absences.len() == absences_dates.len() {
+                absences
+                    .into_iter()
+                    .zip(absences_dates)
+                    .map(|(absence, date)| Absences {
+                        absences: absence.absences[0].clone(),
+                        source_document: absence.source_document,
+                        date: *date,
+                    })
+                    .collect()
+            } else if !absences.is_empty() {
+                let absence = std::mem::take(absences.first_mut().unwrap());
+                if absence.absences.is_empty() {
+                    vec![]
+                } else {
+                    vec![Absences {
+                        absences: absence.absences[0].clone(),
+                        source_document: absence.source_document.clone(),
+                        date: absences_dates[0],
+                    }]
+                }
+            } else {
+                vec![]
+            }
+        }
+    }
 }

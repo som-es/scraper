@@ -4,3 +4,4 @@
 .DS_Store
 caching
 flamegraph*.svg
+AGENTS.md

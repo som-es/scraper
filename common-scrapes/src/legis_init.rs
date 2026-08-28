@@ -116,6 +116,7 @@ pub enum AcceptedState {
     #[default]
     Declined,
     PreDeclined,
+    Unknown,
 }
 
 impl core::fmt::Display for AcceptedState {
@@ -124,15 +125,41 @@ impl core::fmt::Display for AcceptedState {
             AcceptedState::Accepted => 'a',
             AcceptedState::Declined => 'd',
             AcceptedState::PreDeclined => 'p',
+            AcceptedState::Unknown => 'u',
         };
         write!(f, "{res}")
     }
+}
+
+impl AcceptedState {
+    pub fn from_result_str(s: &str) -> Self {
+        match s {
+            "ADOPTED" => AcceptedState::Accepted,
+            "REJECTED" => AcceptedState::Declined,
+            _ => AcceptedState::default(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
+pub struct DelegateRef {
+    pub name: String,
+    pub id: Option<u32>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize, Default)]
+pub struct NamedVoteProContra {
+    pub pro: Vec<DelegateRef>,
+    pub contra: Vec<DelegateRef>,
+    pub abstention: Vec<DelegateRef>,
+    pub no_vote: Vec<DelegateRef>,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct ProContra {
     pub pro: Vec<String>,
     pub contra: Vec<String>,
+    pub abstained: Vec<String>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -215,8 +242,10 @@ pub struct HiddenVotes {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub struct VotedByName {
-    pub delegates_pro_contra: Option<ProContra>,
+    pub delegates_pro_contra: Option<NamedVoteProContra>,
     pub vote_sum: usize,
+    pub abstention_count: Option<usize>,
+    pub no_vote_count: Option<usize>,
     pub pro_count: usize,
     pub contra_count: usize,
     pub invalid_count: usize,
@@ -248,6 +277,18 @@ pub enum Voting {
     Resolution, // Entschließung
     Report,
     Law,
+}
+
+impl Voting {
+    pub fn from_type_str(s: &str) -> Option<Self> {
+        match s {
+            "AMENDMENT" => Some(Voting::Amendment),
+            "RESOLUTION" => Some(Voting::Resolution),
+            "REPORT" => Some(Voting::Report),
+            "LAW" => Some(Voting::Law),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Voting {

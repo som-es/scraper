@@ -1,7 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use reqwest::StatusCode;
 use thiserror::Error;
+
+use crate::eu_parliament::votes::ParseError;
 
 #[derive(Error, Clone, Debug)]
 pub enum ScraperError {
@@ -37,6 +39,9 @@ pub enum ScraperError {
     #[error("Encounterd invalid proposal information from API")]
     InvalidProposalInfoError,
 
+    #[error("Too many requests, retry after")]
+    TooManyRequests(Option<Duration>),
+
     #[error("Could not parse proposal information from API")]
     ProposalParseError,
 
@@ -60,4 +65,19 @@ pub enum ScraperError {
 
     #[error("Parse Error")]
     ParseError,
+
+    #[error("Parse Error")]
+    ParseErrorVerbose(ParseError),
+    #[error("Other")]
+    Other(String),
+}
+
+impl PartialEq for ScraperError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::StatusError(l0), Self::StatusError(r0)) => l0 == r0,
+            (Self::ParseErrorVerbose(l0), Self::ParseErrorVerbose(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }

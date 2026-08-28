@@ -2,11 +2,12 @@ use std::fmt::Display;
 
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, Serialize, Deserialize, Default)]
 pub enum FileType {
     OriginalPDF,
     DigitalPDF,
     HTML,
+    #[default]
     Unknown,
 }
 
@@ -16,7 +17,7 @@ impl Display for FileType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct Document {
     pub title: String,
     pub link: String,

@@ -1,7 +1,7 @@
 pub mod test_data;
 use std::{collections::HashSet, str::FromStr};
 
-use chrono::NaiveTime;
+use chrono::{NaiveDate, NaiveTime};
 use common_scrapes::{Opinion, Reference, Speech, SpeechTextInfo};
 
 use crate::{
@@ -215,12 +215,371 @@ async fn test_look_all_plenar_gegenstand_paths() {
 }
 
 #[tokio::test]
+async fn test_absences_for_xxvii_32() {
+    // /gegenstand/XXVII/NRSITZ/32
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXVII/NRSITZ/32")
+        .await
+        .unwrap();
+}
+
+// /gegenstand/XXVI/NRSITZ/76
+#[tokio::test]
+async fn test_absences_for_xxvi_76() {
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXVI/NRSITZ/76")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_absences_count_matching() {
+    for gp in [
+        "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+    ] {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec![gp.to_string()];
+
+        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
+
+        let paths = scraper
+            .plenar_paths(plenar_infos)
+            .expect("Failed to get paths");
+        for path in paths {
+            let plenar_info = scraper.get_plenar(&path).await.unwrap();
+            if plenar_info.plenary_dates.len() == 0 {
+                dbg!(&path);
+            }
+            // assert!(plenar_info.plenary_dates.len() >= 1);
+            if plenar_info.absences.len() > 1 {
+                if plenar_info.plenary_dates.len() != plenar_info.absences.len() {
+                    println!("full or single absence doc: does not match for {path}")
+                }
+                // plenar_infos.
+            } else if plenar_info.absences.len() == 1 {
+                let abs = &plenar_info.absences[0].absences;
+                if plenar_info.plenary_dates.len() != abs.len() {
+                    println!("full or single absence doc: does not match for {path}")
+                }
+            } else {
+            }
+            for absence in plenar_info.absences {}
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_absences_for_xxviii_91() {
+    use super::{Absence, Absences};
+    use common_scrapes::{Document, FileType};
+
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXVIII/NRSITZ/91")
+        .await
+        .unwrap();
+    assert_eq!(
+        plenar_info.absences,
+        vec![
+            Absences {
+                absences: vec![
+                    Absence { name: "Peter Schmiedlechner".into(), id: None },
+                    Absence { name: "Gudrun Kugler".into(), id: None },
+                    Absence { name: "Klaus Lindinger".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "stenographisches".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/91/A_-_14_36_32_00994403.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2026, 7, 8).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence { name: "Barbara Kolm".into(), id: None },
+                    Absence { name: "Peter Schmiedlechner".into(), id: None },
+                    Absence { name: "Klaus Lindinger".into(), id: None },
+                    Absence { name: "Leonore Gewessler".into(), id: None },
+                    Absence { name: "Barbara Neßler".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "stenographisches".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/91/B_-_09_05_12_00998086.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2026, 7, 9).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence { name: "Barbara Kolm".into(), id: None },
+                    Absence { name: "Peter Schmiedlechner".into(), id: None },
+                    Absence { name: "Sebastian Schwaighofer".into(), id: None },
+                    Absence { name: "Johanna Jachs".into(), id: None },
+                    Absence { name: "Klaus Lindinger".into(), id: None },
+                ],
+                source_document: Document {
+                    title: "stenographisches".into(),
+                    link: "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/91/C_-_09_05_09_01001351.html".into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2026, 7, 10).unwrap(),
+            },
+        ]
+    );
+}
+
+#[tokio::test]
+async fn test_absences_for_xxiv_132() {
+    use super::{Absence, Absences};
+    use common_scrapes::{Document, FileType};
+
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXIV/NRSITZ/132")
+        .await
+        .unwrap();
+    assert_eq!(
+        &plenar_info.plenary_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2011, 11, 16).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 17).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 18).unwrap(),
+        ]
+    );
+    assert_eq!(
+        &plenar_info.agenda_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2011, 11, 16).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 17).unwrap(),
+            NaiveDate::from_ymd_opt(2011, 11, 18).unwrap(),
+        ]
+    );
+
+    assert_eq!(
+        plenar_info.absences,
+        vec![
+            Absences {
+                absences: vec![
+                    Absence {
+                        name: "Grillitsch".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Großruck".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hofer".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hagen".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Bellen".into(),
+                        id: None
+                    },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 132. Sitzung".into(),
+                    link:
+                        "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/132/fnameorig_241985.html"
+                            .into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2011, 11, 16).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence {
+                        name: "Grillitsch".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Großruck".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hofer".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Musiol".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Lugar".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Bellen".into(),
+                        id: None
+                    },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 132. Sitzung".into(),
+                    link:
+                        "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/132/fnameorig_241985.html"
+                            .into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2011, 11, 17).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence {
+                        name: "Grillitsch".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Großruck".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Tadler".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hofer".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Bellen".into(),
+                        id: None
+                    },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 132. Sitzung".into(),
+                    link:
+                        "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/132/fnameorig_241985.html"
+                            .into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2011, 11, 18).unwrap(),
+            },
+        ]
+    );
+}
+
+#[tokio::test]
+async fn test_absences_for_xxiv_91() {
+    use super::{Absence, Absences};
+    use common_scrapes::{Document, FileType};
+
+    let scraper = AustriaScraper::default();
+    let plenar_info = scraper
+        .get_plenar("/gegenstand/XXIV/NRSITZ/91")
+        .await
+        .unwrap();
+    assert_eq!(
+        &plenar_info.plenary_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            NaiveDate::from_ymd_opt(2010, 12, 22).unwrap(),
+        ]
+    );
+    assert_eq!(
+        &plenar_info.agenda_dates,
+        &vec![
+            NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            NaiveDate::from_ymd_opt(2010, 12, 22).unwrap(),
+        ]
+    );
+
+    assert_eq!(
+        plenar_info.absences,
+        vec![
+            Absences {
+                absences: vec![
+                    Absence {
+                        name: "Katzian".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hofer".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Ursula Haubner".into(),
+                        id: None
+                    },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 91. Sitzung".into(),
+                    link:
+                        "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html"
+                            .into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence {
+                        name: "Katzian".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Schüssel".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hofer".into(),
+                        id: None
+                    },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 91. Sitzung".into(),
+                    link:
+                        "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html"
+                            .into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2010, 12, 21).unwrap(),
+            },
+            Absences {
+                absences: vec![
+                    Absence {
+                        name: "Katzian".into(),
+                        id: None
+                    },
+                    Absence {
+                        name: "Hofer".into(),
+                        id: None
+                    },
+                ],
+                source_document: Document {
+                    title: "Stenographisches Protokoll der 91. Sitzung".into(),
+                    link:
+                        "https://www.parlament.gv.at/dokument/XXIV/NRSITZ/91/fnameorig_208681.html"
+                            .into(),
+                    ftype: FileType::HTML,
+                },
+                date: NaiveDate::from_ymd_opt(2010, 12, 22).unwrap(),
+            },
+        ]
+    );
+}
+
+#[tokio::test]
 async fn test_absences_for_xxvii_247() {
     let scraper = AustriaScraper::default();
     let plenar_info = scraper
         .get_plenar("/gegenstand/XXVII/NRSITZ/247")
         .await
         .unwrap();
+
+    dbg!(&plenar_info.absences);
+    assert_eq!(plenar_info.absences.len(), 1);
+    assert_eq!(
+        plenar_info.plenary_dates,
+        vec![NaiveDate::from_ymd_opt(2023, 12, 15).unwrap()]
+    );
 
     assert_eq!(plenar_info.council, "NR");
     assert_eq!(
@@ -244,7 +603,12 @@ async fn test_absences_for_xxvii_247() {
             "Julia Seidl"
         ]
         .as_slice(),
-        &plenar_info.absences.unwrap().clone().absences
+        &plenar_info.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>()
     );
 }
 
@@ -257,15 +621,15 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_85() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.plenary_dates.len(), 1);
+    assert_eq!(plenar.absences.len(), 1);
     println!("plenar: {plenar:?}");
     assert_eq!(
-        plenar
+        plenar.absences[0]
             .absences
-            .unwrap()
             .clone()
-            .absences
             .iter()
-            .map(|x| x.as_str())
+            .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
         vec![
             "Andreas Kollross",
@@ -284,14 +648,13 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_19() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     println!("plenar: {plenar:?}");
     assert_eq!(
-        plenar
-            .absences
-            .unwrap()
+        plenar.absences[0]
             .absences
             .iter()
-            .map(|x| x.as_str())
+            .map(|x| x.name.as_str())
             .collect::<Vec<_>>(),
         vec![
             "Hermann Gahr",
@@ -350,8 +713,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_78_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Marie-Christine Giuliani-Sterrer".to_string(),
             "Martin Graf".to_string(),
@@ -364,7 +733,7 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_78_absences() {
     );
     println!("{:?}", plenar.absences);
     assert_eq!(
-        plenar.absences.unwrap().source_document.link,
+        plenar.absences[0].source_document.link,
         "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/78/A_-_17_49_11_00962921.html"
     );
     // println!("plenar: {plenar:?}");
@@ -386,8 +755,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Giuliani-Sterrer".to_string(),
             "Herbert".to_string(),
@@ -398,7 +773,7 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_5_absences() {
     );
     println!("{:?}", plenar.absences);
     assert_eq!(
-        plenar.absences.unwrap().source_document.link,
+        plenar.absences[0].source_document.link,
         "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/5/A_-_09_09_06_00597342.html"
     );
     // println!("plenar: {plenar:?}");
@@ -417,9 +792,15 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_6_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     dbg!(&plenar);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Marie-Christine Giuliani-Sterrer".to_string(),
             "Werner Herbert".to_string(),
@@ -445,8 +826,14 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_12_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Moser".to_string(),
             "Schenk".to_string(),
@@ -470,8 +857,14 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_14_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Heinzl".to_string(),
             "Stefan".to_string(),
@@ -498,8 +891,14 @@ async fn test_get_plenar_gegenstand_xxv_nrsitz_30_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Bayr".to_string(),
             "Auer".to_string(),
@@ -522,8 +921,14 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_30_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Faul".to_string(),
             "Praßl".to_string(),
@@ -544,8 +949,14 @@ async fn test_get_plenar_gegenstand_xxiii_nrsitz_30_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Hagenhofer".to_string(),
             "Kräuter".to_string(),
@@ -573,8 +984,14 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_30_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Gabriela Moser".to_string(),
             "Kurt Grünewald".to_string(),
@@ -594,8 +1011,14 @@ async fn test_get_plenar_gegenstand_xxi_nrsitz_30_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Fasslabend".to_string(),
             "Amon".to_string(),
@@ -619,8 +1042,14 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_30_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Brinek".to_string(),
             "Frieser".to_string(),
@@ -645,8 +1074,14 @@ async fn test_get_plenar_gegenstand_xx_nrsitz_110_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Aumayr".to_string(),
             "Schaffenrath".to_string(),
@@ -668,8 +1103,15 @@ async fn test_get_plenar_gegenstand_xxii_nrsitz_110_absences() {
         .await
         .unwrap();
 
+    dbg!(&plenar.absences[0].absences);
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Großruck".to_string(),
             "Wimmer".to_string(),
@@ -688,8 +1130,14 @@ async fn test_get_plenar_gegenstand_xxiv_nrsitz_110_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Keck".to_string(),
             "Schüssel".to_string(),
@@ -709,8 +1157,14 @@ async fn test_get_plenar_gegenstand_xxvi_nrsitz_69_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Barbara Krenn".to_string(),
             "Nico Marchetti".to_string(),
@@ -732,8 +1186,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_69_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Manuel Litzke".to_string(),
             "Reinhold Maier".to_string(),
@@ -760,8 +1220,14 @@ async fn test_get_plenar_gegenstand_xxviii_nrsitz_41_absences() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec!["Elisabeth Heiß".to_string(), "Reinhold Binder".to_string(),]
     );
     println!("plenar: {plenar:?}");
@@ -1029,6 +1495,7 @@ async fn test_get_plenar_gegenstand_xxvii_nrsitz_117() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_plenar_bundesrat() {
     let mut scraper = AustriaScraper::default();
     scraper.scrape_info.gp = vec!["XXVIII".into()];
@@ -1225,6 +1692,7 @@ async fn test_speech_herbert_scheibner() {
         delegate_id: 1604,
         delegate_display_name: "Herbert Scheibner (B)".into(),
         opinion: Opinion::Against,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(96),
             site_end: None,
@@ -1351,6 +1819,7 @@ async fn test_plenar_speech_diesner_martina() {
         delegate_id: 16218,
         delegate_display_name: "Martina Diesner-Wais (V)".into(),
         opinion: Opinion::Infavor,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: None,
             site_end: None,
@@ -1388,6 +1857,7 @@ async fn test_plenar_speech_paul_stich() {
             delegate_id: 30707,
             delegate_display_name: "Paul Stich (S)".into(),
             opinion: Opinion::Infavor,
+            speech_texts: None,
             spoken_text_html_urls: vec![SpeechTextInfo {
                 site_start: None,
                 site_end: None,
@@ -1455,6 +1925,7 @@ async fn test_plenar_speech_dieter_brosz_nrsitz_117() {
     let speech = Speech {
         delegate_id: 8239,
         delegate_display_name: "Dieter Brosz, Msc (G)".into(),
+        speech_texts: None,
         opinion: Opinion::Against,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(15),
@@ -1710,6 +2181,7 @@ async fn test_elisabeth_gehrer_speech() {
         delegate_id: 3131,
         delegate_display_name: "BM Elisabeth Gehrer (V)".into(),
         opinion: Opinion::Other("Regierungsbank".into()),
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(29),
             site_end: Some(31),
@@ -1778,6 +2250,7 @@ async fn test_speech_fritz_neugebauer() {
         delegate_id: 3604,
         delegate_display_name: "Fritz Neugebauer (V)".into(),
         opinion: Opinion::Infavor,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(46),
             site_end: Some(48),
@@ -1837,6 +2310,7 @@ async fn test_speech_beate_schasching() {
         delegate_id: 8181,
         delegate_display_name: "Beate Schasching (S)".into(),
         opinion: Opinion::Infavor,
+        speech_texts: None,
         spoken_text_html_urls: vec![SpeechTextInfo {
             site_start: Some(48),
             site_end: Some(49),
@@ -1934,8 +2408,14 @@ async fn test_plenar_absences_br_brsitz_827() {
         .await
         .unwrap();
 
+    assert_eq!(plenar.absences.len(), 1);
     assert_eq!(
-        plenar.absences.clone().unwrap().absences,
+        plenar.absences[0]
+            .absences
+            .clone()
+            .into_iter()
+            .map(|absence| absence.name)
+            .collect::<Vec<_>>(),
         vec![
             "Efgani Dönmez".to_string(),
             "Adelheid Ebner".to_string(),

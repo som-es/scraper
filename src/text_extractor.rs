@@ -80,6 +80,19 @@ enum State {
     Cached(Option<String>),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ExtractorConfig {
+    pub remove_steno_info: bool,
+}
+
+impl Default for ExtractorConfig {
+    fn default() -> Self {
+        Self {
+            remove_steno_info: true,
+        }
+    }
+}
+
 /// Extracts text from an Austrian parliament HTML document containing speeches.
 /// An Austrian parliament HTML document is defined as Schrödinger's document.
 /// You can't know if it's an entire protocol of speeches or just an isolated speech.
@@ -92,6 +105,7 @@ pub struct TextExtractor {
     pub client: reqwest::Client,
     pub fit_speech_regexes: FitSpeechRegexes,
     pub cache_config: CacheConfig,
+    pub extractor_config: ExtractorConfig,
 }
 
 unsafe impl Sync for TextExtractor {}
@@ -137,6 +151,7 @@ impl TextExtractor {
                 time_marker_re,
             },
             cache_config,
+            extractor_config: Default::default(),
         }
     }
 
@@ -189,6 +204,7 @@ impl TextExtractor {
                 self.fit_speech_regexes.steno_info_regex.clone(),
                 self.fit_speech_regexes.br_steno_info_regex.clone(),
             ];
+            let should_remove_steno_info = self.extractor_config.remove_steno_info;
             let extractor = self.clone();
             let (html, text) = tokio::task::spawn_blocking(move || {
                 let html = Html::parse_document(&html);
@@ -198,7 +214,13 @@ impl TextExtractor {
                         extract_text_from_html_via_name_attribute_finding_optimal_solution,
                     )(&html, url.split('#').nth(1).unwrap(), extractor)
                     // .inspect(|x| println!("--------------------- {x}\n --------------"))
-                    .map(|text| remove_steno_info(&text, &steno_info_regex));
+                    .map(|text| {
+                        if should_remove_steno_info {
+                            remove_steno_info(&text, &steno_info_regex)
+                        } else {
+                            text
+                        }
+                    });
                 (html, text)
             })
             .await
@@ -212,8 +234,14 @@ impl TextExtractor {
                 self.fit_speech_regexes.steno_info_regex.clone(),
                 self.fit_speech_regexes.br_steno_info_regex.clone(),
             ];
+            let should_remove_steno_info = self.extractor_config.remove_steno_info;
             tokio::task::spawn_blocking(move || {
-                remove_steno_info(&extract_text_from_html(&html), &steno_info_regex)
+                let text = extract_text_from_html(&html);
+                if should_remove_steno_info {
+                    remove_steno_info(&text, &steno_info_regex)
+                } else {
+                    text
+                }
             })
             .await
             .ok()?

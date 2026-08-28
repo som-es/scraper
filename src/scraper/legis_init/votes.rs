@@ -1,5 +1,8 @@
 use chrono::NaiveDate;
-use common_scrapes::{HiddenVotes, ProContra, Stage, VoteStage, VoteType, VotedByName};
+use common_scrapes::{
+    DelegateRef, HiddenVotes, NamedVoteProContra, ProContra, Stage, VoteStage, VoteType,
+    VotedByName,
+};
 use regex::Regex;
 use serde_json::Value;
 
@@ -256,6 +259,8 @@ pub async fn extract_most_fitting_votes(
                 pro_count,
                 contra_count,
                 invalid_count,
+                abstention_count: None,
+                no_vote_count: None,
             });
             // println!("hidden_votes: {hidden_votes:?}");
             break;
@@ -294,7 +299,7 @@ pub fn extract_vote_count(text: &str) -> Option<(usize, usize, usize, usize)> {
     ))
 }
 
-pub fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
+pub fn extract_votes_by_name(from_html_text: &str) -> Option<NamedVoteProContra> {
     let yes_no_regex = yes_no_votes_inside_regex();
     let start_of_yes_no_idx = yes_no_regex
         .find(from_html_text)
@@ -350,8 +355,17 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<ProContra> {
 
     let contra_delegates = group_names_from_vote_section(contra_delegates);
 
-    Some(ProContra {
-        pro: pro_delegates,
-        contra: contra_delegates,
+    Some(NamedVoteProContra {
+        pro: pro_delegates
+            .into_iter()
+            .map(|name| DelegateRef { name, id: None })
+            .collect(),
+
+        contra: contra_delegates
+            .into_iter()
+            .map(|name| DelegateRef { name, id: None })
+            .collect(),
+        abstention: vec![],
+        no_vote: vec![],
     })
 }

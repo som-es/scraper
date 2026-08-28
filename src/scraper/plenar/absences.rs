@@ -1,17 +1,22 @@
 use std::collections::HashSet;
 
+use chrono::NaiveDate;
 use common_scrapes::{Document, FileType};
 use regex::Regex;
 
 use crate::{
-    caching::CacheConfig, filter::filter_name_extraction, plenar::Absences, unique_titles,
-    TextExtractor,
+    caching::CacheConfig,
+    filter::filter_name_extraction,
+    plenar::{Absence, InnerAbsences},
+    unique_titles, TextExtractor,
 };
 
 pub(super) async fn extract_absences(
     documents: &[Document],
     cache_config: &CacheConfig,
-) -> Option<Absences> {
+    // plenary_dates: &[NaiveDate],
+) -> Vec<InnerAbsences> {
+    let mut all_absences = vec![];
     for document in documents {
         if document.ftype == FileType::HTML
             && document.title.to_lowercase().contains("stenographisches")
@@ -21,42 +26,66 @@ pub(super) async fn extract_absences(
             else {
                 continue;
             };
-            return Some(Absences {
+            all_absences.push(InnerAbsences {
                 absences: extracted_absences,
                 source_document: document.clone(),
             });
         }
     }
-    None
+    all_absences
 }
 
 async fn extract_absences_from_document(
     doc: &Document,
     cache_config: &CacheConfig,
-) -> Option<Vec<String>> {
+) -> Option<Vec<Vec<Absence>>> {
     let mut extractor = TextExtractor::new(cache_config.clone());
     let text = extractor
         .extract_text_from_url(&doc.link, None, true)
         .await?;
-    extract_absences_from_text(&text)
+
+    let text = clean_absence_text(&text);
+
+    let mut input_text = text.as_str();
+    let mut all_absences: Vec<Vec<Absence>> = vec![];
+    while let Some(absence_extraction) = extract_absences_from_text(&input_text) {
+        input_text = &input_text[absence_extraction.end_of_absence_marker_idx..];
+        if absence_extraction.added_afterwards {
+            if let Some(last_absences) = all_absences.last_mut() {
+                let snapshot = last_absences.clone();
+                last_absences.extend(
+                    absence_extraction
+                        .absences
+                        .iter()
+                        .filter(|absence| !snapshot.contains(&absence))
+                        .cloned(),
+                );
+            }
+        } else {
+            all_absences.push(absence_extraction.absences.into_iter().collect())
+        }
+    }
+    if all_absences.is_empty() {
+        None
+    } else {
+        Some(
+            all_absences
+                .into_iter()
+                .map(|absences| absences.into_iter().collect())
+                .collect(),
+        )
+    }
 }
 
-fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
-    // remove this later -> only for testing purposes
-    // if text.len() < 50000 {
-    //     return None;
-    // }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AbsenceExtraction {
+    absences: Vec<Absence>,
+    added_afterwards: bool,
+    end_of_absence_marker_idx: usize,
+}
 
-    let text = &text.replace('\u{a0}', " ");
-    let text = text.replace('\u{ad}', "");
-    let titles = unique_titles();
-
-    let text = text
-        .split_inclusive(char::is_whitespace)
-        .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
-        .filter(|x| !(x.contains(".") && x.len() <= 3))
-        .collect::<String>();
-
+fn extract_absences_from_text(text: &str) -> Option<AbsenceExtraction> {
+    let text = clean_absence_text(text);
     let absence_marker_regex = Regex::new(r"verhindert\s*gemeldet").unwrap();
     let absence_match = absence_marker_regex.find(&text)?;
 
@@ -77,7 +106,7 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
 
     // open_ended_absence.replace(&["Hi", "Bi"], " ");
 
-    let info = &open_ended_absence[..open_ended_absence
+    let end_idx = open_ended_absence
         .find(".\n")
         .unwrap_or(usize::MAX)
         .min(open_ended_absence.find(". \n").unwrap_or(usize::MAX))
@@ -103,8 +132,10 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
             open_ended_absence
                 .find(". (s. auch S. 32)")
                 .unwrap_or(open_ended_absence.len()),
-        )];
+        );
+    let info = &open_ended_absence[..end_idx];
 
+    let added_afterwards = info.contains("bereits verkündet");
     log::info!(
         "-------------
     info: {info:?}"
@@ -238,18 +269,37 @@ fn extract_absences_from_text(text: &str) -> Option<Vec<String>> {
         // .map(|x| x.collect::<String>())
         .collect::<Vec<_>>();
 
-    Some(
-        filter_name_extraction(info.iter().map(|x| x.as_str()))
+    Some(AbsenceExtraction {
+        absences: filter_name_extraction(info.iter().map(|x| x.as_str()))
             .filter(|x| !x.is_empty())
+            .map(|name| Absence { name, id: None })
             .collect::<Vec<_>>(),
-    )
+        added_afterwards,
+        end_of_absence_marker_idx: absence_match.end() + 1,
+    })
+}
+
+fn clean_absence_text(text: &str) -> String {
+    let text = &text.replace('\u{a0}', " ");
+    let text = text.replace('\u{ad}', "");
+    let titles = unique_titles();
+
+    let text = text
+        .split_inclusive(char::is_whitespace)
+        .filter(|x| !titles.contains(x.trim_matches(char::is_whitespace)))
+        .filter(|x| !(x.contains(".") && x.len() <= 3))
+        .collect::<String>();
+    text
 }
 
 #[cfg(test)]
 mod tests {
     use common_scrapes::Document;
 
-    use crate::{caching::CacheConfig, plenar::absences::extract_absences_from_document};
+    use crate::{
+        caching::CacheConfig,
+        plenar::{absences::extract_absences_from_document, Absence},
+    };
 
     #[tokio::test]
     async fn test_absences_extraction_from_doc() {
@@ -265,7 +315,7 @@ mod tests {
             .await
             .unwrap();
         println!("absences: {absences:?}");
-        assert_eq!(&absences, &Vec::<String>::new());
+        assert_eq!(&absences, &vec![vec![]]);
     }
 
     //
@@ -282,7 +332,15 @@ mod tests {
         let absences = extract_absences_from_document(&doc, &CacheConfig::default())
             .await
             .unwrap();
-        assert_eq!(absences, vec!["Wilhelm Molterer".to_string()]);
+
         println!("absences: {absences:?}");
+        assert_eq!(
+            absences[0]
+                .clone()
+                .into_iter()
+                .map(|absence| absence.name)
+                .collect::<Vec<_>>(),
+            vec!["Wilhelm Molterer".to_string()]
+        );
     }
 }

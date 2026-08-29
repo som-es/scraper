@@ -6,31 +6,56 @@ pub struct Text {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Language {
+    #[serde(alias = "es")]
     Es,
+    #[serde(alias = "sl")]
     Sl,
+    #[serde(alias = "en")]
     En,
+    #[default]
+    #[serde(alias = "de")]
     De,
+    #[serde(alias = "hu")]
     Hu,
+    #[serde(alias = "ro")]
     Ro,
+    #[serde(alias = "pt")]
     Pt,
+    #[serde(alias = "sv")]
     Sv,
+    #[serde(alias = "da")]
     Da,
+    #[serde(alias = "fr")]
     Fr,
+    #[serde(alias = "pl")]
     Pl,
+    #[serde(alias = "et")]
     Et,
+    #[serde(alias = "nl")]
     Nl,
+    #[serde(alias = "el")]
     El,
+    #[serde(alias = "hr")]
     Hr,
+    #[serde(alias = "lv")]
     Lv,
+    #[serde(alias = "it")]
     It,
+    #[serde(alias = "fi")]
     Fi,
+    #[serde(alias = "cs")]
     Cs,
+    #[serde(alias = "lt")]
     Lt,
+    #[serde(alias = "ga")]
     Ga,
+    #[serde(alias = "mt")]
     Mt,
+    #[serde(alias = "bg")]
     Bg,
+    #[serde(alias = "sk")]
     Sk,
 }
 

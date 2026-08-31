@@ -16,16 +16,40 @@ Payload keys (all values are arrays, all optional):
 | `GP_CODE` | GP of the **statement** | `["XXVIII"]` |
 | `ITYP` | ityp of the **statement** | `["SNME"]` |
 | `VHG` | site's fixed param (`fixedParams {"VHG":["1"]}`) | `["1"]` |
-| `DATUM_VON` | date range, ISO `YYYY-MM-DDT00:00:00.000Z` (cf. `DatePayload::to_at_format`) | |
+| `DATUM` | **OR-set of exact days**, `TT.MM.JJJJ` — *no* range support (see below) | `["15.09.2025","01.10.2025"]` |
 | `BEZUG_GP_CODE` / `BEZUG_ITYP` / `BEZUG_INR` | filter by referenced Gegenstand | `["XXVIII"] / ["ME"] / [126]` |
 
 * `selectedStage` is **only a URL/UI param** — 833 rows with and without it, no effect.
 * `INR` of the statement itself is **not** filterable (`{"GP_CODE","ITYP","INR"}` → 0 rows).
+
+### Date filtering: ranges are NOT supported (verified live, per your request)
+
+| payload | result |
+|---|---|
+| `DATUM_VON` ISO / `TT.MM.JJJJ`, ± `DATUM_BIS`, also `VON`/`BIS` | **ignored** — identical to unfiltered (6009 rows) |
+| `DATUM_SORT`, or `DATUM` with ISO values (`"2025-09-01"`) | **0 rows** |
+| `DATUM: ["01.09.2025","01.10.2025"]` | 7 rows: 09-01 ×2, 10-01 ×5 |
+| `DATUM: ["02.09.2025","30.09.2025"]` | 14 rows: 09-02 ×8, 09-30 ×6 — **nothing in between** |
+| `DATUM: ["15.09.2025","20.09.2025","01.09.2025"]` | 5 rows on exactly those 3 days (N dates OK) |
+
+⇒ `DATUM` is a plain multi-value filter (exact days, `OR`), so list 142 **cannot** do date
+ranges. Drop `date_payload` from `StatementsPayload`; expose `datum: Vec<NaiveDate>` formatted
+`%d.%m.%Y` instead (it doubles as the bulk-chunking key below).
 * Verified totals: SN 274 648 · SNME 211 512 · SPET 4 346 · SBI 6 828 · **SPET-BR 0**
   (`/gegenstand/…/SPET-BR/1` → 404). Real statement ityps = `SN, SNME, SPET, SBI`.
 * `ITYP` + `BEZUG_*` combine fine → `(reference, ityp)` narrows a query.
-* Unfiltered queries are capped (count 300 000, `pages: 3`, 100 000 rows) → always send
-  `GP_CODE` (XXVIII → 639 rows).
+* **Result-size limit / paging** — `showAll=true&export=true` returns at most *one* page (default
+  page size 100 000; `count` is capped at `pages * pagesize`: `{}` → `count 300 000, pages 3,
+  rows 100 000`). So `GP_CODE:XXVII + ITYP:SN` (`count 272 748`) is only ~37 % readable, and
+  `showAll=true&page=2` → **0 rows**. Paging instead uses **URL params** `pagesize` + `page`
+  (1-based) *without* `showAll`:
+  ```
+  ?js=eval&pagesize=20000&page=1 -> count 272748, pages 14, 20000 rows, last inr 40744
+  ?js=eval&pagesize=20000&page=2 -> 20000 rows, first inr 40745   (contiguous, stable order)
+  ```
+  Payload keys `page`/`pageStart` are ignored. Loop `1..=pages` from the first response, or chunk
+  by `DATUM` day-sets (robust against inserts mid-scrape). Always send `GP_CODE` anyway
+  (XXVIII → 6009 SNME rows).
 * Confirmed via `?json=true` on ME/AUA detail pages: their embedded "Stellungnahmen" filter is
   `FP_142_vhg` with exactly `{BEZUG_GP_CODE, BEZUG_ITYP, BEZUG_INR}` → matches the user example.
 
@@ -85,7 +109,7 @@ formlink, shortinfo`.
 ## Proposed code
 
 ```rust
-pub struct Statement {                     // -> common-scrapes? (see Q1)
+pub struct Statement {                     // -> common-scrapes/src/statements.rs
     id: u64, inr: u64, ityp: String, gp: String, zitation: String,
     title: String, description: String,
     statement_text: Option<String>,        // from content.statement, html -> text
@@ -96,20 +120,19 @@ pub struct Statement {                     // -> common-scrapes? (see Q1)
     primary_reference: Option<Reference>,  // == row BEZUG_*
     created_at: DateTime<Utc>, updated_at: Option<DateTime<Utc>>,
     topics / eurovoc_topics / other_keyword_topics: Vec<String>,
-    supports: u32, stage: Option<String>,  // stages[..].text
+    supports: u64, stage: Option<String>,  // row col 12 / stages[..].text
     path: String,                          // /gegenstand/XXVIII/SNME/4729
-    public: bool,                          // false = "Nicht-öffentliche Stellungnahme"
 }
 pub struct StatementAuthor { name: String, delegate_id: Option<u64>,
     party_code: Option<String>, institution: Option<String> /*ltext*/ }
 pub enum StatementAuthorKind { Organisation, PrivatePerson }  // from TYP I/P
 pub struct StatementListItem { path: String, gp: String, ityp: String, inr: u64,
     zitation: String, datum: NaiveDate, author_name: String, kind: StatementAuthorKind,
-    reference: Option<Reference>, supports: u64, public: bool }   // like GegenstandInfo
+    reference: Option<Reference>, supports: u64 }   // like GegenstandInfo
 ```
 
-`StatementsPayload::as_json()` (rename `as_json` per Q2) emits
-`{"GP_CODE": gp, "VHG": ["1"], "ITYP": […], "DATUM_VON": date_payload.to_at_format()}` plus,
+`StatementsPayload::as_json()` emits
+`{"GP_CODE": gp, "VHG": ["1"], "ITYP": […], "DATUM": ["01.09.2025", …]}` plus,
 when `reference: Option<Reference>` is `Some`, `{"BEZUG_GP_CODE":[gp], "BEZUG_ITYP":[ityp],
 "BEZUG_INR":[inr]}`. `SNME => ME`: `StatementItyp::from_reference_ityp("ME") -> SNME`
 (ME→SNME, PET→SPET, BI→SBI, A/I/AUA→SN) used *only* to default `ityp` from the reference, and
@@ -118,7 +141,7 @@ when `reference: Option<Reference>` is `Some`, `{"BEZUG_GP_CODE":[gp], "BEZUG_IT
 Trait (rename `raw_ministrial_prop_*` → `raw_statement_into_statement`,
 `ministrial_prop_paths` → `statement_paths`):
 * `statement_paths(Value) -> Vec<StatementListItem>` (header-driven index map with fallback to
-  the fixed indices above)
+  the fixed indices above; skips `"Nicht-öffentliche"` rows)
 * `get_statement(&self, StatementListItem) -> Result<Statement, ScraperError>` using
   `self.cache(path)` (the existing `Scraper::cache`) + `Self::raw_statement_into_statement(raw, item)`
 * `post_statements_payload(StatementsPayload) -> Value` (already drafted), keep `FILTER_PATH`
@@ -136,43 +159,40 @@ Trait (rename `raw_ministrial_prop_*` → `raw_statement_into_statement`,
 3. `test_snme_1510_organisation` — org: `Amt der Vorarlberger Landesregierung`, `Organisation`,
    documents[0] = `Document{title:"Stellungnahme", link:
    "https://www.parlament.gv.at/PtWeb/api/s3serv/file/304bc548-271e-41db-9653-465a4681ca99",
-   ftype: DigitalPDF}` (assert the s3serv link is kept as-is — see Q4).
+   ftype: DigitalPDF}` (s3serv link kept as-is; `type: "PDF"` → `FileType::DigitalPDF`).
 4. `test_sn_552_minister_is_organisation` — author delegate_id 23963, party "S", institution
    "Bundesministerium für Wohnen, Kunst, Kultur, Medien und Sport", kind Organisation,
    references `[{AUA 33}, {A 372}]`, primary A 372.
 5. `test_spet_2795` / `test_sbi_5090` — SPET + SBI happy paths (documents + person).
-6. `test_unpublished_statement` — `/gegenstand/XXVIII/SN/386` → `public == false`,
-   authors empty, no documents/text.
+6. `test_statement_paths_skips_unpublished` — XXVIII/SN contains
+   "Nicht-öffentliche Stellungnahme (386/SN)" rows (`names: []` on the detail page); assert
+   `/gegenstand/XXVIII/SN/386` is **not** among `statement_paths` but the neighbouring public
+   ones are, and that `statement_paths` never returns a path whose `content.names` is empty.
 7. `test_statement_paths_for_reference_me_126` — payload with
-   `reference = Some(XXVIII/ME/126)` → 833 rows, all `primary_reference == XXVIII/ME/126`,
+   `reference = Some(XXVIII/ME/126)` → ~841 rows, all `primary_reference == XXVIII/ME/126`,
    every path matches `^/gegenstand/XXVIII/SNME/\d+$`, both `I` and `P` present; parse the
    first ~10 and assert no `Err`.
 8. `test_statement_paths_row_columns_match_header` — assert `feld_name`s at the hardcoded
    indices (GP_CODE/ITYP/INR/BEZUG_*/TYP) so the index constants can't silently rot.
 
-## Open questions (please answer before I implement)
+## Decisions (user, 2026-08-31)
 
-1. **Where does `Statement` live?** `common-scrapes` (like `Proposal`, `MinistrialProposal`
-   is in the scraper crate though) or `src/scraper/statements.rs`? Struct or
-   `serde` Serialize/Deserialize too?
-2. **Method naming**: you said names must be updated — confirm
-   `statement_paths` / `get_statement` / `raw_statement_into_statement` /
-   `post_statements_payload`, and the trait name `StatementsScraper`. Also: keep the payload
-   method name `as_json()` (as in `ProposalsPayload`) or rename to `to_payload_json()`?
-3. **`selectedStage`**: drop it (it is a no-op), or keep an optional
-   `selected_stage: Option<String>` field for fidelity with the UI?
-4. **`SPET-BR`**: it returns 0 rows and has no gegenstand pages. Keep the enum variant
-   (dead code) or remove it? Also: are `SBI` and `SPET` in scope now, or SNME-only?
-5. **Documents on statement pages**: statement PDFs are often `/PtWeb/api/s3serv/file/<uuid>`
-   (no file extension) → `documents()` maps them by `type: "PDF"` to `DigitalPDF`. OK, or should
-   s3serv links be marked `Unknown`/`OriginalPDF`?
-6. **Unpublished ("Nicht-öffentliche") statements**: keep them as `Statement{public:false}` with
-   empty authors, or filter them out in `statement_paths`?
-7. **Date filter**: is `DATUM_VON` the right key for list 142 (the site itself only ever sends
-   `GP_CODE`/`VHG`/`ITYP`/`BEZUG_*`; the sortable date column is `DATUM` with
-   `mediaType: datetime`)? I have not yet verified `DATUM_VON` actually filters — want me to
-   verify live before wiring it, or is date filtering out of scope for now?
-8. **Bulk scraping**: XXVII/SN has 274k rows (> 100k cap). Do you want `showAll=true&export=true`
-   paging via `GP_CODE`+`ITYP`+date chunks, or is single-request-per-filter enough?
-9. **Support count (`Unterstützungen`, col 12)** — keep in `Statement`, or drop?
-10. **`id`**: `inr` alone, or `format!("{ityp}/{inr}")` like `Proposal::id`?
+1. `Statement` (+ `StatementAuthor`, `StatementAuthorKind`) go into **common-scrapes**
+   (new `common-scrapes/src/statements.rs`, `pub mod statements; pub use statements::*;`, derive
+   `Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize` like the other types there).
+   `StatementListItem` stays in the scraper crate (scrape metadata, like `GegenstandInfo`).
+2. Naming as proposed (`statement_paths` / `get_statement` / `raw_statement_into_statement` /
+   `post_statements_payload`); payload method stays `as_json()`.
+3. **Keep** `StatementItyp::SpetBr` (no live data, kept for the UI's ityp list).
+4. "Nicht-öffentliche Stellungnahme" rows are **filtered out in `statement_paths`**; no `public`
+   flag on `Statement`.
+5. s3serv PDF links: keep `documents()` as-is.
+6. `Statement.id: u64 = inr`; keep `supports: u64` (row col 12).
+7. No date range — `datum: Vec<NaiveDate>` day-set (`DATUM`, `%d.%m.%Y`).
+8. Bulk scrape: helper that loops `1..=pages` with `pagesize`/`page` instead of `showAll=true`.
+
+## Still open (defaults in place unless you object)
+
+* `selectedStage` → dropped from the payload (verified no-op).
+* Scope: implement all four live ityps (`SN`, `SNME`, `SPET`, `SBI`) now, not SNME-only.
+* `stage: Option<String>` from `stages[0].text` ("Einlangen im Nationalrat") — keep or drop?

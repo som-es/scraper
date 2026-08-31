@@ -25,6 +25,7 @@ pub mod parliamentary_questions;
 pub mod parties;
 pub mod plenar;
 pub mod proposals;
+pub mod statements;
 
 #[async_trait]
 pub trait Scraper {

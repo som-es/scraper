@@ -39,6 +39,12 @@ pub enum ScraperError {
     #[error("Encounterd invalid proposal information from API")]
     InvalidProposalInfoError,
 
+    #[error("Encountered invalid statement information from API")]
+    InvalidStatementInfoError,
+
+    #[error("Could not parse statement paths from API")]
+    StatementPathsParseError,
+
     #[error("Too many requests, retry after")]
     TooManyRequests(Option<Duration>),
 

@@ -1,4 +1,9 @@
-# Statements scraper — implementation plan (draft, NOT yet implemented)
+# Statements scraper — implementation plan
+
+Implemented 2026-08-31: `common-scrapes/src/statements.rs` (`Statement`, `StatementAuthor`,
+`StatementAuthorKind`) and `src/scraper/statements/{mod,payload,ityp,list,parsing,tests}.rs`
+(`StatementsPayload`, `StatementListItem`, `StatementRowIndices`, `StatementsScraper`).
+14 tests in `src/scraper/statements/tests.rs`, all green.
 
 ## Research findings (verified live against parlament.gv.at, 2026-08-31)
 
@@ -47,7 +52,13 @@ ranges. Drop `date_payload` from `StatementsPayload`; expose `datum: Vec<NaiveDa
   ?js=eval&pagesize=20000&page=1 -> count 272748, pages 14, 20000 rows, last inr 40744
   ?js=eval&pagesize=20000&page=2 -> 20000 rows, first inr 40745   (contiguous, stable order)
   ```
-  Payload keys `page`/`pageStart` are ignored. Loop `1..=pages` from the first response, or chunk
+  Payload keys `page`/`pageStart` are ignored.
+
+  **Paging needs an explicit sort**: without `sortrnr` the ordering is non-deterministic and
+  pages overlap — crawling XXVIII/SPET (413 rows, `pagesize=100`) yielded only **367 distinct**
+  ids out of 413. Adding `&sortrnr=6&ascDesc=DESC` (the sort of the web page itself, `DATUM_SORT`)
+  or `&sortrnr=16&ascDesc=ASC` → 413 distinct, 0 duplicates. `PAGED_FILTER_PATH` therefore carries
+  `sortrnr=6&ascDesc=DESC`; neither sort is immune to inserts mid-scrape → prefer `DATUM` Loop `1..=pages` from the first response, or chunk
   by `DATUM` day-sets (robust against inserts mid-scrape). Always send `GP_CODE` anyway
   (XXVIII → 6009 SNME rows).
 * Confirmed via `?json=true` on ME/AUA detail pages: their embedded "Stellungnahmen" filter is

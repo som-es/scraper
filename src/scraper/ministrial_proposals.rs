@@ -142,7 +142,6 @@ impl MinistrialProposalScraper for AustriaScraper {
     const TO_DELEGATES_IDX: &'static str = "rows";
 
     fn ministrial_payload(&self) -> Self::Payload {
-        println!("scrape info: {:?}", self.scrape_info.gp);
         json!({
             "GP_CODE": self.scrape_info.gp,
             "DOKTYP": "MEG",

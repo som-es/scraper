@@ -4,9 +4,10 @@ use somes_scraper::{volksbg::VolksbgScraper, AustriaScraper};
 async fn main() {
     let scraper = AustriaScraper::default();
 
-    let url = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| somes_scraper::volksbg::BMI_VOLKSBEGEHREN_URL.to_string());
+    let url = std::env::args().nth(1).unwrap_or_else(|| {
+        "https://web.archive.org/web/20260614003610/https://www.bmi.gv.at/411/start.html"
+            .to_string()
+    });
 
     let Some(eintragungswoche) = scraper.eintragungswoche_of(&url).await.unwrap() else {
         println!("keine Eintragungswoche angekuendigt auf {url}");
@@ -40,6 +41,10 @@ async fn main() {
                 .take(240)
                 .collect::<String>()
         );
+
+        for document in volksbg.documents {
+            println!("  - {} | {}", document.title, document.link);
+        }
     }
 
     println!(

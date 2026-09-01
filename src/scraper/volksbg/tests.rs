@@ -498,6 +498,61 @@ fn ids_aus_unterschiedlichen_linkformaten() {
     );
 }
 
+/// `web.archive.org` rewrites every href of a snapshot to an archive link.
+/// Extracted links still point at the live BMI pages, only the page that was
+/// fetched stays archived
+#[test]
+fn archivierte_seite_liefert_links_auf_die_live_seiten() {
+    const ARCHIV: &str =
+        "https://web.archive.org/web/20260614003610/https://www.bmi.gv.at/411/start.html";
+
+    let woche = parse_eintragungswoche(&fixture(LAUFEND), ARCHIV).unwrap();
+
+    assert_eq!(
+        woche.polling_stations_url.as_deref(),
+        Some(
+            "https://www.bmi.gv.at/411/files/eintragungslokale/eintragungslokale-20260608-073212.xlsx"
+        )
+    );
+
+    for volksbg in &woche.volksbegehren {
+        assert!(
+            !volksbg.overview_url.contains("archive.org"),
+            "{}",
+            volksbg.overview_url
+        );
+    }
+
+    let gratis_verhuetung = woche
+        .volksbegehren
+        .iter()
+        .find(|volksbg| volksbg.id == "gratis_verhuetung")
+        .unwrap();
+
+    assert_eq!(
+        gratis_verhuetung.overview_url,
+        detail_page("gratis_verhuetung")
+    );
+}
+
+#[test]
+fn archivierte_detailseite_liefert_dokumente_der_live_seite() {
+    const ARCHIV: &str = "https://web.archive.org/web/20260216142606/https://www.bmi.gv.at/411/Volksbegehren_der_XX_Gesetzgebungsperiode/GRATIS_Verhuetung/start.aspx";
+
+    let mut volksbg = Volksbg::default();
+    merge_volksbg_detail(&mut volksbg, &fixture(DETAIL_NACH_STATTGEBUNG), ARCHIV);
+
+    assert!(!volksbg.documents.is_empty());
+
+    for document in &volksbg.documents {
+        assert!(
+            document.link.starts_with("https://www.bmi.gv.at/411/"),
+            "{}",
+            document.link
+        );
+    }
+}
+
 #[test]
 fn altes_cms_liefert_nur_den_wortlaut_ohne_begruendung() {
     let mut volksbg = Volksbg::default();
@@ -598,4 +653,38 @@ fn alle_detailseiten_aus_den_fixtures_werden_geparst() {
             }
         }
     }
+}
+
+#[test]
+fn scratch_table() {
+    let directory = format!("{}/test-data/bmi", env!("CARGO_MANIFEST_DIR"));
+    let mut files = std::fs::read_dir(directory)
+        .unwrap()
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            path.file_name()?
+                .to_str()
+                .is_some_and(|name| name.contains("detail") && name.starts_with("2026-09-01__bmi411__detail"))
+                .then_some(path)
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+
+    for file in &files {
+        let name = file.file_name().unwrap().to_string_lossy().to_string();
+        let slug = name.trim_start_matches("2026-09-01__bmi411__detail_").trim_end_matches(".html");
+        let html = std::fs::read_to_string(file).unwrap();
+        let mut volksbg = Volksbg::default();
+        merge_volksbg_detail(&mut volksbg, &html, &detail_page(slug));
+
+        println!(
+            "(\"{slug}\", \"{}\", {}, {}, {}, {}),",
+            volksbg.title.replace('"', "\\\""),
+            volksbg.documents.len(),
+            volksbg.ruling_date.map(|d| format!("Some(date({}))", d.to_string().replace('-', ", "))).unwrap_or("None".into()),
+            volksbg.cut_off_date.map(|d| format!("Some(date({}))", d.to_string().replace('-', ", "))).unwrap_or("None".into()),
+            volksbg.description.as_ref().map(|d| d.chars().count()).unwrap_or(0),
+        );
+    }
+    println!("files: {}", files.len());
 }

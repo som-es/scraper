@@ -15,6 +15,8 @@ const GP_INDEX: &str = "2026-09-01__bmi411__gp_index.html";
 const DETAIL_ALTE_RS: &str = "2025-11-16_wayback__bmi411__detail_arbeitslosengeld_rauf.html";
 const DETAIL_ANTI_GENDERN: &str = "2026-04-05_wayback__bmi411__detail_anti_gendern.html";
 const DETAIL_ASYL: &str = "2026-03-11_wayback__bmi411__detail_asyl_europagerecht.html";
+const DETAIL_TTIP: &str = "2026-09-01__bmi411__detail_gegen_ttip_ceta.html";
+const DETAIL_TURNSTUNDE: &str = "2026-09-01__bmi411__detail_taegliche_turnstunde.html";
 
 fn fixture(name: &str) -> String {
     std::fs::read_to_string(format!(
@@ -494,4 +496,106 @@ fn ids_aus_unterschiedlichen_linkformaten() {
         ),
         "https://www.bmi.gv.at/411/x/files/text.pdf"
     );
+}
+
+#[test]
+fn altes_cms_liefert_nur_den_wortlaut_ohne_begruendung() {
+    let mut volksbg = Volksbg::default();
+
+    merge_volksbg_detail(
+        &mut volksbg,
+        &fixture(DETAIL_TTIP),
+        &detail_page("gegen_ttip_ceta"),
+    );
+
+    assert_eq!(volksbg.title, "Gegen TTIP / CETA");
+    assert_eq!(volksbg.ruling_date, Some(date(2016, 9, 12)));
+    assert_eq!(volksbg.documents.len(), 12);
+
+    let description = volksbg.description.unwrap();
+
+    assert!(
+        description.starts_with("\"Der Nationalrat möge ein Bundesverfassungsgesetz"),
+        "{description}"
+    );
+    assert!(description.ends_with("abzuschließen.\""), "{description}");
+    assert!(!description.contains("Begründung"), "{description}");
+    assert!(description.chars().count() < 300, "{description}");
+}
+
+#[test]
+fn wortlaut_als_pdf_liefert_keine_beschreibung_nur_dokumente() {
+    let mut volksbg = Volksbg::default();
+
+    merge_volksbg_detail(
+        &mut volksbg,
+        &fixture(DETAIL_TURNSTUNDE),
+        &detail_page("taegliche_turnstunde"),
+    );
+
+    assert_eq!(volksbg.description, None);
+    assert_eq!(volksbg.ruling_date, Some(date(2024, 1, 9)));
+    assert_eq!(volksbg.documents.len(), 6);
+
+    assert!(volksbg.documents.iter().any(|document| document
+        .link
+        .ends_with("text_taegliche_turnstunde.pdf")
+        && document.title == "Text des Volksbegehrens"));
+}
+
+#[test]
+fn alle_detailseiten_aus_den_fixtures_werden_geparst() {
+    let directory = format!("{}/test-data/bmi", env!("CARGO_MANIFEST_DIR"));
+
+    let files = std::fs::read_dir(&directory)
+        .unwrap()
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            path.file_name()?
+                .to_str()
+                .is_some_and(|name| name.contains("detail"))
+                .then_some(path)
+        })
+        .collect::<Vec<_>>();
+
+    assert!(files.len() >= 7, "zu wenige Detail-Fixtures");
+
+    for file in files {
+        let name = file.file_name().unwrap().to_string_lossy().to_string();
+        let html = std::fs::read_to_string(&file).unwrap();
+
+        let mut volksbg = Volksbg::default();
+        merge_volksbg_detail(&mut volksbg, &html, &detail_page("volksbegehren"));
+
+        assert!(!volksbg.title.is_empty(), "{name}");
+
+        for document in &volksbg.documents {
+            assert!(
+                document.link.starts_with("http"),
+                "{name}: {}",
+                document.link
+            );
+            assert!(
+                !document.link.contains("start.html/"),
+                "{name}: {}",
+                document.link
+            );
+            assert!(!document.title.is_empty(), "{name}: {}", document.link);
+        }
+
+        if let Some(description) = &volksbg.description {
+            assert!(!description.is_empty(), "{name}");
+
+            for needle in [
+                "Bevollm",
+                "Stellvertreter",
+                "Unterstützungserklärungen",
+                "Volksbegehren seit der",
+                "Leichter Lesen",
+                "(pdf,",
+            ] {
+                assert!(!description.contains(needle), "{name}: {name}");
+            }
+        }
+    }
 }

@@ -10,8 +10,9 @@ const DOCUMENT_SELECTOR: &str = "a[href$=\".pdf\"], a[href$=\".csv\"], a[href$=\
 
 const WORTLAUT_MARKER: &str = "Das Volksbegehren hat folgenden Wortlaut";
 
-/// After the Wortlaut follow the Begründung links, the Bevollmächtigte and the results
-const WORTLAUT_END_MARKERS: [&str; 3] = ["<h2", "<span class=\"bmifile\"", "</main>"];
+/// After the Wortlaut follow the Begründung links, the Bevollmächtigte and the results.
+/// `Bevollm` also matches the entities of the old CMS layout (`Bevollm&auml;chtigter`)
+const WORTLAUT_END_MARKERS: [&str; 4] = ["<h2", "<span class=\"bmifile\"", "Bevollm", "</main>"];
 
 /// Fills in everything the „Aktuelles“ box doesn't carry: Wortlaut, documents
 /// and the dates of the BMI ruling (Beginn / Ende des Eintragungszeitraumes, Stichtag)
@@ -71,14 +72,37 @@ fn parse_documents(html: &str, page_url: &str) -> Vec<Document> {
 
     raw_links
         .into_iter()
-        .filter_map(|link| Some((link.value().attr("href")?.to_string(), link.inner_html())))
+        .filter_map(|link| Some((link.value().attr("href")?.to_string(), link)))
         .filter(|(href, _)| !href.starts_with('#'))
-        .map(|(href, title)| Document {
-            title: one_line(&extract_text_from_html(&title)),
-            ftype: file_type(&href),
-            link: absolute_url(&href, page_url),
+        .map(|(href, link)| {
+            let text = one_line(&extract_text_from_html(&link.inner_html()));
+
+            let title = match text.is_empty() {
+                false => text,
+                true => link
+                    .value()
+                    .attr("title")
+                    .map(|title| one_line(&extract_text_from_html(title)))
+                    .filter(|title| !title.is_empty())
+                    .unwrap_or_else(|| file_name(&href)),
+            };
+
+            Document {
+                title,
+                ftype: file_type(&href),
+                link: absolute_url(&href, page_url),
+            }
         })
         .collect()
+}
+
+/// The old CMS layout has anchors without any text
+fn file_name(href: &str) -> String {
+    href.split(['?', '#'])
+        .next()
+        .and_then(|href| href.rsplit('/').next())
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn file_type(href: &str) -> FileType {

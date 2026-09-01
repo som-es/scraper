@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
-use common_scrapes::VolksbgEintragungswoche;
+use common_scrapes::{Volksbg, VolksbgEintragungswoche};
 
 use crate::{
     caching::{disk_caching, get_disk_cache, CacheConfig},
@@ -22,6 +22,10 @@ pub use list::*;
 
 pub const BMI_BASE_URL: &str = "https://www.bmi.gv.at";
 pub const BMI_VOLKSBEGEHREN_URL: &str = "https://www.bmi.gv.at/411/start.html";
+
+/// BMI overview of all Volksbegehren seit der XX. Gesetzgebungsperiode
+pub const BMI_VOLKSBEGEHREN_INDEX_URL: &str =
+    "https://www.bmi.gv.at/411/volksbegehren_der_xx_gesetzgebungsperiode/start.html";
 
 /// ID Austria / eIDAS entry point for supporting a Volksbegehren,
 /// identical for every Volksbegehren
@@ -73,6 +77,23 @@ pub trait VolksbgScraper: Scraper {
         Ok(Some(eintragungswoche))
     }
 
+    /// Links to the BMI pages of the Volksbegehren listed on `url`,
+    /// without fetching the detail pages
+    async fn volksbg_links_of(&self, url: &str) -> Result<Vec<Volksbg>, ScraperError> {
+        Ok(parse_volksbg_links(&self.bmi_html(url).await?, url))
+    }
+
+    /// Links to the BMI pages of the Volksbegehren on the BMI Volksbegehren page,
+    /// those are the ones of the Eintragungswoche and of the results announcement
+    async fn volksbg_links(&self) -> Result<Vec<Volksbg>, ScraperError> {
+        self.volksbg_links_of(BMI_VOLKSBEGEHREN_URL).await
+    }
+
+    /// Links to the BMI pages of all Volksbegehren seit der XX. Gesetzgebungsperiode
+    async fn all_volksbg_links(&self) -> Result<Vec<Volksbg>, ScraperError> {
+        self.volksbg_links_of(BMI_VOLKSBEGEHREN_INDEX_URL).await
+    }
+
     /// Eintragungswoche that signatures can be handed in for
     async fn open_eintragungswoche(&self) -> Result<Option<VolksbgEintragungswoche>, ScraperError> {
         Ok(self
@@ -90,7 +111,10 @@ pub trait VolksbgScraper: Scraper {
 
         for volksbg in eintragungswoche.volksbegehren.iter_mut() {
             match self.bmi_html(&volksbg.overview_url).await {
-                Ok(html) => merge_volksbg_detail(volksbg, &html),
+                Ok(html) => {
+                    let overview_url = volksbg.overview_url.clone();
+                    merge_volksbg_detail(volksbg, &html, &overview_url)
+                }
                 Err(error) => log::warn!("could not fetch {}: {error}", volksbg.overview_url),
             }
         }

@@ -3,16 +3,19 @@ use regex::Regex;
 use scraper::{Html, Selector};
 
 use super::dates::parse_german_date;
-use super::list::one_line;
+use super::list::{absolute_url, one_line};
 use crate::extract_text_from_html;
 
 const DOCUMENT_SELECTOR: &str = "a[href$=\".pdf\"], a[href$=\".csv\"], a[href$=\".xlsx\"]";
 
 const WORTLAUT_MARKER: &str = "Das Volksbegehren hat folgenden Wortlaut";
 
+/// After the Wortlaut follow the Begründung links, the Bevollmächtigte and the results
+const WORTLAUT_END_MARKERS: [&str; 3] = ["<h2", "<span class=\"bmifile\"", "</main>"];
+
 /// Fills in everything the „Aktuelles“ box doesn't carry: Wortlaut, documents
 /// and the dates of the BMI ruling (Beginn / Ende des Eintragungszeitraumes, Stichtag)
-pub fn merge_volksbg_detail(volksbg: &mut Volksbg, html: &str) {
+pub fn merge_volksbg_detail(volksbg: &mut Volksbg, html: &str, page_url: &str) {
     let text = one_line(&extract_text_from_html(html));
 
     if volksbg.description.is_none() {
@@ -26,7 +29,7 @@ pub fn merge_volksbg_detail(volksbg: &mut Volksbg, html: &str) {
     volksbg.ruling_date = parse_after_keyword(&text, "hat am").or(volksbg.ruling_date);
     volksbg.cut_off_date = parse_after_keyword(&text, "Stichtag:").or(volksbg.cut_off_date);
 
-    let documents = parse_documents(html);
+    let documents = parse_documents(html, page_url);
     if !documents.is_empty() {
         volksbg.documents = documents;
     }
@@ -36,9 +39,10 @@ pub fn merge_volksbg_detail(volksbg: &mut Volksbg, html: &str) {
 pub fn parse_wortlaut(html: &str) -> Option<String> {
     let start = html.find(WORTLAUT_MARKER)?;
     let after_marker = &html[start..];
-    let end = after_marker
-        .find("<h2")
-        .or_else(|| after_marker.find("</main>"))
+    let end = WORTLAUT_END_MARKERS
+        .iter()
+        .filter_map(|marker| after_marker.find(marker))
+        .min()
         .unwrap_or(after_marker.len());
 
     let wortlaut = one_line(&extract_text_from_html(&after_marker[..end]))
@@ -51,7 +55,7 @@ pub fn parse_wortlaut(html: &str) -> Option<String> {
 }
 
 /// Documents of the article column, navigation links excluded
-fn parse_documents(html: &str) -> Vec<Document> {
+fn parse_documents(html: &str, page_url: &str) -> Vec<Document> {
     let document = Html::parse_document(html);
     let Ok(selector) = Selector::parse(DOCUMENT_SELECTOR) else {
         return Vec::new();
@@ -72,14 +76,19 @@ fn parse_documents(html: &str) -> Vec<Document> {
         .map(|(href, title)| Document {
             title: one_line(&extract_text_from_html(&title)),
             ftype: file_type(&href),
-            link: href,
+            link: absolute_url(&href, page_url),
         })
         .collect()
 }
 
 fn file_type(href: &str) -> FileType {
-    match href.rsplit('.').next() {
+    match href
+        .split(['?', '#'])
+        .next()
+        .and_then(|href| href.rsplit('.').next())
+    {
         Some("pdf") => FileType::OriginalPDF,
+        Some("html") | Some("htm") => FileType::HTML,
         _ => FileType::Unknown,
     }
 }

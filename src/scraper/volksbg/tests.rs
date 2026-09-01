@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use common_scrapes::{Volksbg, VolksbgState};
+use common_scrapes::{FileType, Volksbg, VolksbgState};
 
 use super::*;
 
@@ -11,6 +11,10 @@ const UNTERSTUETZUNG: &str = "2026-09-01__bmi411__unterstuetzung_und_ergebnisse.
 const DETAIL: &str = "2026-09-01__bmi411__detail_gratis_verhuetung.html";
 const DETAIL_NACH_STATTGEBUNG: &str =
     "2026-02-16_wayback__bmi411__detail_gratis_verhuetung_nach_stattgebung.html";
+const GP_INDEX: &str = "2026-09-01__bmi411__gp_index.html";
+const DETAIL_ALTE_RS: &str = "2025-11-16_wayback__bmi411__detail_arbeitslosengeld_rauf.html";
+const DETAIL_ANTI_GENDERN: &str = "2026-04-05_wayback__bmi411__detail_anti_gendern.html";
+const DETAIL_ASYL: &str = "2026-03-11_wayback__bmi411__detail_asyl_europagerecht.html";
 
 fn fixture(name: &str) -> String {
     std::fs::read_to_string(format!(
@@ -22,6 +26,10 @@ fn fixture(name: &str) -> String {
 
 fn date(year: i32, month: u32, day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(year, month, day).unwrap()
+}
+
+fn detail_page(slug: &str) -> String {
+    format!("{BMI_BASE_URL}/411/volksbegehren_der_xx_gesetzgebungsperiode/{slug}/start.html")
 }
 
 #[test]
@@ -153,7 +161,8 @@ fn detailseite_liefert_wortlaut_und_dokumente() {
         ..Default::default()
     };
 
-    merge_volksbg_detail(&mut volksbg, &fixture(DETAIL));
+    let overview_url = volksbg.overview_url.clone();
+    merge_volksbg_detail(&mut volksbg, &fixture(DETAIL), &overview_url);
 
     assert_eq!(volksbg.title, "GRATIS Verhütung");
     assert_eq!(volksbg.ruling_date, Some(date(2026, 1, 16)));
@@ -194,13 +203,233 @@ fn detailseite_liefert_wortlaut_und_dokumente() {
 }
 
 #[test]
+fn dokumentenlinks_sind_aktiviert() {
+    let mut volksbg = Volksbg {
+        id: "gratis_verhuetung".to_string(),
+        overview_url: detail_page("gratis_verhuetung"),
+        ..Default::default()
+    };
+
+    let overview_url = volksbg.overview_url.clone();
+    merge_volksbg_detail(&mut volksbg, &fixture(DETAIL), &overview_url);
+
+    assert!(volksbg.documents.iter().all(|document| document
+        .link
+        .starts_with("https://www.bmi.gv.at/411/volksbegehren_der_xx_gesetzgebungsperiode/gratis_verhuetung/files/")));
+}
+
+#[test]
+fn altes_cms_liefert_alle_dokumente_mit_demrichtigen_dateitypen() {
+    let mut volksbg = Volksbg {
+        id: "arbeitslosengeld_rauf".to_string(),
+        ..Default::default()
+    };
+
+    merge_volksbg_detail(
+        &mut volksbg,
+        &fixture(DETAIL_ALTE_RS),
+        &detail_page("Arbeitslosengeld_RAUF"),
+    );
+
+    assert_eq!(volksbg.title, "Arbeitslosengeld RAUF!");
+    assert_eq!(volksbg.ruling_date, Some(date(2022, 2, 11)));
+    assert_eq!(volksbg.cut_off_date, Some(date(2022, 3, 28)));
+
+    let documents = volksbg
+        .documents
+        .iter()
+        .map(|document| {
+            (
+                document.link.rsplit('/').next().unwrap().to_string(),
+                document.ftype,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        documents,
+        [
+            (
+                "Verlautbarung_Arbeitslosengeld_Rauf.pdf".to_string(),
+                FileType::OriginalPDF
+            ),
+            (
+                "Stattgebung_Arbeitslosengeld_rauf_20220211.pdf".to_string(),
+                FileType::OriginalPDF
+            ),
+            (
+                "Begruendung_Arbeitslosengeld_rauf_20221102.pdf".to_string(),
+                FileType::OriginalPDF
+            ),
+            (
+                "Broschuere_Arbeitslosengeld_rauf_E.pdf".to_string(),
+                FileType::OriginalPDF
+            ),
+            (
+                "Statistik_Arbeitslosengeld_rauf_E.csv".to_string(),
+                FileType::Unknown
+            ),
+        ]
+    );
+
+    assert!(volksbg.documents.iter().all(|document| document
+        .link
+        .starts_with("https://www.bmi.gv.at/411/Volksbegehren_der_XX_Gesetzgebungsperiode/Arbeitslosengeld_RAUF/files/")));
+}
+
+#[test]
+fn jedes_detail_dokument_erscheint_genau_einmal() {
+    for (fixture_name, page, documents) in [
+        (DETAIL_ALTE_RS, "Arbeitslosengeld_RAUF", 5),
+        (DETAIL_ANTI_GENDERN, "Anti-gendern-Volksbegehren", 5),
+        (DETAIL_ASYL, "Asyl_europagerecht_umsetzen", 5),
+    ] {
+        let mut volksbg = Volksbg::default();
+        merge_volksbg_detail(&mut volksbg, &fixture(fixture_name), &detail_page(page));
+
+        assert_eq!(volksbg.documents.len(), documents, "{fixture_name}");
+
+        let unique = volksbg
+            .documents
+            .iter()
+            .map(|document| document.link.clone())
+            .collect::<std::collections::HashSet<_>>();
+
+        assert_eq!(unique.len(), documents, "{fixture_name}");
+        assert!(volksbg
+            .documents
+            .iter()
+            .all(|document| !document.title.is_empty()));
+    }
+}
+
+#[test]
+fn wortlaut_endet_vor_dem_gesamtergebnis() {
+    let mut volksbg = Volksbg::default();
+    merge_volksbg_detail(
+        &mut volksbg,
+        &fixture(DETAIL_ANTI_GENDERN),
+        &detail_page("Anti-gendern-Volksbegehren"),
+    );
+
+    let description = volksbg.description.unwrap();
+
+    assert!(
+        description.starts_with(r#""Der Nationalrat wolle ein Bundesverfassungsgesetz"#),
+        "{description}"
+    );
+    assert!(
+        !description.contains("Begründung zum Volksbegehren"),
+        "{description}"
+    );
+    assert!(
+        !description.contains("Unterstützungserklärungen"),
+        "{description}"
+    );
+    assert!(
+        !description.contains("Volksbegehren seit der"),
+        "{description}"
+    );
+    assert!(volksbg.documents.len() >= 3);
+}
+
+#[test]
+fn wortlaut_und_dokumente_fehlen_duerfen_nicht_crashen() {
+    assert_eq!(parse_wortlaut(&fixture(UNTERSTUETZUNG)), None);
+
+    let mut volksbg = Volksbg {
+        id: "ohne_dokumente".to_string(),
+        ..Default::default()
+    };
+
+    merge_volksbg_detail(
+        &mut volksbg,
+        "<html><body><h1>Test</h1></body></html>",
+        "https://www.bmi.gv.at/411/test/start.html",
+    );
+
+    assert_eq!(volksbg.title, "Test");
+    assert_eq!(volksbg.description, None);
+    assert!(volksbg.documents.is_empty());
+    assert_eq!(volksbg.ruling_date, None);
+}
+
+#[test]
+fn links_auf_alle_volksbg_des_bmi_verzeichnisses() {
+    let links = parse_volksbg_links(&fixture(GP_INDEX), BMI_VOLKSBEGEHREN_INDEX_URL);
+
+    assert_eq!(links.len(), 97);
+
+    assert_eq!(links[0].id, "gratis_verhuetung");
+    assert_eq!(links[0].title, "GRATIS Verhütung");
+    assert_eq!(
+        links[0].overview_url,
+        "https://www.bmi.gv.at/411/volksbegehren_der_xx_gesetzgebungsperiode/gratis_verhuetung/start.html"
+    );
+
+    assert!(links.iter().all(|volksbg| !volksbg.id.is_empty()));
+    assert!(links.iter().all(|volksbg| !volksbg.title.is_empty()));
+    assert!(links
+        .iter()
+        .all(|volksbg| !volksbg.overview_url.contains('#')));
+
+    let unique = links
+        .iter()
+        .map(|volksbg| volksbg.id.clone())
+        .collect::<std::collections::HashSet<_>>();
+
+    assert_eq!(unique.len(), links.len());
+}
+
+#[test]
+fn links_aus_dem_aktuellen_kasten() {
+    let links = parse_volksbg_links(&fixture(LAUFEND), BMI_VOLKSBEGEHREN_URL);
+
+    assert_eq!(
+        links
+            .iter()
+            .map(|volksbg| volksbg.id.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "karfreitag_feiertag_fuer_alle",
+            "polizei_-_kritischer_personalmangel",
+            "wahlpflicht_nationalratswahl_bundespraesidentenwahl",
+            "gratis_verhuetung",
+            "transparenz_im_parlament"
+        ]
+    );
+
+    assert_eq!(links[3].title, "GRATIS Verhütung");
+}
+
+#[test]
+fn links_sind_kosten_und_zeitneutral() {
+    let with_fragment = parse_volksbg_links(&fixture(GP_INDEX), BMI_VOLKSBEGEHREN_INDEX_URL);
+    let again = parse_volksbg_links(&fixture(GP_INDEX), BMI_VOLKSBEGEHREN_INDEX_URL);
+
+    assert_eq!(with_fragment, again);
+    assert_eq!(
+        with_fragment
+            .iter()
+            .filter(|volksbg| volksbg.id == "klimavolksbegehren")
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn detailseite_nach_stattgebung_ohne_hashtag_links() {
     let mut volksbg = Volksbg {
         id: "GRATIS_Verhuetung".to_string(),
         ..Default::default()
     };
 
-    merge_volksbg_detail(&mut volksbg, &fixture(DETAIL_NACH_STATTGEBUNG));
+    let overview_url = volksbg.overview_url.clone();
+    merge_volksbg_detail(
+        &mut volksbg,
+        &fixture(DETAIL_NACH_STATTGEBUNG),
+        &overview_url,
+    );
 
     assert_eq!(volksbg.ruling_date, Some(date(2026, 1, 16)));
     assert_eq!(volksbg.cut_off_date, Some(date(2026, 5, 11)));
@@ -250,5 +479,19 @@ fn ids_aus_unterschiedlichen_linkformaten() {
     assert_eq!(
         absolute_url("files/text.pdf", "https://www.bmi.gv.at/411/start.html"),
         "https://www.bmi.gv.at/411/files/text.pdf"
+    );
+    assert_eq!(
+        absolute_url(
+            "411/Volksbegehren_der_XX_Gesetzgebungsperiode/x/files/y.pdf",
+            "https://www.bmi.gv.at/411/volksbegehren_der_xx_gesetzgebungsperiode/x/start.html"
+        ),
+        "https://www.bmi.gv.at/411/Volksbegehren_der_XX_Gesetzgebungsperiode/x/files/y.pdf"
+    );
+    assert_eq!(
+        absolute_url(
+            "../files/text.pdf",
+            "https://www.bmi.gv.at/411/x/start.html"
+        ),
+        "https://www.bmi.gv.at/411/x/files/text.pdf"
     );
 }

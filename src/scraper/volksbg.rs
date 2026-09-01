@@ -9,6 +9,7 @@ use crate::{
     Scraper,
 };
 
+pub mod archive;
 pub mod dates;
 pub mod detail;
 pub mod list;
@@ -16,6 +17,7 @@ pub mod list;
 #[cfg(test)]
 mod tests;
 
+pub use archive::*;
 pub use dates::*;
 pub use detail::*;
 pub use list::*;

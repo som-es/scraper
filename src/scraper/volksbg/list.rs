@@ -2,6 +2,7 @@ use common_scrapes::{Volksbg, VolksbgEintragungswoche};
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 
+use super::archive::{live_url, unwrap_archive};
 use super::dates::{online_deadline_utc, parse_german_date, parse_german_date_range};
 use crate::extract_text_from_html;
 
@@ -56,6 +57,7 @@ pub fn parse_eintragungswoche(html: &str, page_url: &str) -> Option<VolksbgEintr
 /// `volksbegehren_der_xx_gesetzgebungsperiode/gratis_verhuetung/start.html#pk_01`
 /// => `gratis_verhuetung`
 pub fn volksbg_id(href: &str) -> Option<String> {
+    let href = unwrap_archive(href).unwrap_or(href);
     let path = href
         .split('#')
         .next()?
@@ -82,8 +84,15 @@ pub fn volksbg_id(href: &str) -> Option<String> {
     is_volksbg.then(|| id.to_owned())
 }
 
-/// Resolves a relative href against the directory of the page it was found on
+/// Resolves a relative href against the directory of the page it was found on.
+/// Archived pages are unwrapped first: `web.archive.org` rewrites the hrefs of
+/// its snapshots to archive links, extracted links should point at the live BMI
+/// pages the snapshot was taken of, see [`archive`](super::archive)
 pub fn absolute_url(href: &str, page_url: &str) -> String {
+    let href = live_url(href);
+    let page_url = live_url(page_url);
+    let (href, page_url) = (href.as_str(), page_url.as_str());
+
     if href.starts_with("http") {
         return href.to_string();
     }

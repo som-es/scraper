@@ -10,6 +10,9 @@ pub use delegates::*;
 mod speeches;
 pub use speeches::*;
 
+mod volksbg;
+pub use volksbg::*;
+
 mod dates;
 
 pub mod eu_hemicycle;

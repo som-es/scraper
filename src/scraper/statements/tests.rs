@@ -3,8 +3,7 @@ use common_scrapes::{FileType, Reference, StatementAuthor, StatementAuthorKind};
 
 use crate::{
     statements::{
-        StatementItyp, StatementListItem, StatementRowIndices, StatementsPayload,
-        StatementsScraper,
+        StatementItyp, StatementListItem, StatementRowIndices, StatementsPayload, StatementsScraper,
     },
     AustriaScraper,
 };
@@ -114,7 +113,9 @@ async fn test_statement_paths_for_reference_me_126() {
         .unwrap();
 
     assert!(paths.len() > 100);
-    assert!(paths.iter().all(|path| path.reference == Some(me_126.clone())));
+    assert!(paths
+        .iter()
+        .all(|path| path.reference == Some(me_126.clone())));
     assert!(paths
         .iter()
         .all(|path| path.path.starts_with("/gegenstand/XXVIII/SNME/")));
@@ -147,7 +148,9 @@ async fn test_statement_paths_skips_unpublished() {
     assert!(!paths
         .iter()
         .any(|path| path.author_name == "Nicht-öffentliche Stellungnahme"));
-    assert!(!paths.iter().any(|path| path.path == "/gegenstand/XXVIII/SN/386"));
+    assert!(!paths
+        .iter()
+        .any(|path| path.path == "/gegenstand/XXVIII/SN/386"));
 }
 
 #[tokio::test]
@@ -161,10 +164,7 @@ async fn test_statements_paging() {
         .statement_paths_of_payload(payload.clone())
         .await
         .unwrap();
-    let paged = scraper
-        .paged_statement_paths(&payload, 100)
-        .await
-        .unwrap();
+    let paged = scraper.paged_statement_paths(&payload, 100).await.unwrap();
 
     assert!(single.len() > 300);
     assert_eq!(paged.len(), single.len());
@@ -236,7 +236,10 @@ async fn test_get_snme_statement_of_private_person() {
         .other_keyword_topics
         .contains(&"Bundesverfassung".to_string()));
     assert_eq!(statement.stage, Some("Einlangen".into()));
-    assert_eq!(statement.created_at.to_rfc3339(), "2026-07-05T22:00:00+00:00");
+    assert_eq!(
+        statement.created_at.to_rfc3339(),
+        "2026-07-05T22:00:00+00:00"
+    );
     assert_eq!(
         statement.updated_at.map(|update| update.to_rfc3339()),
         Some("2026-07-06T15:49:49+00:00".to_string())
@@ -248,12 +251,7 @@ async fn test_get_snme_statement_of_private_person() {
 async fn test_get_snme_statement_of_organisation() {
     let scraper = AustriaScraper::default();
 
-    let mut item = statement_item(
-        "XXVIII",
-        "SNME",
-        1510,
-        StatementAuthorKind::Organisation,
-    );
+    let mut item = statement_item("XXVIII", "SNME", 1510, StatementAuthorKind::Organisation);
     item.supports = 3;
     let statement = scraper.get_statement(item).await.unwrap();
 
@@ -399,7 +397,10 @@ async fn test_get_sbi_statement() {
     assert_eq!(statement.gp, "XXVII");
     assert_eq!(statement.zitation, "5090/SBI");
     assert_eq!(statement.title, "Stellungnahme zu 58/BI");
-    assert_eq!(statement.authors[0].name, "Hafezi Birkani, Amin (1100 Wien)");
+    assert_eq!(
+        statement.authors[0].name,
+        "Hafezi Birkani, Amin (1100 Wien)"
+    );
     assert_eq!(statement.references, vec![reference("XXVII", "BI", 58)]);
     assert_eq!(
         statement.updated_at.map(|update| update.date_naive()),

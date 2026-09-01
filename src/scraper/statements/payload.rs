@@ -52,21 +52,19 @@ impl StatementsPayload {
         }
 
         if !self.ityp.is_empty() {
-            payload["ITYP"] = json!(
-                self.ityp
-                    .iter()
-                    .map(|ityp| ityp.as_str())
-                    .collect::<Vec<&'static str>>()
-            );
+            payload["ITYP"] = json!(self
+                .ityp
+                .iter()
+                .map(|ityp| ityp.as_str())
+                .collect::<Vec<&'static str>>());
         }
 
         if !self.datum.is_empty() {
-            payload["DATUM"] = json!(
-                self.datum
-                    .iter()
-                    .map(|datum| datum.format("%d.%m.%Y").to_string())
-                    .collect::<Vec<String>>()
-            );
+            payload["DATUM"] = json!(self
+                .datum
+                .iter()
+                .map(|datum| datum.format("%d.%m.%Y").to_string())
+                .collect::<Vec<String>>());
         }
 
         if let Some(reference) = &self.reference {

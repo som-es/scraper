@@ -2225,7 +2225,10 @@ async fn test_xxvii_uea_144() {
     );
     assert_eq!(named_vote.contra_count, 109);
     let pro_contra = named_vote.delegates_pro_contra.unwrap();
-    assert!(pro_contra.contra.iter().any(|d| d.name == "Zanger Wolfgang"));
+    assert!(pro_contra
+        .contra
+        .iter()
+        .any(|d| d.name == "Zanger Wolfgang"));
 
     assert_eq!(res.br_hidden_votes_info, None);
 }
@@ -3044,7 +3047,7 @@ async fn test_named_vote_xxviii_a_372() {
     }
 
     for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3066,7 +3069,7 @@ async fn test_named_vote_xxviii_a_372_by_document_link() {
     }
 
     for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3128,7 +3131,7 @@ async fn test_named_vote_xxviii_a_353() {
     }
 
     for contra_checks in ["Tomaselli", "Stögmüller", "Kaniak", "Lausch"] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 
@@ -3178,7 +3181,7 @@ async fn test_named_vote_xxviii_i_136() {
         "Zanger",
         "Zorba",
     ] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 

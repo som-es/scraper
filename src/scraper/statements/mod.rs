@@ -126,7 +126,8 @@ pub trait StatementsScraper: Scraper {
 }
 
 impl StatementsScraper for AustriaScraper {
-    const FILTER_PATH: &'static str = "/Filter/api/filter/data/142?js=eval&showAll=true&export=true";
+    const FILTER_PATH: &'static str =
+        "/Filter/api/filter/data/142?js=eval&showAll=true&export=true";
     const PAGED_FILTER_PATH: &'static str =
         "/Filter/api/filter/data/142?js=eval&export=true&sortrnr=6&ascDesc=DESC";
 

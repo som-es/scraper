@@ -1,3 +1,5 @@
+use std::path::Display;
+
 use chrono::{DateTime, NaiveDate, Utc};
 use serde_derive::{Deserialize, Serialize};
 
@@ -10,6 +12,22 @@ pub enum VolksbgState {
     Scheduled,
     /// Eintragungswoche is running, signatures can be handed in
     Open,
+}
+
+impl std::fmt::Display for VolksbgState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = self.as_str();
+        write!(f, "{str}")
+    }
+}
+
+impl VolksbgState {
+    pub fn as_str(&self) -> &str {
+        match self {
+            VolksbgState::Scheduled => "Scheduled",
+            VolksbgState::Open => "Open",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]

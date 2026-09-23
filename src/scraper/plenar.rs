@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
-use common_scrapes::{Document, PlenarSpeech, Reference};
+use common_scrapes::{Document, PlenarSpeech, Reference, Speech};
 use serde_json::{json, Value};
 
 mod absences;
@@ -57,6 +57,7 @@ pub struct PlenarInfo {
     pub absences: Vec<Absences>,
     pub plenary_dates: Vec<NaiveDate>,
     pub agenda_dates: Vec<NaiveDate>,
+    pub document_link_speeches: Vec<Vec<Speech>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -236,7 +237,7 @@ impl Plenar for AustriaScraper {
         // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
         let debates_with_speeches = extract_speeches(past_debates);
-        let debates = combine_speech_info(debates_with_speeches, document_link_speeches);
+        let debates = combine_speech_info(debates_with_speeches, document_link_speeches.clone());
 
         Some(PlenarInfo {
             title,
@@ -256,6 +257,7 @@ impl Plenar for AustriaScraper {
             absences,
             plenary_dates,
             agenda_dates,
+            document_link_speeches,
         })
     }
 }

@@ -3,6 +3,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use chrono::{NaiveDate, NaiveTime};
 use common_scrapes::{Opinion, Reference, Speech, SpeechTextInfo};
+use tokio::time::sleep;
 
 use crate::{
     caching::CacheConfig, text_utils::compare_words, AustriaScraper, Scraper, TextExtractor,
@@ -45,70 +46,54 @@ async fn test_combine_warning() {
 
 #[tokio::test]
 async fn test_all_speeches_extract() {
-    return;
     let mut scraper = AustriaScraper::default();
-
-    let mut extractor = TextExtractor::default();
 
     unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
     let mut all_speeches_count = 0;
-    let mut i = 0;
-    'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-        scraper.scrape_info.gp = vec![gp.to_string()];
+    let mut all_document_link_speeches_count = 0;
+    for council in ["BR", "NR"] {
+        scraper.scrape_info.council_type = vec![council.into()];
+        for gp in [
+            "XIX", "XVIII", "XVII", "XVI", "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII",
+            "XXII", "XXI", "XX",
+        ] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
 
-        let plenar_infos = scraper.post_plenar_payload().await.unwrap();
-
-        let paths = scraper
-            .plenar_paths(plenar_infos)
-            .expect("Failed to get paths");
-        for path in paths {
-            i += 1;
-            println!("path: {path}");
-            // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
-
-            // newer ones do not provide a document
-
-            let plenar_info = scraper.get_plenar(&path).await.unwrap();
-            println!(
-                "{:?}, {}, {:?}",
-                plenar_info.inr, plenar_info.gp, plenar_info.created_at
-            );
-
-            if i == 2 {
-                // break 'outer;
+            let mut plenar_infos = scraper.post_plenar_payload().await;
+            while let Err(e) = plenar_infos {
+                plenar_infos = scraper.post_plenar_payload().await;
+                eprintln!("{e:?}");
+                sleep(std::time::Duration::from_secs(10)).await
             }
-            for debate in plenar_info.clone().debates {
-                for speech in debate.speeches {
-                    if let Some(spoken_text_url) = speech.speech.spoken_text_html_urls.first() {
-                        let text = extractor
-                            .speech_extraction_with_fit(
-                                spoken_text_url,
-                                &speech.speech.delegate_display_name,
-                            )
-                            .await
-                            .unwrap();
+            let plenar_infos = plenar_infos.unwrap();
 
-                        if speech.speech.delegate_id == 5649 {
-                            if text.len() > 10000 {
-                                println!("text: {text:?}");
-                                println!("plenar_info: {plenar_info:?}");
-                                println!();
-                                println!();
-                                println!();
-                                println!();
-                                println!();
-                                println!("spoken_text_url: {spoken_text_url:?}");
-                            }
-                        }
+            let paths = scraper
+                .plenar_paths(plenar_infos)
+                .expect("Failed to get paths");
+            for path in paths {
+                println!("path: {path}");
+
+                let plenar_info = scraper.get_plenar(&path).await.unwrap();
+
+                println!(
+                    "{:?}, {}, {:?}",
+                    plenar_info.inr, plenar_info.gp, plenar_info.created_at
+                );
+
+                for debate in plenar_info.clone().document_link_speeches {
+                    all_document_link_speeches_count += debate.len();
+                }
+
+                for debate in plenar_info.clone().debates {
+                    for _speech in debate.speeches {
                         all_speeches_count += 1;
                     }
                 }
             }
+            println!("current speeches: {all_speeches_count}, doc link speeches: {all_document_link_speeches_count}");
         }
     }
-
-    // 20805
-    // println!("speeches: {all_speeches_count}");
+    println!("speeches: {all_speeches_count}, doc link: {all_document_link_speeches_count}");
 }
 
 #[tokio::test]

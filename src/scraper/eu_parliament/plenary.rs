@@ -295,6 +295,7 @@ fn sitting_to_plenar_info(sitting: &PlenarySitting) -> PlenarInfo {
         absences: vec![],
         plenary_dates: vec![sitting.date],
         agenda_dates: vec![sitting.date],
+        document_link_speeches: vec![],
     }
 }
 

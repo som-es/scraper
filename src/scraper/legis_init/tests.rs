@@ -112,6 +112,35 @@ async fn test_unfinished_xxviii_a_104() {
 }
 
 #[tokio::test]
+async fn test_ris_link_from_bgbllinks() {
+    let mut scraper = AustriaScraper::default();
+    scraper.cache_config = CacheConfig {
+        cache_dir: "./test-data".into(),
+        ignore_current_gp_cache: false,
+        redo_secs: u64::MAX,
+    };
+    scraper.text_extractor.cache_config = CacheConfig {
+        cache_dir: "./test-data".into(),
+        ignore_current_gp_cache: false,
+        redo_secs: u64::MAX,
+    };
+
+    // /gegenstand/XXVII/I/104 has content.status.bgbllinks[0] pointing to the core RIS doc
+    let init = scraper
+        .get_legis_init("/gegenstand/XXVII/I/104")
+        .await
+        .unwrap();
+    assert!(init.is_law);
+    assert_eq!(
+        init.ris_link,
+        Some(
+            "http://www.ris.bka.gv.at/Dokument.wxe?Abfrage=BgblAuth&Dokumentnummer=BGBLA_2020_I_14"
+                .to_string()
+        )
+    );
+}
+
+#[tokio::test]
 async fn test_legis_init_all() {
     let mut scraper = AustriaScraper::default();
     scraper.cache_config = CacheConfig {

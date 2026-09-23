@@ -335,6 +335,8 @@ pub struct LegislativeInitiative {
     pub plenary_session: Option<u64>,
     pub references: Option<Vec<Reference>>,
     pub status: Option<u8>,
+    #[serde(default)]
+    pub ris_link: Option<String>,
     pub is_law: bool,
     pub law_accepted: Option<bool>,
     pub is_voteable_on: bool,

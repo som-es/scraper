@@ -179,6 +179,7 @@ impl LegislativeInitiatives for EuParliamentScraper {
             }),
             references: Some(voteable.votes.references),
             status: None,
+            ris_link: None,
             is_law: false,
             law_accepted: None,
             is_voteable_on: true,

@@ -112,6 +112,9 @@ impl LegislativeInitiatives for AustriaScraper {
 
         let legis_content = &raw_legis["content"];
         let status = legis_content["status"]["number"].as_u64().map(|x| x as u8);
+        let ris_link = legis_content["status"]["bgbllinks"][0]["link"]
+            .as_str()
+            .map(ToString::to_string);
 
         let ityp = legis_content["ityp"].as_str()?.to_string();
         let doktyp = legis_content["doktyp"].as_str()?.to_string();
@@ -362,6 +365,7 @@ impl LegislativeInitiatives for AustriaScraper {
             plenary_session,
             references,
             status,
+            ris_link,
             is_law,
             law_accepted: vote_infavor,
             is_voteable_on,

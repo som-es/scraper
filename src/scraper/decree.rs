@@ -1,7 +1,8 @@
-use std::{future::Future, str::FromStr};
+use std::{future::Future, str::FromStr, sync::OnceLock};
 
 use chrono::NaiveDate;
-use common_scrapes::{Document, FileType, RisAmendment, RisDecree, Thing};
+use common_scrapes::{Document, FileType, RisAmendmentRef, Thing};
+use regex::Regex;
 use reqwest::Method;
 use serde_json::Value;
 
@@ -29,10 +30,8 @@ pub trait RisScraper: Scraper {
     ) -> impl Future<Output = Result<Vec<Thing>, ScraperError>> {
         async move {
             let decree = self.fetch_decrees(page).await?;
-            let decrees = decree["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"]
-                .as_array()
-                .ok_or(ScraperError::ParseError)?
-                .iter()
+            let decrees = search_refs(&decree)
+                .into_iter()
                 .filter_map(|decree| self.parse_ministrial_decree(decree))
                 .collect::<Vec<Thing>>();
 
@@ -40,21 +39,39 @@ pub trait RisScraper: Scraper {
         }
     }
 
-    /// Fetch a single RIS act (Gesetz/Verordnung) by its document number, e.g.
-    /// `BGBLA_2021_II_363`, together with the acts that have amended it. The
-    /// document number is the one referenced by `bgbllinks` on a legislative
-    /// initiative (see [`crate::legis_init::LegislativeInitiative::ris_link`]).
-    fn fetch_single_decree(
+    fn fetch_consolidated_decrees(
         &self,
-        doc_number: &str,
-    ) -> impl Future<Output = Result<RisDecree, ScraperError>> {
+        page: u32,
+    ) -> impl Future<Output = Result<Vec<Thing>, ScraperError>> {
         async move {
-            let (year, _part, number) =
-                parse_doc_number(doc_number).ok_or(ScraperError::ParseError)?;
-            let suchworte = format!("{}/{}", number, year).replace('/', "%2F");
-            let url = format!("{}?Suchworte={}", Self::STATE_LAW_URL, suchworte);
+            let url = format!(
+                "{}?Applikation=BrKons&Seitennummer={}&DokumenteProSeite=OneHundred",
+                Self::STATE_LAW_URL,
+                page
+            );
             let data = request::request(Method::GET, self.client(), (), url).await?;
-            parse_ris_decree(&data, doc_number).ok_or(ScraperError::ParseError)
+            Ok(search_refs(&data)
+                .into_iter()
+                .filter_map(|r| self.parse_consolidated_norm_entry(r))
+                .collect())
+        }
+    }
+
+    fn fetch_single_ris_entry(
+        &self,
+        dokumentnummer: &str,
+    ) -> impl Future<Output = Result<Thing, ScraperError>> {
+        async move {
+            let url = format!(
+                "{}?Applikation=BgblAuth&Suchworte={}",
+                Self::STATE_LAW_URL,
+                dokumentnummer
+            );
+            let data = request::request(Method::GET, self.client(), (), url).await?;
+            search_refs(&data)
+                .into_iter()
+                .find_map(|r| self.general_parse_thing(r))
+                .ok_or(ScraperError::ParseError)
         }
     }
 
@@ -68,45 +85,52 @@ pub trait RisScraper: Scraper {
         Some(thing)
     }
 
+    fn parse_consolidated_norm_entry(&self, raw: &Value) -> Option<Thing> {
+        let br_kons = &raw["Data"]["Metadaten"]["Bundesrecht"]["BrKons"];
+        if br_kons["Dokumenttyp"].as_str() != Some("Norm") {
+            return None;
+        }
+        let mut thing = self.general_parse_thing(raw)?;
+        thing.amendments = br_kons["Aenderung"]
+            .as_str()
+            .map(parse_amendments)
+            .unwrap_or_default();
+        Some(thing)
+    }
+
     fn general_parse_thing(&self, thing_raw: &Value) -> Option<Thing> {
         let data = &thing_raw["Data"]["Metadaten"];
-        // println!("data: {}", serde_json::to_string_pretty(data).unwrap());
-        let document_url = data["Allgemein"]["DokumentUrl"].as_str()?.to_string();
-        let technical_data = &data["Technisch"];
-        let id = technical_data["ID"].as_str().unwrap();
-        let issuer = technical_data["Einbringer"].as_str().unwrap();
-        let organization = technical_data["Organ"].as_str().unwrap();
+        let technical = &data["Technisch"];
+        let id = technical["ID"].as_str()?;
+        let organization = technical["Organ"].as_str().unwrap_or_default();
+        let issuer = technical["Einbringer"].as_str().unwrap_or(organization);
+        let document_url = data["Allgemein"]["DokumentUrl"]
+            .as_str()
+            .unwrap_or_default();
 
         let general_info = &data["Bundesrecht"];
-        let eli = general_info["Eli"].as_str().unwrap().to_string();
-        let title = general_info["Titel"].as_str().unwrap();
-        let short_title = general_info["Kurztitel"].as_str().unwrap();
+        let eli = general_info["Eli"].as_str().unwrap_or_default();
+        let title = general_info["Titel"].as_str().unwrap_or_default();
+        let short_title = general_info["Kurztitel"].as_str().unwrap_or_default();
 
-        let general_bgbl_info = &general_info["BgblAuth"];
+        let bgbl_auth = &general_info["BgblAuth"];
+        let br_kons = &general_info["BrKons"];
 
-        let part = general_bgbl_info["Teil"].as_str().unwrap();
-        let date = general_bgbl_info["Ausgabedatum"].as_str().unwrap();
-        let thing_type = general_bgbl_info["Typ"].as_str().unwrap();
+        let bgbl = bgbl_auth["Bgblnummer"]
+            .as_str()
+            .or_else(|| br_kons["Kundmachungsorgan"].as_str())
+            .unwrap_or_default();
+        let part = bgbl_auth["Teil"].as_str().unwrap_or_default();
+        let date = bgbl_auth["Ausgabedatum"]
+            .as_str()
+            .or_else(|| br_kons["Inkrafttretensdatum"].as_str())
+            .unwrap_or_default();
+        let thing_type = bgbl_auth["Typ"]
+            .as_str()
+            .or_else(|| br_kons["Typ"].as_str())
+            .unwrap_or_default();
 
-        let documents = thing_raw["Data"]["Dokumentliste"]["ContentReference"]["Urls"]
-            ["ContentUrl"]
-            .as_array()?
-            .iter()
-            .filter_map(|doc| {
-                let doc_type = doc["DataType"].as_str()?;
-                let url = doc["Url"].as_str()?;
-                let ftype = match doc_type {
-                    "Html" => FileType::HTML,
-                    "Authentisch" => FileType::OriginalPDF,
-                    _ => FileType::Unknown,
-                };
-                Some(Document {
-                    title: doc_type.to_string(),
-                    link: url.to_string(),
-                    ftype,
-                })
-            })
-            .collect::<Vec<Document>>();
+        let documents = parse_documents(thing_raw);
 
         Some(Thing {
             id: id.to_string(),
@@ -114,154 +138,231 @@ pub trait RisScraper: Scraper {
             issuer: issuer.to_string(),
             title: title.to_string(),
             short_title: short_title.to_string(),
-            date: NaiveDate::from_str(date).unwrap(),
+            date: NaiveDate::from_str(date).ok()?,
             thing_type: thing_type.to_string(),
             part: part.to_string(),
-            eli,
-            document_url,
+            bgbl: bgbl.split_whitespace().collect::<Vec<_>>().join(" "),
+            eli: eli.to_string(),
+            document_url: document_url.to_string(),
             documents,
+            amendments: Vec::new(),
         })
     }
 }
 
 impl RisScraper for AustriaScraper {}
 
-/// Split a RIS document number like `BGBLA_2021_II_363` into `(year, part, number)`.
-fn parse_doc_number(doc_number: &str) -> Option<(String, String, String)> {
-    let mut parts = doc_number.split('_');
-    let _prefix = parts.next()?;
-    let year = parts.next()?.to_string();
-    let part = parts.next()?.to_string();
-    let number = parts.next()?.to_string();
-    Some((year, part, number))
+fn search_refs(data: &Value) -> Vec<&Value> {
+    as_list(&data["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"])
 }
 
-/// Parse a single decree and the acts that amended it out of a `Bundesrecht`
-/// search response, keyed by the decree's document number. The search is issued
-/// for `"<number>/<year>"`, which returns the decree itself plus every act that
-/// references it; the amendments are those whose short title carries the main
-/// decree's short title (e.g. "Änderung der Verordnung über ... Klimatickets").
-fn parse_ris_decree(data: &Value, doc_number: &str) -> Option<RisDecree> {
-    let (year, part, number) = parse_doc_number(doc_number)?;
-    let main_bgbl = format!("BGBl. {} Nr. {}/{}", part, number, year);
-    // With a single hit the API returns one object; with several, an array.
-    let raw_refs = &data["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"];
-    let refs: Vec<&Value> = match raw_refs {
+fn as_list(value: &Value) -> Vec<&Value> {
+    match value {
         Value::Array(items) => items.iter().collect(),
-        item if !item.is_null() => vec![item],
-        _ => Vec::new(),
-    };
+        Value::Null => Vec::new(),
+        other => vec![other],
+    }
+}
 
-    let main = refs.iter().find(|r| {
-        r["Data"]["Metadaten"]["Technisch"]["Applikation"].as_str() == Some("BgblAuth")
-            && r["Data"]["Metadaten"]["Bundesrecht"]["BgblAuth"]["Bgblnummer"].as_str()
-                == Some(main_bgbl.as_str())
-    })?;
-
-    let main_meta = &main["Data"]["Metadaten"]["Bundesrecht"];
-    let main_keys = title_match_keys(main_meta["Kurztitel"].as_str().unwrap_or_default());
-
-    let amendments = refs
-        .iter()
-        .filter(|r| {
-            r["Data"]["Metadaten"]["Technisch"]["Applikation"].as_str() == Some("BgblAuth")
-                && r["Data"]["Metadaten"]["Technisch"]["ID"].as_str() != Some(doc_number)
-        })
-        .filter_map(|r| {
-            let meta = &r["Data"]["Metadaten"]["Bundesrecht"];
-            let short = meta["Kurztitel"].as_str().unwrap_or_default();
-            let short_lc = short.to_lowercase();
-            let is_amendment = !main_keys.is_empty() && main_keys.iter().any(|k| short_lc.contains(k));
-            is_amendment.then(|| RisAmendment {
-                doc_number: r["Data"]["Metadaten"]["Technisch"]["ID"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string(),
-                bgbl: meta["BgblAuth"]["Bgblnummer"].as_str().unwrap_or_default().to_string(),
-                short_title: short.to_string(),
-                eli: meta["Eli"].as_str().unwrap_or_default().to_string(),
+fn parse_documents(thing_raw: &Value) -> Vec<Document> {
+    as_list(&thing_raw["Data"]["Dokumentliste"]["ContentReference"])
+        .into_iter()
+        .flat_map(|content_reference| as_list(&content_reference["Urls"]))
+        .flat_map(|urls| as_list(&urls["ContentUrl"]))
+        .filter_map(|content_url| {
+            let doc_type = content_url["DataType"].as_str()?;
+            let url = content_url["Url"].as_str()?;
+            let ftype = match doc_type {
+                "Html" => FileType::HTML,
+                "Authentisch" => FileType::OriginalPDF,
+                _ => FileType::Unknown,
+            };
+            Some(Document {
+                title: doc_type.to_string(),
+                link: url.to_string(),
+                ftype,
             })
         })
-        .collect::<Vec<_>>();
-    let mut amendments = amendments;
-    amendments.sort_by_key(|a| doc_number_sort_key(&a.doc_number));
-
-    Some(RisDecree {
-        doc_number: doc_number.to_string(),
-        short_title: main_meta["Kurztitel"].as_str().unwrap_or_default().to_string(),
-        title: main_meta["Titel"].as_str().unwrap_or_default().to_string(),
-        typ: main_meta["BgblAuth"]["Typ"].as_str().unwrap_or_default().to_string(),
-        bgbl: main_bgbl,
-        publication_date: main_meta["BgblAuth"]["Ausgabedatum"]
-            .as_str()
-            .and_then(|d| NaiveDate::from_str(d).ok()),
-        eli: main_meta["Eli"].as_str().unwrap_or_default().to_string(),
-        documents: parse_content_documents(&main["Data"]),
-        amendments,
-    })
+        .collect()
 }
 
-/// Chronological sort key for a document number: `(year, part, number)`.
-fn doc_number_sort_key(doc_number: &str) -> (u32, u32, u32) {
-    let parts: Vec<&str> = doc_number.split('_').collect();
-    let year = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
-    let part = parts
-        .get(2)
-        .map(|p| p.chars().filter(|c| c.is_ascii_alphabetic()).count() as u32)
-        .unwrap_or(0);
-    let number = parts.last().and_then(|p| p.parse().ok()).unwrap_or(0);
-    (year, part, number)
-}
-
-/// Phrases to look for in an amending act's short title: the full short title
-/// plus each comma-separated alias long enough to be distinctive. E.g.
-/// "NetzdienstleistungsVO Strom 2012, END-VO 2012" yields both parts, so that
-/// amendments phrased as "... – Novelle YYYY" or "END-VO 2012 – ..." match.
-fn title_match_keys(short_title: &str) -> Vec<String> {
-    let mut keys: Vec<String> = Vec::new();
-    let full = short_title.trim().to_lowercase();
-    if !full.is_empty() {
-        keys.push(full);
-    }
-    for part in short_title.split(',') {
-        let p = part.trim().to_lowercase();
-        let specific = p.chars().count() >= 10 && p.split_whitespace().count() >= 2;
-        if specific && !keys.contains(&p) {
-            keys.push(p);
-        }
-    }
-    keys
-}
-
-/// The downloadable representations (XML/HTML/RTF/PDF) of a document.
-fn parse_content_documents(data: &Value) -> Vec<Document> {
-    data["Dokumentliste"]["ContentReference"]["Urls"]["ContentUrl"]
-        .as_array()
-        .map(|urls| {
-            urls.iter()
-                .filter_map(|doc| {
-                    let doc_type = doc["DataType"].as_str()?;
-                    let url = doc["Url"].as_str()?;
-                    let ftype = match doc_type {
-                        "Html" => FileType::HTML,
-                        "Pdf" | "Authentisch" => FileType::OriginalPDF,
-                        _ => FileType::Unknown,
-                    };
-                    Some(Document {
-                        title: doc_type.to_string(),
-                        link: url.to_string(),
-                        ftype,
-                    })
-                })
-                .collect()
+fn parse_amendments(aenderung: &str) -> Vec<RisAmendmentRef> {
+    aenderung
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .map(|bgbl| {
+            let doc_number = derive_doc_number(&bgbl).unwrap_or_default();
+            RisAmendmentRef { bgbl, doc_number }
         })
-        .unwrap_or_default()
+        .collect()
+}
+
+fn derive_doc_number(bgbl: &str) -> Option<String> {
+    let re = Regex::new(r"(?i)BGBl\.\s*(?<teil>I{1,3})\s*Nr\.\s*(?<nr>\d+)\s*/\s*(?<jahr>\d{4})")
+        .ok()?;
+    let caps = re.captures(bgbl)?;
+    let number: u32 = caps["nr"].parse().ok()?;
+    let year: u32 = caps["jahr"].parse().ok()?;
+    Some(format!("BGBLA_{}_{}_{}", year, &caps["teil"], number))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::scraper::AustriaScraper;
+
+    fn fixture(name: &str) -> Value {
+        let raw = std::fs::read_to_string(format!("test-data/ris/{name}.json")).unwrap();
+        serde_json::from_str(&raw).unwrap()
+    }
+
+    #[test]
+    fn test_derive_doc_number() {
+        assert_eq!(
+            derive_doc_number("BGBl. II Nr. 122/2022").as_deref(),
+            Some("BGBLA_2022_II_122")
+        );
+        assert_eq!(
+            derive_doc_number("BGBl. I Nr. 75/2021").as_deref(),
+            Some("BGBLA_2021_I_75")
+        );
+        assert_eq!(
+            derive_doc_number("BGBl. III Nr. 62/2023").as_deref(),
+            Some("BGBLA_2023_III_62")
+        );
+        assert_eq!(
+            derive_doc_number("idF: BGBl. II Nr. 119/2025").as_deref(),
+            Some("BGBLA_2025_II_119")
+        );
+        assert_eq!(derive_doc_number("BGBl. Nr. 506/1976"), None);
+        assert_eq!(derive_doc_number("dRGBl. I S 42/1944"), None);
+        assert_eq!(derive_doc_number("not a bgbl citation"), None);
+    }
+
+    #[test]
+    fn test_parse_amendments() {
+        assert!(parse_amendments("").is_empty());
+        assert!(parse_amendments("   \r\n  \r\n").is_empty());
+
+        let two = parse_amendments("BGBl. II Nr. 122/2022\r\nBGBl. II Nr. 323/2022\r\n");
+        assert_eq!(two.len(), 2);
+        assert_eq!(two[0].bgbl, "BGBl. II Nr. 122/2022");
+        assert_eq!(two[0].doc_number, "BGBLA_2022_II_122");
+        assert_eq!(two[1].doc_number, "BGBLA_2022_II_323");
+
+        let spaced = parse_amendments("BGBl. Nr.  50/1968\r\nBGBl. II  Nr. 74/2025");
+        assert_eq!(spaced[0].bgbl, "BGBl. Nr. 50/1968");
+        assert_eq!(spaced[0].doc_number, "");
+        assert_eq!(spaced[1].bgbl, "BGBl. II Nr. 74/2025");
+        assert_eq!(spaced[1].doc_number, "BGBLA_2025_II_74");
+
+        let unparseable = parse_amendments("dRGBl. I S 42/1944");
+        assert_eq!(unparseable.len(), 1);
+        assert_eq!(unparseable[0].bgbl, "dRGBl. I S 42/1944");
+        assert_eq!(unparseable[0].doc_number, "");
+    }
+
+    #[test]
+    fn test_search_refs_normalizes_object_and_array() {
+        let single: Value = serde_json::json!({"OgdSearchResult":{"OgdDocumentResults":{"OgdDocumentReference":{"Data":{}}}}});
+        assert_eq!(search_refs(&single).len(), 1);
+
+        let many: Value = serde_json::json!({"OgdSearchResult":{"OgdDocumentResults":{"OgdDocumentReference":[{"Data":{}},{"Data":{}}]}}});
+        assert_eq!(search_refs(&many).len(), 2);
+
+        let none: Value = serde_json::json!({"OgdSearchResult":{"OgdDocumentResults":{}}});
+        assert!(search_refs(&none).is_empty());
+    }
+
+    #[test]
+    fn test_general_parse_thing_authentic_entry() {
+        let data = fixture("BGBLA_2021_II_363_auth");
+        let scraper = AustriaScraper::default();
+        let entry = scraper.general_parse_thing(search_refs(&data)[0]).unwrap();
+
+        assert_eq!(entry.id, "BGBLA_2021_II_363");
+        assert_eq!(entry.bgbl, "BGBl. II Nr. 363/2021");
+        assert_eq!(entry.part, "Teil2");
+        assert_eq!(entry.thing_type, "Verordnung");
+        assert_eq!(entry.date, NaiveDate::from_ymd_opt(2021, 8, 18).unwrap());
+        assert!(!entry.documents.is_empty());
+        assert!(entry.amendments.is_empty());
+    }
+
+    #[test]
+    fn test_parse_ministrial_decree_extracts_ministry() {
+        let data = fixture("BGBLA_2021_II_363_auth");
+        let scraper = AustriaScraper::default();
+        let decree = scraper
+            .parse_ministrial_decree(search_refs(&data)[0])
+            .unwrap();
+
+        assert_eq!(
+            decree.issuer,
+            "Bundesministerium für Klimaschutz, Umwelt, Energie, Mobilität, Innovation und Technologie"
+        );
+        assert_eq!(decree.id, "BGBLA_2021_II_363");
+    }
+
+    #[test]
+    fn test_parse_consolidated_entry_amendments() {
+        let data = fixture("BGBLA_2021_II_363_p0");
+        let scraper = AustriaScraper::default();
+        let entry = scraper
+            .parse_consolidated_norm_entry(search_refs(&data)[0])
+            .unwrap();
+
+        assert_eq!(entry.bgbl, "BGBl. II Nr. 363/2021");
+        assert_eq!(entry.short_title, "Einführung des Klimatickets");
+        assert_eq!(entry.amendments.len(), 9);
+
+        let doc_numbers: Vec<&str> = entry
+            .amendments
+            .iter()
+            .map(|a| a.doc_number.as_str())
+            .collect();
+        assert_eq!(
+            doc_numbers,
+            vec![
+                "BGBLA_2022_II_122",
+                "BGBLA_2022_II_323",
+                "BGBLA_2022_II_425",
+                "BGBLA_2023_II_136",
+                "BGBLA_2023_II_293",
+                "BGBLA_2024_II_136",
+                "BGBLA_2024_II_310",
+                "BGBLA_2025_II_74",
+                "BGBLA_2025_II_119",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_consolidated_entry_no_amendments() {
+        let data = fixture("BGBLA_2026_II_282_p0");
+        let scraper = AustriaScraper::default();
+        let entry = scraper
+            .parse_consolidated_norm_entry(search_refs(&data)[0])
+            .unwrap();
+
+        assert_eq!(entry.bgbl, "BGBl. II Nr. 282/2026");
+        assert_eq!(entry.thing_type, "V");
+        assert!(entry.amendments.is_empty());
+    }
+
+    #[test]
+    fn test_parse_consolidated_entry_skips_paragraph_records() {
+        let mut data = fixture("BGBLA_2021_II_363_p0");
+        data["OgdSearchResult"]["OgdDocumentResults"]["OgdDocumentReference"]["Data"]
+            ["Metadaten"]["Bundesrecht"]["BrKons"]["Dokumenttyp"] =
+            Value::String("Paragraph".to_string());
+
+        let scraper = AustriaScraper::default();
+        assert!(scraper
+            .parse_consolidated_norm_entry(search_refs(&data)[0])
+            .is_none());
+    }
 
     #[tokio::test]
     async fn test_fetch_decrees() {
@@ -278,109 +379,26 @@ mod tests {
             .await
             .unwrap();
         assert!(!decrees.is_empty());
-        println!("decrees count: {}", decrees.len());
-        dbg!(&decrees[..10]);
-    }
-
-    fn fixture(doc_number: &str) -> Value {
-        let path = format!("test-data/ris/{doc_number}.json");
-        let raw = std::fs::read_to_string(path).expect("fixture file");
-        serde_json::from_str(&raw).expect("valid json")
-    }
-
-    #[test]
-    fn test_parse_ris_decree_klimaticket() {
-        let data = fixture("BGBLA_2021_II_363");
-        let decree = parse_ris_decree(&data, "BGBLA_2021_II_363").unwrap();
-
-        assert_eq!(decree.doc_number, "BGBLA_2021_II_363");
-        assert_eq!(decree.short_title, "Einführung des Klimatickets");
-        assert_eq!(decree.typ, "Verordnung");
-        assert_eq!(decree.bgbl, "BGBl. II Nr. 363/2021");
-        assert_eq!(
-            decree.publication_date,
-            NaiveDate::from_ymd_opt(2021, 8, 18)
-        );
-
-        let amendments: Vec<&str> =
-            decree.amendments.iter().map(|a| a.doc_number.as_str()).collect();
-        assert_eq!(
-            amendments,
-            vec![
-                "BGBLA_2022_II_122",
-                "BGBLA_2022_II_323",
-                "BGBLA_2022_II_425",
-                "BGBLA_2023_II_136",
-                "BGBLA_2023_II_293",
-                "BGBLA_2024_II_136",
-                "BGBLA_2024_II_310",
-                "BGBLA_2025_II_74",
-                "BGBLA_2025_II_119",
-            ]
-        );
-
-        let first = &decree.amendments[0];
-        assert_eq!(first.bgbl, "BGBl. II Nr. 122/2022");
-        assert!(first.short_title.contains("Klimaticket"));
-        assert!(first.eli.contains("/eli/bgbl/II/2022/122"));
-    }
-
-    #[test]
-    fn test_parse_ris_decree_aliased_short_title() {
-        // The main decree carries two names ("... , END-VO 2012"), and its
-        // amendments reference either of them, so both must match.
-        let data = fixture("BGBLA_2012_II_477");
-        let decree = parse_ris_decree(&data, "BGBLA_2012_II_477").unwrap();
-
-        assert_eq!(
-            decree.short_title,
-            "NetzdienstleistungsVO Strom 2012, END-VO 2012"
-        );
-        let amendments: Vec<&str> =
-            decree.amendments.iter().map(|a| a.doc_number.as_str()).collect();
-        assert_eq!(
-            amendments,
-            vec!["BGBLA_2013_II_192", "BGBLA_2023_II_394", "BGBLA_2026_II_177"]
-        );
-    }
-
-    #[test]
-    fn test_parse_ris_decree_no_amendments() {
-        // A single hit is returned as one object (not an array) by the API.
-        let data = fixture("BGBLA_2026_II_282");
-        let decree = parse_ris_decree(&data, "BGBLA_2026_II_282").unwrap();
-        assert_eq!(decree.doc_number, "BGBLA_2026_II_282");
-        assert_eq!(decree.bgbl, "BGBl. II Nr. 282/2026");
-        assert!(decree.amendments.is_empty());
-    }
-
-    #[test]
-    fn test_parse_ris_decree_unknown_number() {
-        let data = fixture("BGBLA_2021_II_363");
-        assert!(parse_ris_decree(&data, "BGBLA_2021_II_999").is_none());
-    }
-
-    #[test]
-    fn test_parse_doc_number() {
-        assert_eq!(
-            parse_doc_number("BGBLA_2021_II_363"),
-            Some(("2021".into(), "II".into(), "363".into()))
-        );
-        assert_eq!(
-            parse_doc_number("BGBLA_2024_I_114"),
-            Some(("2024".into(), "I".into(), "114".into()))
-        );
-        assert!(parse_doc_number("not-a-doc-number").is_none());
+        assert!(decrees.iter().all(|d| d.bgbl.starts_with("BGBl")));
     }
 
     #[tokio::test]
-    async fn test_fetch_single_decree() {
+    async fn test_fetch_consolidated_decrees() {
         let scraper = AustriaScraper::default();
-        let decree = scraper
-            .fetch_single_decree("BGBLA_2021_II_363")
+        let decrees = scraper.fetch_consolidated_decrees(1).await.unwrap();
+        assert!(decrees.iter().all(|d| d.bgbl.starts_with("BGBl")));
+        dbg!(decrees);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_single_entry() {
+        let scraper = AustriaScraper::default();
+        let entry = scraper
+            .fetch_single_ris_entry("BGBLA_2025_II_74")
             .await
             .unwrap();
-        assert_eq!(decree.doc_number, "BGBLA_2021_II_363");
-        assert!(!decree.amendments.is_empty());
+        assert_eq!(entry.id, "BGBLA_2025_II_74");
+        assert_eq!(entry.bgbl, "BGBl. II Nr. 74/2025");
+        dbg!(&entry);
     }
 }

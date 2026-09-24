@@ -354,32 +354,16 @@ pub struct Thing {
     pub date: NaiveDate,
     pub thing_type: String,
     pub part: String,
+    pub bgbl: String,
     pub eli: String,
     pub document_url: String,
     pub documents: Vec<Document>,
+    #[serde(default)]
+    pub amendments: Vec<RisAmendmentRef>,
 }
 
-/// A single RIS (Rechtliches Informationssystem) federal act, e.g. a Gesetz or
-/// Verordnung, identified by its document number such as `BGBLA_2021_II_363`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RisDecree {
-    pub doc_number: String,
-    pub short_title: String,
-    pub title: String,
-    pub typ: String,
+pub struct RisAmendmentRef {
     pub bgbl: String,
-    pub publication_date: Option<NaiveDate>,
-    pub eli: String,
-    pub documents: Vec<Document>,
-    /// The acts that have amended this decree, in chronological order.
-    pub amendments: Vec<RisAmendment>,
-}
-
-/// An act that amended a [`RisDecree`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RisAmendment {
     pub doc_number: String,
-    pub bgbl: String,
-    pub short_title: String,
-    pub eli: String,
 }

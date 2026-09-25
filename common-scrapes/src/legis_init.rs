@@ -358,6 +358,7 @@ pub struct Thing {
     pub eli: String,
     pub document_url: String,
     pub documents: Vec<Document>,
+    pub is_norm: bool,
     #[serde(default)]
     pub amendments: Vec<RisAmendmentRef>,
 }

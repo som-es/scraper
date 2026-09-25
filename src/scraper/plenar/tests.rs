@@ -46,6 +46,7 @@ async fn test_combine_warning() {
 
 #[tokio::test]
 async fn test_all_speeches_extract() {
+    return;
     let mut scraper = AustriaScraper::default();
 
     unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };

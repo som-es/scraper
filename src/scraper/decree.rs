@@ -1,4 +1,4 @@
-use std::{future::Future, str::FromStr, sync::OnceLock};
+use std::{future::Future, str::FromStr};
 
 use chrono::NaiveDate;
 use common_scrapes::{Document, FileType, RisAmendmentRef, Thing};
@@ -45,10 +45,11 @@ pub trait RisScraper: Scraper {
     ) -> impl Future<Output = Result<Vec<Thing>, ScraperError>> {
         async move {
             let url = format!(
-                "{}?Applikation=BrKons&Seitennummer={}&DokumenteProSeite=OneHundred",
+                "{}?Applikation=BrKons&Seitennummer={}&DokumenteProSeite=OneHundred&Typ=V&Abschnitt.Von=0&Abschnitt.Bis=0&Abschnitt.Typ=Paragraph",
                 Self::STATE_LAW_URL,
                 page
             );
+            dbg!(&url);
             let data = request::request(Method::GET, self.client(), (), url).await?;
             Ok(search_refs(&data)
                 .into_iter()
@@ -70,13 +71,13 @@ pub trait RisScraper: Scraper {
             let data = request::request(Method::GET, self.client(), (), url).await?;
             search_refs(&data)
                 .into_iter()
-                .find_map(|r| self.general_parse_thing(r))
+                .find_map(|r| self.parse_ministrial_decree(r))
                 .ok_or(ScraperError::ParseError)
         }
     }
 
     fn parse_ministrial_decree(&self, decree_raw: &Value) -> Option<Thing> {
-        let mut thing = self.general_parse_thing(decree_raw)?;
+        let mut thing = self.general_parse_thing(decree_raw, false)?;
         if !thing.issuer.to_lowercase().contains("minister") {
             return None;
         }
@@ -90,15 +91,20 @@ pub trait RisScraper: Scraper {
         if br_kons["Dokumenttyp"].as_str() != Some("Norm") {
             return None;
         }
-        let mut thing = self.general_parse_thing(raw)?;
+        let mut thing = self.general_parse_thing(raw, true)?;
         thing.amendments = br_kons["Aenderung"]
             .as_str()
             .map(parse_amendments)
             .unwrap_or_default();
+
+        if thing.issuer.to_lowercase().contains("minister") {
+            thing.issuer =
+                thing.issuer[thing.issuer.find('(')? + 1..thing.issuer.find(')')?].to_string();
+        }
         Some(thing)
     }
 
-    fn general_parse_thing(&self, thing_raw: &Value) -> Option<Thing> {
+    fn general_parse_thing(&self, thing_raw: &Value, is_norm: bool) -> Option<Thing> {
         let data = &thing_raw["Data"]["Metadaten"];
         let technical = &data["Technisch"];
         let id = technical["ID"].as_str()?;
@@ -145,6 +151,7 @@ pub trait RisScraper: Scraper {
             eli: eli.to_string(),
             document_url: document_url.to_string(),
             documents,
+            is_norm,
             amendments: Vec::new(),
         })
     }
@@ -209,6 +216,10 @@ fn derive_doc_number(bgbl: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use tokio::time::sleep;
+
     use super::*;
     use crate::scraper::AustriaScraper;
 
@@ -279,7 +290,9 @@ mod tests {
     fn test_general_parse_thing_authentic_entry() {
         let data = fixture("BGBLA_2021_II_363_auth");
         let scraper = AustriaScraper::default();
-        let entry = scraper.general_parse_thing(search_refs(&data)[0]).unwrap();
+        let entry = scraper
+            .general_parse_thing(search_refs(&data)[0], false)
+            .unwrap();
 
         assert_eq!(entry.id, "BGBLA_2021_II_363");
         assert_eq!(entry.bgbl, "BGBl. II Nr. 363/2021");
@@ -303,6 +316,7 @@ mod tests {
             "Bundesministerium für Klimaschutz, Umwelt, Energie, Mobilität, Innovation und Technologie"
         );
         assert_eq!(decree.id, "BGBLA_2021_II_363");
+        assert!(!decree.is_norm);
     }
 
     #[test]
@@ -316,6 +330,7 @@ mod tests {
         assert_eq!(entry.bgbl, "BGBl. II Nr. 363/2021");
         assert_eq!(entry.short_title, "Einführung des Klimatickets");
         assert_eq!(entry.amendments.len(), 9);
+        assert!(entry.is_norm);
 
         let doc_numbers: Vec<&str> = entry
             .amendments
@@ -348,6 +363,7 @@ mod tests {
 
         assert_eq!(entry.bgbl, "BGBl. II Nr. 282/2026");
         assert_eq!(entry.thing_type, "V");
+        assert!(entry.is_norm);
         assert!(entry.amendments.is_empty());
     }
 
@@ -383,6 +399,14 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_fetch_consolidated_decrees_ignore() {
+        let scraper = AustriaScraper::default();
+        let decrees = scraper.fetch_consolidated_decrees(1).await.unwrap();
+        assert!(decrees.iter().all(|d| d.bgbl.starts_with("BGBl")));
+        dbg!(decrees);
+    }
+
+    #[tokio::test]
     async fn test_fetch_consolidated_decrees() {
         let scraper = AustriaScraper::default();
         let decrees = scraper.fetch_consolidated_decrees(1).await.unwrap();
@@ -400,5 +424,38 @@ mod tests {
         assert_eq!(entry.id, "BGBLA_2025_II_74");
         assert_eq!(entry.bgbl, "BGBl. II Nr. 74/2025");
         dbg!(&entry);
+    }
+
+    // BGBLA_2021_II_363
+    #[tokio::test]
+    async fn test_fetch_single_entry_klimaticket() {
+        let scraper = AustriaScraper::default();
+        let entry = scraper
+            .fetch_single_ris_entry("BGBLA_2021_II_363")
+            .await
+            .unwrap();
+        assert_eq!(entry.id, "BGBLA_2021_II_363");
+        dbg!(&entry);
+    }
+
+    #[tokio::test]
+    async fn test_find_klimaticket_2021() {
+        let scraper = AustriaScraper::default();
+        let page = 20;
+        for page in page..30 {
+            let decrees = scraper
+                .fetch_and_parse_ministrial_decrees(page)
+                .await
+                .unwrap();
+            let found = decrees
+                .iter()
+                .find(|decree| decree.id == "BGBLA_2021_II_363");
+            if found.is_some() {
+                let decrees = scraper.fetch_decrees(page).await.unwrap();
+                dbg!(decrees);
+                dbg!(found);
+            }
+            sleep(Duration::from_secs(2)).await;
+        }
     }
 }

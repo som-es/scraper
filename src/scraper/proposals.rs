@@ -58,6 +58,13 @@ pub trait ProposalScraper: Scraper {
         .await
     }
 
+    async fn post_proposals_payload_latest(
+        &self,
+        searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
+        self.post_proposals_payload(searched_doktyps).await
+    }
+
     async fn post_proposals_payload_by_di(
         &self,
         proposal_payload: ProposalsPayload,

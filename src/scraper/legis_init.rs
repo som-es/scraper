@@ -38,6 +38,14 @@ pub trait LegislativeInitiatives: ProposalScraper + Sync {
         self.post_proposals_payload(searched_doktyps).await
     }
 
+    #[inline]
+    async fn post_legis_payload_latest(
+        &self,
+        searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
+        self.post_proposals_payload_latest(searched_doktyps).await
+    }
+
     async fn raw_legis_into_legis(&self, raw_legis: Value) -> Option<LegislativeInitiative>;
 
     fn legis_paths(&self, initiatives: Value) -> Result<GegenstandPaths, ScraperError>;

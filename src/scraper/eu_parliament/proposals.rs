@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{Days, NaiveDate};
 use common_scrapes::{Document, FileType, Proposal, ProposalType};
 use regex::Regex;
-use serde_json::Value::{self, Array};
+use serde_json::Value::{self};
 
 use crate::{
     error::ScraperError,
@@ -454,6 +454,21 @@ impl ProposalScraper for EuParliamentScraper {
             .map(|data| serde_json::to_value(data).unwrap())
     }
 
+    async fn post_proposals_payload_latest(
+        &self,
+        _searched_doktyps: Option<&[&str]>,
+    ) -> Result<Value, ScraperError> {
+        let start_date = today().checked_sub_days(Days::new(60)).unwrap();
+        Ok(serde_json::to_value(
+            self.list_procedures_feed(start_date)
+                .await?
+                .into_iter()
+                .map(|data| data.process_id)
+                .collect::<Vec<_>>(),
+        )
+        .unwrap())
+    }
+
     async fn post_proposals_payload_by_di(
         &self,
         _proposal_payload: ProposalsPayload,
@@ -500,6 +515,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_procedure_ids() {
         let scraper = EuParliamentScraper::default();
+        let latest = scraper.post_proposals_payload_latest(None).await.unwrap();
         let ids = scraper.list_procedure_ids().await.unwrap();
         let mut id_count = HashMap::<&str, u32>::new();
         for id in &ids {

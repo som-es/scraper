@@ -78,9 +78,11 @@ pub struct EuParliamentScraper {
 
 impl Default for EuParliamentScraper {
     fn default() -> Self {
+        let mut cache_config = CacheConfig::default();
+        cache_config.redo_secs = 60 * 60 * 24;
         Self {
             client: http_client().unwrap(),
-            cache_config: Default::default(),
+            cache_config,
             delegate_seats: Default::default(),
             scrape_info: GeneralScrapeInfo {
                 gp: vec![today().year().to_string()],

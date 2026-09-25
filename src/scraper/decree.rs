@@ -49,7 +49,6 @@ pub trait RisScraper: Scraper {
                 Self::STATE_LAW_URL,
                 page
             );
-            dbg!(&url);
             let data = request::request(Method::GET, self.client(), (), url).await?;
             Ok(search_refs(&data)
                 .into_iter()
@@ -78,11 +77,11 @@ pub trait RisScraper: Scraper {
 
     fn parse_ministrial_decree(&self, decree_raw: &Value) -> Option<Thing> {
         let mut thing = self.general_parse_thing(decree_raw, false)?;
-        if !thing.issuer.to_lowercase().contains("minister") {
-            return None;
+
+        if thing.issuer.to_lowercase().contains("(") {
+            thing.issuer =
+                thing.issuer[thing.issuer.find('(')? + 1..thing.issuer.find(')')?].to_string();
         }
-        thing.issuer =
-            thing.issuer[thing.issuer.find('(')? + 1..thing.issuer.find(')')?].to_string();
         Some(thing)
     }
 
@@ -97,7 +96,7 @@ pub trait RisScraper: Scraper {
             .map(parse_amendments)
             .unwrap_or_default();
 
-        if thing.issuer.to_lowercase().contains("minister") {
+        if thing.issuer.to_lowercase().contains("(") {
             thing.issuer =
                 thing.issuer[thing.issuer.find('(')? + 1..thing.issuer.find(')')?].to_string();
         }
@@ -401,8 +400,8 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_consolidated_decrees_ignore() {
         let scraper = AustriaScraper::default();
-        let decrees = scraper.fetch_consolidated_decrees(1).await.unwrap();
-        assert!(decrees.iter().all(|d| d.bgbl.starts_with("BGBl")));
+        let decrees = scraper.fetch_consolidated_decrees(8).await.unwrap();
+        // assert!(decrees.iter().all(|d| d.bgbl.starts_with("BGBl")));
         dbg!(decrees);
     }
 

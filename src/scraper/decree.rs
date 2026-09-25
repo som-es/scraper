@@ -125,6 +125,13 @@ pub trait RisScraper: Scraper {
             .as_str()
             .or_else(|| br_kons["Kundmachungsorgan"].as_str())
             .unwrap_or_default();
+
+        let main_bgbl = br_kons["StammnormBgblnummer"]
+            .as_str()
+            .map(|nr| nr.to_string());
+
+        let gesetzesnummer = br_kons["Gesetzesnummer"].as_str().map(|nr| nr.to_string());
+
         let part = bgbl_auth["Teil"].as_str().unwrap_or_default();
         let date = bgbl_auth["Ausgabedatum"]
             .as_str()
@@ -147,10 +154,12 @@ pub trait RisScraper: Scraper {
             thing_type: thing_type.to_string(),
             part: part.to_string(),
             bgbl: bgbl.split_whitespace().collect::<Vec<_>>().join(" "),
+            main_bgbl,
             eli: eli.to_string(),
             document_url: document_url.to_string(),
             documents,
             is_norm,
+            gesetzesnummer,
             amendments: Vec::new(),
         })
     }
@@ -436,25 +445,26 @@ mod tests {
         assert_eq!(entry.id, "BGBLA_2021_II_363");
         dbg!(&entry);
     }
+    // BGBLA_2026_II_216
+    #[tokio::test]
+    async fn test_fetch_single_entry_bgbla_2026_ii_216() {
+        let scraper = AustriaScraper::default();
+        let entry = scraper
+            .fetch_single_ris_entry("BGBLA_2026_II_216")
+            .await
+            .unwrap();
+        assert_eq!(entry.id, "BGBLA_2026_II_216");
+        assert_eq!(entry.issuer, "Rundfunk und Telekom Regulierungs-GmbH");
+    }
 
     #[tokio::test]
-    async fn test_find_klimaticket_2021() {
+    async fn test_find_consolidated_klimaticket_2021() {
         let scraper = AustriaScraper::default();
-        let page = 20;
-        for page in page..30 {
-            let decrees = scraper
-                .fetch_and_parse_ministrial_decrees(page)
-                .await
-                .unwrap();
-            let found = decrees
-                .iter()
-                .find(|decree| decree.id == "BGBLA_2021_II_363");
-            if found.is_some() {
-                let decrees = scraper.fetch_decrees(page).await.unwrap();
-                dbg!(decrees);
-                dbg!(found);
-            }
-            sleep(Duration::from_secs(2)).await;
+        let page = 40;
+        let decrees = scraper.fetch_consolidated_decrees(page).await.unwrap();
+        let found = decrees.iter().find(|decree| decree.id == "NOR40237426");
+        if found.is_some() {
+            dbg!(found);
         }
     }
 }

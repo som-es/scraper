@@ -355,10 +355,12 @@ pub struct Thing {
     pub thing_type: String,
     pub part: String,
     pub bgbl: String,
+    pub main_bgbl: Option<String>,
     pub eli: String,
     pub document_url: String,
     pub documents: Vec<Document>,
     pub is_norm: bool,
+    pub gesetzesnummer: Option<String>,
     #[serde(default)]
     pub amendments: Vec<RisAmendmentRef>,
 }

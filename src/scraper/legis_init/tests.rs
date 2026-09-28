@@ -1,28 +1,22 @@
-use std::collections::HashSet;
+mod live;
+mod voting;
 
 use crate::{
     caching::CacheConfig,
     extract_text_from_html, find_optimal_votes_by_name,
     legis_init::{
         votes::{extract_vote_count, extract_votes_by_name},
-        LegislativeInitiatives, LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES,
+        LegislativeInitiatives,
     },
     AustriaScraper, Scraper, TextExtractor,
 };
-use chrono::{Days, NaiveDate};
+use chrono::NaiveDate;
 use common_scrapes::{
     AcceptedState, Document, FileType, Opinion, Party, ProContra, Reference, Stage, Vote,
     VoteStage, VoteType, Voting,
 };
 
 use super::is_accepted_based_on_votes;
-
-#[test]
-fn test_trim_potential_trailing_zeros() {
-    let s = "00001";
-    let s = s.trim_start_matches('0');
-    assert_eq!(s, "1");
-}
 
 #[tokio::test]
 pub async fn test_xxvii_a_2173() {
@@ -85,30 +79,7 @@ fn test_text_extract() {
     let html = r#"<h4>Schwerpunkte der Regierungsvorlage</h4>\n\n<ul class=\"unordered-list\">\n\t<li>&Auml;nderung des &sect; 46 KFG und Schaffung exakterer Vorgaben f&uuml;r die Bewilligung von &Uuml;berstellungsfahrten</li>\n\t<li>Entsprechende &Auml;nderung des &sect; 40 und des &sect; 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister &uuml;bernehmen k&ouml;nnen. Zus&auml;tzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgef&uuml;hrt werden</li>\n</ul>\n"#;
 
     let text = extract_text_from_html(html);
-    // assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
-}
-
-// /gegenstand/XXVIII/A/104
-#[tokio::test]
-async fn test_unfinished_xxviii_a_104() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let init = scraper
-        .get_legis_init("/gegenstand/XXVIII/A/104")
-        .await
-        .unwrap();
-    println!("init: {init:?}");
-    assert!(init.is_voteable_on);
+    assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
 }
 
 #[tokio::test]
@@ -138,52 +109,6 @@ async fn test_ris_link_from_bgbllinks() {
                 .to_string()
         )
     );
-}
-
-#[tokio::test]
-async fn test_legis_init_all() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XXVIII".to_string()];
-
-    scraper.scrape_info.date_start = chrono::Local::now()
-        .naive_local()
-        .checked_sub_days(Days::new(90));
-
-    let initiatives = scraper.post_legis_payload(None).await.unwrap();
-    let paths = scraper.legis_paths(initiatives).unwrap();
-
-    assert!(paths.len() >= 10);
-    println!("length: {}", paths.len());
-
-    // return;
-
-    let mut error_count = 0;
-    for path in &paths {
-        // let x = scraper.get_legis_init(path).await;
-        // if x.is_err() {
-        //     error_count += 1;
-        //     println!("erorring path: {path}");
-        // }
-        // if path.contains("I/1858") {
-        //     println!("path: {path:?}");
-        // }
-        if path.contains("A/77") {
-            println!("path: {path:?}");
-        }
-        // println!("path: {path:?}");
-    }
-    println!("paths: {}", paths.len());
-    println!("error count: {error_count}");
 }
 
 // /gegenstand/XXVII/A/4129
@@ -232,314 +157,6 @@ async fn test_get_legis_init_invisibly_declined_2_3_majority() {
 
     let voted_at_date = legis_init.hidden_votes_info.voted_at_date.unwrap();
     assert_eq!(voted_at_date, NaiveDate::from_ymd_opt(2024, 7, 3).unwrap());
-}
-
-// test if named vote contains "HomeGesamtes ProtokollVorherig"
-#[tokio::test]
-async fn test_look_for_named_vote_contains_home_gesamtes() {
-    return;
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    for gp in [
-        "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
-    ]
-    .iter()
-    .rev()
-    {
-        println!("checking gp {gp}");
-        scraper.scrape_info.gp = vec![gp.to_string()];
-
-        let initiatives = scraper
-            .post_legis_payload(Some(&LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES))
-            .await
-            .unwrap();
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            // println!();
-            // println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                // println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-
-            let Some(voted_by_name_data) = init.hidden_votes_info.voted_by_name_data else {
-                continue;
-            };
-
-            let Some(delegates_pro_contra) = voted_by_name_data.delegates_pro_contra else {
-                continue;
-            };
-
-            delegates_pro_contra
-                .pro
-                .iter()
-                .chain(delegates_pro_contra.contra.iter())
-                .for_each(|delegate| {
-                    if delegate.name.contains("HomeGesamtes ProtokollVorherig") {
-                        println!("(HomeGesamtes ProtokollVorherig) found one in {path}");
-                    }
-                    if delegate.name.contains("Gesamtes ProtokollVorherig") {
-                        println!("(Gesamtes ProtokollVorherig) found one in {path}");
-                    }
-                    if delegate.name.contains("Home") {
-                        println!("(home) found one in {path}");
-                    }
-                });
-        }
-    }
-}
-
-#[tokio::test]
-async fn test_get_legis_init_with_accepted_and_status_5() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    return;
-
-    let start = std::time::Instant::now();
-
-    let mut count = 0;
-    // for gp in ["XXIV", "XXIII", "XXII"] {
-    for gp in [
-        "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
-    ] {
-        scraper.scrape_info.gp = vec![gp.to_string()];
-
-        if gp != "XXVII" {
-            continue;
-        }
-
-        let initiatives = scraper.post_legis_payload(None).await.unwrap();
-        let mut doktypes_with_law = HashSet::new();
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            // println!();
-            // println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                // println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-
-            let law_file = init
-                .documents
-                .iter()
-                .find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
-            if let Some(_law_file) = law_file {
-                if init.doktyp == "AUB" {
-                    // let url = format!("{}/gegenstand/{}/{}/{}", AustriaScraper::BASE_URL, init.gp, init.ityp, init.inr);
-                    // println!("url: {url:?}")
-                }
-                doktypes_with_law.insert(init.doktyp);
-            }
-
-            if init.is_law
-            /*&& init.law_accepted == Some(true)*/
-            {
-                count += 1;
-            }
-        }
-        println!("elapsed: {:?}", start.elapsed());
-        println!("count: {count:?}");
-        println!("{doktypes_with_law:?}");
-        // break;
-    }
-
-    println!("count: {count:?}");
-}
-
-#[tokio::test]
-async fn test_get_legis_init_was_voted_by_name() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    return;
-    let start = std::time::Instant::now();
-
-    let mut doktypes = HashSet::new();
-    let mut itypes = HashSet::new();
-    let mut count = 0;
-    // for gp in ["XXIV", "XXIII", "XXII"] {
-    for gp in [
-        // "XXVIII", "XXVII", "XXVI", "XXV", "XXIV",
-        "XXIII", "XXII", "XXI", "XX",
-    ] {
-        scraper.scrape_info.gp = vec![gp.to_string()];
-
-        let initiatives = scraper.post_legis_payload(None).await.unwrap();
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            // println!();
-            // println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-            doktypes.insert(init.doktyp.clone());
-            itypes.insert(init.ityp.clone());
-
-            // println!("init: {init:?}");
-            if init.hidden_votes_info.voted_by_name {
-                println!(
-                    "init: title: {}, accepted: {:?}, votes: {:?}, id: {:?}, hidden_votes: {:?}, ",
-                    init.title, init.accepted, init.votes, init.id, init.hidden_votes_info
-                );
-                println!(" {}{path}", AustriaScraper::BASE_URL,);
-                if let Some(c) = init.hidden_votes_info.voted_by_name_data {
-                    if let Some(d) = c.delegates_pro_contra {
-                        count += 1;
-                    }
-                }
-            }
-        }
-        println!("elapsed: {:?}", start.elapsed());
-        println!("count: {count:?}");
-
-        // break;
-        if gp == "XXIV" {
-            break;
-        }
-    }
-
-    println!("doktypes: {doktypes:?}");
-    println!("itypes: {itypes:?}");
-    /*
-           doktypes: {"US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2", "RVVB", "USVL", "BUA", "UEAM"}
-    itypes: {"AA", "URH2", "UEA", "I", "US", "A"}
-             */
-
-    println!("count: {count:?}");
-}
-
-#[tokio::test]
-async fn test_get_legis_init_was_invisibly_declined() {
-    return;
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let start = std::time::Instant::now();
-
-    let initiatives = scraper.post_legis_payload(None).await.unwrap();
-    let mut count = 0;
-    for path in scraper.legis_paths(initiatives).unwrap() {
-        println!("path: {path:?}");
-        let Ok(init) = scraper.get_legis_init(&path).await else {
-            println!("error {}{path}", AustriaScraper::BASE_URL);
-            continue;
-        };
-        if init.accepted == Some(AcceptedState::PreDeclined) {
-            println!(
-                "{}, {hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
-                init.hidden_votes_info.voted_by_name,
-                init.accepted,
-                AustriaScraper::BASE_URL,
-                hidden = init.hidden_votes_info.pro_contra_parties,
-                ty = init.hidden_votes_info.vote_stage
-            );
-            count += 1;
-        }
-    }
-
-    println!("elapsed: {:?}", start.elapsed());
-    println!("count: {count:?}");
-}
-
-#[tokio::test]
-async fn test_get_legis_init_majority() {
-    return;
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let start = std::time::Instant::now();
-
-    let initiatives = scraper.post_legis_payload(None).await.unwrap();
-    for path in scraper.legis_paths(initiatives).unwrap() {
-        //println!("path: {path:?}");
-        let Ok(init) = scraper.get_legis_init(&path).await else {
-            println!("error {}{path}", AustriaScraper::BASE_URL);
-            continue;
-        };
-        // if init.accepted == Some(false) {
-        // println!("{:?} 1/2 majority?: {} {}{path}", init.accepted,init.requires_simple_majority, AustriaScraper::BASE_URL);
-        if !init.requires_simple_majority {
-            println!("---------------------------------");
-        }
-        println!(
-            "1/2 majority?: {} {}{path}",
-            init.requires_simple_majority,
-            AustriaScraper::BASE_URL
-        );
-        if !init.requires_simple_majority {
-            println!("---------------------------------");
-        }
-        // }
-        // println!("{:?} {}{path}", init.accepted, AustriaScraper::BASE_URL);
-        // println!("topics: {:?}", init.topics);
-        // println!("id: {}, title: {}", init.id, init.title);
-    }
-
-    println!("elapsed: {:?}", start.elapsed());
-}
-
-#[tokio::test]
-async fn test_get_legis_init_xxvii_a_3373_path() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let init = scraper
-        .get_legis_init("/gegenstand/XXVII/A/3373")
-        .await
-        .unwrap();
-    println!("init: {init:?}");
 }
 
 #[tokio::test]
@@ -3209,34 +2826,6 @@ async fn test_named_vote_xxviii_i_136() {
     ] {
         assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
     }
-}
-
-#[tokio::test]
-async fn test_get_latest() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XXVIII".to_string()];
-    scraper.scrape_info.date_start = chrono::Local::now()
-        .naive_local()
-        .checked_sub_days(Days::new(100));
-
-    let legis_inits = scraper
-        .post_legis_payload(Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice()))
-        // .post_legis_payload(None)
-        .await
-        .unwrap();
-    let legis_init_paths = scraper.legis_paths(legis_inits).unwrap();
-
-    println!("legis_init_paths: {:?}", &legis_init_paths[..]);
 }
 
 #[tokio::test]

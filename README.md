@@ -30,3 +30,44 @@ The selected legislative fixtures have no roll-call votes requiring additional
 HTTP requests. No running services or scraper cache are needed. Cargo may need
 to download build dependencies initially; add `--offline` once they are available.
 The general `cargo test` command also includes existing live tests and EU tests.
+
+Run the full legislative-initiative fixture tests and the full-session tests:
+
+```bash
+cargo test --locked --lib scraper::legis_init::tests
+cargo test --locked --test austria_parliament --test austria_plenary
+```
+
+The legislative suite shares one fixture-cache setup for JSON and linked HTML.
+Its live filter test is ignored by default and uses a fixed historical period:
+
+```bash
+cargo test --locked --lib scraper::legis_init::tests::live -- --ignored
+```
+
+`--offline` only disables Cargo dependency downloads. To verify runtime network
+independence as well, on Linux with user namespaces enabled run:
+
+```bash
+unshare --user --map-root-user --net cargo test --offline --locked --lib scraper::legis_init::tests
+unshare --user --map-root-user --net cargo test --offline --locked --test austria_parliament --test austria_plenary
+```
+
+The five previously disabled bulk diagnostic scans are consolidated in an
+example. It reports law document types, majority requirements, named votes,
+rejections, suspicious delegate names, and request/parse failures. It contacts
+the live website and is never run by `cargo test`:
+
+```bash
+cargo run --example inspect_legislative_initiatives -- XXVII
+```
+
+The former output-only `3373/A` test, pending `104/A` test, and string-only
+leading-zero test are covered by `austria_parliament`. Historical fixture cases
+remain in the legislative unit tests; formerly assertion-free cases now check
+their results. The ORF case uses its saved law response instead of an unrelated
+live request. The missing roll-call subsection case uses the saved full protocol.
+
+The focused suites do not establish coverage of every Austrian scraper module,
+HTTP failure handling, or changes to the live website. Existing tests elsewhere
+may still require the network. No line-coverage percentage has been measured.

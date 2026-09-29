@@ -24,7 +24,7 @@ pub fn is_accepted_based_on_votes(
     requires_simple_majority: bool,
 ) -> AcceptedState {
     let pro_share = pro_count as f64 / vote_sum as f64;
-    if requires_simple_majority && pro_share >= 0.5 {
+    if requires_simple_majority && pro_share > 0.5 {
         AcceptedState::Accepted
     } else if !requires_simple_majority && pro_share >= 2_f64 / 3_f64 {
         AcceptedState::Accepted
@@ -73,7 +73,7 @@ pub fn extract_plenary_date<'a>(legis_content: &'a Value, council: &str) -> Opti
         }
 
         // extract_speeches_from_stages(stages, &mut speeches);
-        most_fitting_date = extract_most_fitting_date(stages);
+        most_fitting_date = extract_most_fitting_date(stages).or(most_fitting_date);
     }
     most_fitting_date
 }

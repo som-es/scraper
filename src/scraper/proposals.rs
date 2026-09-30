@@ -138,7 +138,7 @@ impl ProposalScraper for AustriaScraper {
             receiver_ids = names
                 .iter()
                 .filter(|name| name["funktext"] == receiver_text)
-                .flat_map(|name| person_url_to_id(name["url"].as_str().unwrap()))
+                .flat_map(|name| person_url_to_id(name["url"].as_str()?))
                 .collect::<Vec<u64>>();
         } else {
             issuer_ids = vec![];
@@ -172,12 +172,10 @@ impl ProposalScraper for AustriaScraper {
             .ok()
             .map(convert_vienna_datetime_to_utc)??;
 
-        let updated_at = raw_proposal_content["update"].as_str();
-        let updated_at = updated_at
-            .map(|updated_at| {
-                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
-            })
-            .map(convert_vienna_datetime_to_utc)?;
+        let updated_at = raw_proposal_content["update"]
+            .as_str()
+            .and_then(|value| NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S").ok())
+            .and_then(convert_vienna_datetime_to_utc);
 
         let id = format!("{ityp}/{inr}");
 

@@ -77,18 +77,12 @@ impl EnactmentScraper for AustriaScraper {
 
     async fn raw_enactment_into_enactment(&self, raw_enactment: &Value) -> Option<Enactment> {
         let content = &raw_enactment["content"];
-        let reference = &content["reference"].as_array()?[0];
-        let legis_init_path = reference["url"].as_str().unwrap();
+        let reference = content["reference"].as_array()?.first()?;
+        let legis_init_path = reference["url"].as_str()?;
 
         let stages = &content["stages"].as_array()?;
-        let nr_stage = &stages[0];
-        let nr_date = NaiveDate::parse_from_str(
-            nr_stage["date"]
-                .as_str()
-                .expect("BNR should be passing the nr stage"),
-            "%d.%m.%Y",
-        )
-        .ok()?;
+        let nr_stage = stages.first()?;
+        let nr_date = NaiveDate::parse_from_str(nr_stage["date"].as_str()?, "%d.%m.%Y").ok()?;
 
         let br_date = if let Some(br_stage) = stages.get(1) {
             Some(NaiveDate::parse_from_str(br_stage["date"].as_str()?, "%d.%m.%Y").ok()?)

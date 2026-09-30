@@ -56,9 +56,9 @@ impl CallToOrder for AustriaScraper {
 
         let updated_at = call_to_order_content["update"].as_str();
         let updated_at = updated_at.and_then(|updated_at| {
-            convert_vienna_datetime_to_utc(
-                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap(),
-            )
+            NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S")
+                .ok()
+                .and_then(convert_vienna_datetime_to_utc)
         });
 
         let ityp = call_to_order_content["ityp"]
@@ -115,7 +115,9 @@ impl CallToOrder for AustriaScraper {
             ityp,
             inr,
             receiver,
-            receiver_id: receiver_id.parse::<u64>().unwrap(),
+            receiver_id: receiver_id
+                .parse::<u64>()
+                .map_err(|_| CallToOrderError::ReceiverUrlWrongFormat)?,
             links_to,
             created_at: Some(created_at),
             updated_at,

@@ -1,15 +1,17 @@
-use std::collections::HashSet;
+mod dates;
+mod live;
+mod voting;
 
 use crate::{
     caching::CacheConfig,
     extract_text_from_html, find_optimal_votes_by_name,
     legis_init::{
         votes::{extract_vote_count, extract_votes_by_name},
-        LegislativeInitiatives, LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES,
+        LegislativeInitiatives,
     },
     AustriaScraper, Scraper, TextExtractor,
 };
-use chrono::{Days, NaiveDate};
+use chrono::NaiveDate;
 use common_scrapes::{
     AcceptedState, Document, FileType, Opinion, Party, ProContra, Reference, Stage, Vote,
     VoteStage, VoteType, Voting,
@@ -17,26 +19,22 @@ use common_scrapes::{
 
 use super::is_accepted_based_on_votes;
 
-#[test]
-fn test_trim_potential_trailing_zeros() {
-    let s = "00001";
-    let s = s.trim_start_matches('0');
-    assert_eq!(s, "1");
+/// Keep both JSON and linked HTML reads on the checked-in fixture cache.
+fn fixture_scraper() -> AustriaScraper {
+    let mut scraper = AustriaScraper::default();
+    let cache_config = CacheConfig {
+        cache_dir: "./test-data".into(),
+        ignore_current_gp_cache: false,
+        redo_secs: u64::MAX,
+    };
+    scraper.cache_config = cache_config.clone();
+    scraper.text_extractor.cache_config = cache_config;
+    scraper
 }
 
 #[tokio::test]
 pub async fn test_xxvii_a_2173() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXVII/A/2173")
@@ -44,13 +42,6 @@ pub async fn test_xxvii_a_2173() {
         .unwrap();
 
     assert!(init.is_law);
-    // let cie = init.come_into_effect_info.unwrap();
-    // assert_eq!(cie.by_publication, true);
-    // assert_eq!(cie.law_come_into_effect_date, None);
-    // assert_eq!(
-    //     cie.law_expires_on_date,
-    //     Some(NaiveDate::from_ymd_opt(2027, 12, 31).unwrap())
-    // );
 }
 
 #[test]
@@ -63,9 +54,9 @@ fn test_vote_count_extraction() {
 }
 
 #[test]
-fn test_accepted_on_vote_count_stuff() {
+fn vote_result_respects_required_majority() {
     let accepted = is_accepted_based_on_votes(100, 50, true);
-    assert_eq!(accepted, AcceptedState::Accepted);
+    assert_eq!(accepted, AcceptedState::Declined);
 
     let accepted = is_accepted_based_on_votes(120, 50, true);
     assert_eq!(accepted, AcceptedState::Declined);
@@ -85,45 +76,12 @@ fn test_text_extract() {
     let html = r#"<h4>Schwerpunkte der Regierungsvorlage</h4>\n\n<ul class=\"unordered-list\">\n\t<li>&Auml;nderung des &sect; 46 KFG und Schaffung exakterer Vorgaben f&uuml;r die Bewilligung von &Uuml;berstellungsfahrten</li>\n\t<li>Entsprechende &Auml;nderung des &sect; 40 und des &sect; 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister &uuml;bernehmen k&ouml;nnen. Zus&auml;tzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgef&uuml;hrt werden</li>\n</ul>\n"#;
 
     let text = extract_text_from_html(html);
-    // assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
-}
-
-// /gegenstand/XXVIII/A/104
-#[tokio::test]
-async fn test_unfinished_xxviii_a_104() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let init = scraper
-        .get_legis_init("/gegenstand/XXVIII/A/104")
-        .await
-        .unwrap();
-    println!("init: {init:?}");
-    assert!(init.is_voteable_on);
+    assert_eq!("Schwerpunkte der Regierungsvorlage\\n\\n\\n\\tÄnderung des § 46 KFG und Schaffung exakterer Vorgaben für die Bewilligung von Überstellungsfahrten\\n\\tEntsprechende Änderung des § 40 und des § 47 KFG, damit die Zulassungsstellen die relevanten Daten aus dem Unternehmensregister übernehmen können. Zusätzlich soll zur Datenbereinigung vorweg ein Datenabgleich durchgeführt werden\\n\\n", text);
 }
 
 #[tokio::test]
 async fn test_ris_link_from_bgbllinks() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     // /gegenstand/XXVII/I/104 has content.status.bgbllinks[0] pointing to the core RIS doc
     let init = scraper
@@ -140,67 +98,11 @@ async fn test_ris_link_from_bgbllinks() {
     );
 }
 
-#[tokio::test]
-async fn test_legis_init_all() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XXVIII".to_string()];
-
-    scraper.scrape_info.date_start = chrono::Local::now()
-        .naive_local()
-        .checked_sub_days(Days::new(90));
-
-    let initiatives = scraper.post_legis_payload(None).await.unwrap();
-    let paths = scraper.legis_paths(initiatives).unwrap();
-
-    assert!(paths.len() >= 10);
-    println!("length: {}", paths.len());
-
-    // return;
-
-    let mut error_count = 0;
-    for path in &paths {
-        // let x = scraper.get_legis_init(path).await;
-        // if x.is_err() {
-        //     error_count += 1;
-        //     println!("erorring path: {path}");
-        // }
-        // if path.contains("I/1858") {
-        //     println!("path: {path:?}");
-        // }
-        if path.contains("A/77") {
-            println!("path: {path:?}");
-        }
-        // println!("path: {path:?}");
-    }
-    println!("paths: {}", paths.len());
-    println!("error count: {error_count}");
-}
-
 // /gegenstand/XXVII/A/4129
 
 #[tokio::test]
 async fn test_get_legis_init_invisibly_declined_2_3_majority() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let legis_init = scraper
         .get_legis_init("/gegenstand/XXVII/A/4129")
         .await
@@ -234,327 +136,9 @@ async fn test_get_legis_init_invisibly_declined_2_3_majority() {
     assert_eq!(voted_at_date, NaiveDate::from_ymd_opt(2024, 7, 3).unwrap());
 }
 
-// test if named vote contains "HomeGesamtes ProtokollVorherig"
-#[tokio::test]
-async fn test_look_for_named_vote_contains_home_gesamtes() {
-    return;
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    for gp in [
-        "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
-    ]
-    .iter()
-    .rev()
-    {
-        println!("checking gp {gp}");
-        scraper.scrape_info.gp = vec![gp.to_string()];
-
-        let initiatives = scraper
-            .post_legis_payload(Some(&LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES))
-            .await
-            .unwrap();
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            // println!();
-            // println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                // println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-
-            let Some(voted_by_name_data) = init.hidden_votes_info.voted_by_name_data else {
-                continue;
-            };
-
-            let Some(delegates_pro_contra) = voted_by_name_data.delegates_pro_contra else {
-                continue;
-            };
-
-            delegates_pro_contra
-                .pro
-                .iter()
-                .chain(delegates_pro_contra.contra.iter())
-                .for_each(|delegate| {
-                    if delegate.name.contains("HomeGesamtes ProtokollVorherig") {
-                        println!("(HomeGesamtes ProtokollVorherig) found one in {path}");
-                    }
-                    if delegate.name.contains("Gesamtes ProtokollVorherig") {
-                        println!("(Gesamtes ProtokollVorherig) found one in {path}");
-                    }
-                    if delegate.name.contains("Home") {
-                        println!("(home) found one in {path}");
-                    }
-                });
-        }
-    }
-}
-
-#[tokio::test]
-async fn test_get_legis_init_with_accepted_and_status_5() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    return;
-
-    let start = std::time::Instant::now();
-
-    let mut count = 0;
-    // for gp in ["XXIV", "XXIII", "XXII"] {
-    for gp in [
-        "XXVIII", "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
-    ] {
-        scraper.scrape_info.gp = vec![gp.to_string()];
-
-        if gp != "XXVII" {
-            continue;
-        }
-
-        let initiatives = scraper.post_legis_payload(None).await.unwrap();
-        let mut doktypes_with_law = HashSet::new();
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            // println!();
-            // println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                // println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-
-            let law_file = init
-                .documents
-                .iter()
-                .find(|x| x.title.contains("Gesetz") && x.ftype == FileType::HTML);
-            if let Some(_law_file) = law_file {
-                if init.doktyp == "AUB" {
-                    // let url = format!("{}/gegenstand/{}/{}/{}", AustriaScraper::BASE_URL, init.gp, init.ityp, init.inr);
-                    // println!("url: {url:?}")
-                }
-                doktypes_with_law.insert(init.doktyp);
-            }
-
-            if init.is_law
-            /*&& init.law_accepted == Some(true)*/
-            {
-                count += 1;
-            }
-        }
-        println!("elapsed: {:?}", start.elapsed());
-        println!("count: {count:?}");
-        println!("{doktypes_with_law:?}");
-        // break;
-    }
-
-    println!("count: {count:?}");
-}
-
-#[tokio::test]
-async fn test_get_legis_init_was_voted_by_name() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    return;
-    let start = std::time::Instant::now();
-
-    let mut doktypes = HashSet::new();
-    let mut itypes = HashSet::new();
-    let mut count = 0;
-    // for gp in ["XXIV", "XXIII", "XXII"] {
-    for gp in [
-        // "XXVIII", "XXVII", "XXVI", "XXV", "XXIV",
-        "XXIII", "XXII", "XXI", "XX",
-    ] {
-        scraper.scrape_info.gp = vec![gp.to_string()];
-
-        let initiatives = scraper.post_legis_payload(None).await.unwrap();
-        for path in scraper.legis_paths(initiatives).unwrap() {
-            // println!();
-            // println!("path: {path:?}");
-            let Ok(init) = scraper.get_legis_init(&path).await else {
-                println!("error {}{path}", AustriaScraper::BASE_URL);
-                continue;
-            };
-            doktypes.insert(init.doktyp.clone());
-            itypes.insert(init.ityp.clone());
-
-            // println!("init: {init:?}");
-            if init.hidden_votes_info.voted_by_name {
-                println!(
-                    "init: title: {}, accepted: {:?}, votes: {:?}, id: {:?}, hidden_votes: {:?}, ",
-                    init.title, init.accepted, init.votes, init.id, init.hidden_votes_info
-                );
-                println!(" {}{path}", AustriaScraper::BASE_URL,);
-                if let Some(c) = init.hidden_votes_info.voted_by_name_data {
-                    if let Some(d) = c.delegates_pro_contra {
-                        count += 1;
-                    }
-                }
-            }
-        }
-        println!("elapsed: {:?}", start.elapsed());
-        println!("count: {count:?}");
-
-        // break;
-        if gp == "XXIV" {
-            break;
-        }
-    }
-
-    println!("doktypes: {doktypes:?}");
-    println!("itypes: {itypes:?}");
-    /*
-           doktypes: {"US", "ARH1", "A", "GABR", "UEA", "GABR13", "RV", "A(E)", "AA", "ARH2", "AMIN", "AVB", "URH2", "RVVB", "USVL", "BUA", "UEAM"}
-    itypes: {"AA", "URH2", "UEA", "I", "US", "A"}
-             */
-
-    println!("count: {count:?}");
-}
-
-#[tokio::test]
-async fn test_get_legis_init_was_invisibly_declined() {
-    return;
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let start = std::time::Instant::now();
-
-    let initiatives = scraper.post_legis_payload(None).await.unwrap();
-    let mut count = 0;
-    for path in scraper.legis_paths(initiatives).unwrap() {
-        println!("path: {path:?}");
-        let Ok(init) = scraper.get_legis_init(&path).await else {
-            println!("error {}{path}", AustriaScraper::BASE_URL);
-            continue;
-        };
-        if init.accepted == Some(AcceptedState::PreDeclined) {
-            println!(
-                "{}, {hidden:?}, {ty:?} was_invisibly_declined: {:?} {}{path}",
-                init.hidden_votes_info.voted_by_name,
-                init.accepted,
-                AustriaScraper::BASE_URL,
-                hidden = init.hidden_votes_info.pro_contra_parties,
-                ty = init.hidden_votes_info.vote_stage
-            );
-            count += 1;
-        }
-    }
-
-    println!("elapsed: {:?}", start.elapsed());
-    println!("count: {count:?}");
-}
-
-#[tokio::test]
-async fn test_get_legis_init_majority() {
-    return;
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let start = std::time::Instant::now();
-
-    let initiatives = scraper.post_legis_payload(None).await.unwrap();
-    for path in scraper.legis_paths(initiatives).unwrap() {
-        //println!("path: {path:?}");
-        let Ok(init) = scraper.get_legis_init(&path).await else {
-            println!("error {}{path}", AustriaScraper::BASE_URL);
-            continue;
-        };
-        // if init.accepted == Some(false) {
-        // println!("{:?} 1/2 majority?: {} {}{path}", init.accepted,init.requires_simple_majority, AustriaScraper::BASE_URL);
-        if !init.requires_simple_majority {
-            println!("---------------------------------");
-        }
-        println!(
-            "1/2 majority?: {} {}{path}",
-            init.requires_simple_majority,
-            AustriaScraper::BASE_URL
-        );
-        if !init.requires_simple_majority {
-            println!("---------------------------------");
-        }
-        // }
-        // println!("{:?} {}{path}", init.accepted, AustriaScraper::BASE_URL);
-        // println!("topics: {:?}", init.topics);
-        // println!("id: {}, title: {}", init.id, init.title);
-    }
-
-    println!("elapsed: {:?}", start.elapsed());
-}
-
-#[tokio::test]
-async fn test_get_legis_init_xxvii_a_3373_path() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let init = scraper
-        .get_legis_init("/gegenstand/XXVII/A/3373")
-        .await
-        .unwrap();
-    println!("init: {init:?}");
-}
-
 #[tokio::test]
 async fn test_get_legis_init_xxvii_i_1774_path() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXVII/I/1774")
@@ -600,17 +184,7 @@ async fn test_get_legis_init_xxvii_i_1774_path() {
 // https://www.parlament.gv.at/gegenstand/XXII/I/451
 #[tokio::test]
 async fn test_get_legis_init_xxii_i_451() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXII/I/451")
@@ -677,17 +251,7 @@ async fn test_get_legis_init_xxii_i_451() {
 // https://www.parlament.gv.at/gegenstand/XX/I/1428
 #[tokio::test]
 async fn test_get_legis_init_xx_i_1428() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XX/I/1428")
@@ -906,17 +470,7 @@ async fn test_get_legis_init_xx_i_1428() {
 
 #[tokio::test]
 async fn test_get_legis_init_xxi_i_1183() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXI/I/1183")
@@ -1126,17 +680,7 @@ async fn test_get_legis_init_xxi_i_1183() {
 // https://www.parlament.gv.at/gegenstand/XXVII/A/2068
 #[tokio::test]
 async fn test_get_legis_init_voted_by_name_xxvii_a_2068() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXVII/A/2068")
@@ -1209,17 +753,7 @@ async fn test_get_legis_init_voted_by_name_xxvii_a_2068() {
 
 #[tokio::test]
 async fn test_get_legis_init_voted_by_name_xxii_i_653() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXII/I/653")
@@ -1284,17 +818,7 @@ async fn test_get_legis_init_voted_by_name_xxii_i_653() {
 
 #[tokio::test]
 async fn test_get_legis_init_xxvi_a_303() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXVI/A/303")
@@ -1365,17 +889,7 @@ async fn test_get_legis_init_xxvi_a_303() {
 
 #[tokio::test]
 async fn test_get_legis_init_i_1954_path() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXVII/I/1954")
@@ -1472,17 +986,7 @@ async fn test_get_legis_init_i_1954_path() {
 
 #[tokio::test]
 async fn test_get_legis_init_a_3021_path() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let init = scraper
         .get_legis_init("/gegenstand/XXVII/A/3021")
@@ -1565,36 +1069,18 @@ async fn test_get_legis_init_a_3021_path() {
 
 #[tokio::test]
 async fn test_xx_legis_init() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XX".into()];
+    let scraper = fixture_scraper();
 
     let res = scraper.get_legis_init("/gegenstand/XX/I/1").await.unwrap();
+    assert_eq!(res.description, "Tiertransportgesetz-Luft - TGLu (1 d.B.)");
+    assert_eq!(res.voting, Some(Voting::Law));
+    assert_eq!(res.accepted, Some(AcceptedState::Accepted));
 }
 
 // /gegenstand/XXVII/A/3945
 #[tokio::test]
 async fn test_legis_init_voted_by_name_xxvii_a_3945() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/3945")
         .await
@@ -1605,17 +1091,7 @@ async fn test_legis_init_voted_by_name_xxvii_a_3945() {
 }
 #[tokio::test]
 async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/2269")
@@ -1627,17 +1103,7 @@ async fn test_xxvii_i_2269_legis_init_was_invisibly_declined_false() {
 #[tokio::test]
 async fn test_xxvii_erroring_legis_init_xxvii_i_405() {
     //https://www.parlament.gv.at/gegenstand/XXVII/I/405
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/405")
@@ -1659,17 +1125,7 @@ async fn test_xxvii_erroring_legis_init_xxvii_i_405() {
 #[tokio::test]
 async fn test_xxvii_erroring_legis_init_xxvi_a_110() {
     //https://www.parlament.gv.at/gegenstand/XXVII/I/405
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/A/110")
@@ -1682,84 +1138,40 @@ async fn test_xxvii_erroring_legis_init_xxvi_a_110() {
     );
 }
 
-// test may get invalid -> legis init got voted on potentially
 #[tokio::test]
-async fn test_orf_gesetz_no_vote_at_some_point_xxvii_i_2082() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    // let out = scraper.get_gegenstand_info("/gegenstand/XXVII/I/2082").await.unwrap();
-    let out = scraper
-        .get_gegenstand_info("/gegenstand/XXVII/A/4070")
-        .await
-        .unwrap();
-    println!("{}", serde_json::to_string_pretty(&out).unwrap());
-    let res = scraper
+async fn orf_law_preserves_adopted_nationalrat_vote() {
+    let init = fixture_scraper()
         .get_legis_init("/gegenstand/XXVII/I/2082")
         .await
         .unwrap();
 
-    println!("res: {res:?}");
-    println!("acc: {:?}", res.accepted);
-
-    let res = scraper
-        .get_legis_init("/gegenstand/XXVII/I/2269")
-        .await
-        .unwrap();
-
-    println!("acc: {:?}", res.accepted);
-
-    // gegenstand/XXVII/I/2269
+    assert_eq!(init.id, "XXVII/I/2082");
+    assert!(init.is_law);
+    assert_eq!(init.accepted, Some(AcceptedState::Accepted));
+    let parties = init.hidden_votes_info.pro_contra_parties.unwrap();
+    assert_eq!(parties.pro, ["ÖVP", "GRÜNE"]);
+    assert_eq!(parties.contra, ["SPÖ", "FPÖ", "NEOS"]);
 }
 
 #[tokio::test]
-async fn test_xxvii_hidden_votes_maybe_not_in_db() {
-    // https://www.parlament.gv.at/gegenstand/XXVII/A/3431
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-
-    let res = scraper
+async fn resolution_preserves_rejection_without_explicit_vote_array() {
+    let init = fixture_scraper()
         .get_legis_init("/gegenstand/XXVII/A/3431")
         .await
         .unwrap();
-    println!("res: {res:?}");
-    res.hidden_votes_info.pro_contra_parties.unwrap();
-}
 
-// https://www.parlament.gv.at/gegenstand/XXVII/A/3874
+    assert_eq!(init.id, "XXVII/A/3431");
+    assert_eq!(init.voting, Some(Voting::Resolution));
+    assert!(!init.is_law);
+    assert!(init.is_voteable_on);
+    assert_eq!(init.accepted, Some(AcceptedState::PreDeclined));
+    assert!(init.votes.is_empty());
+}
 
 #[tokio::test]
 async fn test_xxvii_a_3874() {
     // https://www.parlament.gv.at/gegenstand/XXVII/A/3874
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/3874")
@@ -1773,17 +1185,7 @@ async fn test_xxvii_a_3874() {
 async fn test_dienstrecht_novelle_oevp_fail() {
     // https://www.parlament.gv.at/gegenstand/XXVII/I/2711
 
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/2711")
@@ -1797,49 +1199,21 @@ async fn test_dienstrecht_novelle_oevp_fail() {
 #[tokio::test]
 async fn test_xxvii_erroring_legis_init_xxvii_i_1531() {
     //https://www.parlament.gv.at/gegenstand/XXVII/I/405
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XXVII".to_string()];
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/1531")
         .await
         .unwrap();
-    res.hidden_votes_info.pro_contra_parties.unwrap();
-
-    // let initiatives = scraper.post_legis_payload().await.unwrap();
-    // let paths = scraper.legis_paths(initiatives).unwrap();
-    // println!("paths len: {}", paths.len());
-    // for path in paths {
-    //     if path.contains("XXVII/I/1531") {
-    //         println!("YUHU")
-    //     }
-    // }
+    assert_eq!(res.accepted, Some(AcceptedState::Accepted));
+    let parties = res.hidden_votes_info.pro_contra_parties.unwrap();
+    assert_eq!(parties.pro, ["ÖVP", "SPÖ", "GRÜNE", "NEOS"]);
+    assert_eq!(parties.contra, ["FPÖ"]);
 }
 
 #[tokio::test]
 async fn test_xxvii_aa_387() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XXVII".to_string()];
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/AA/387")
@@ -1880,80 +1254,55 @@ async fn test_xxvii_aa_387() {
 //      72 | XXIII  | I    |   527 | 117318417 |
 #[tokio::test]
 async fn test_xxiii_i_527() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXIII/I/527")
         .await
         .unwrap();
-    println!("res: {res:?}");
+    assert_eq!(res.id, "XXIII/I/527");
+    assert_eq!(res.doktyp, "AUB");
+    assert!(!res.is_law);
+    assert!(!res.is_voteable_on);
+    assert!(res.votes.is_empty());
+    assert_eq!(res.law_accepted, None);
 }
 
 // 110965 | XXVII  | I    |    50 | 117423840 |
 #[tokio::test]
 async fn test_xxvii_i_50() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/50")
         .await
         .unwrap();
-    println!("res: {res:?}");
+    assert_eq!(res.id, "XXVII/I/50");
+    assert_eq!(res.doktyp, "AUB");
+    assert!(!res.is_law);
+    assert!(!res.is_voteable_on);
+    assert!(res.votes.is_empty());
+    assert_eq!(res.law_accepted, None);
 }
 #[tokio::test]
 async fn test_xxvii_i_1858() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/1858")
         .await
         .unwrap();
-    println!("res: {res:?}");
+    assert_eq!(res.id, "XXVII/I/1858");
+    assert_eq!(res.doktyp, "AUB");
+    assert!(!res.is_law);
+    assert!(!res.is_voteable_on);
+    assert!(res.votes.is_empty());
+    assert_eq!(res.law_accepted, None);
 }
 
 #[tokio::test]
 async fn test_xxvii_iii_835() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/III/835")
@@ -1986,17 +1335,7 @@ async fn test_xxvii_iii_835() {
 
 #[tokio::test]
 async fn test_xxvii_a_3342() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/3342")
@@ -2026,17 +1365,7 @@ async fn test_xxvii_a_3342() {
 // THIS HAS WRONG PRO AND CONTRA COUNT - not anymore!!
 #[tokio::test]
 async fn test_xxv_uea_855() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXV/UEA/855")
@@ -2080,17 +1409,7 @@ async fn test_xxv_uea_855() {
 
 #[tokio::test]
 async fn test_xxv_uea_835() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXV/UEA/835")
@@ -2130,17 +1449,7 @@ async fn test_xxv_uea_835() {
 
 #[tokio::test]
 async fn test_xxvii_a_2956() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/2956")
@@ -2172,17 +1481,7 @@ async fn test_xxvii_a_2956() {
 
 #[tokio::test]
 async fn test_xxvi_a_571() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/A/571")
@@ -2210,17 +1509,7 @@ async fn test_xxvi_a_571() {
 
 #[tokio::test]
 async fn test_xxvii_uea_144() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/UEA/144")
@@ -2254,24 +1543,17 @@ async fn test_xxvii_uea_144() {
     );
     assert_eq!(named_vote.contra_count, 109);
     let pro_contra = named_vote.delegates_pro_contra.unwrap();
-    assert!(pro_contra.contra.iter().any(|d| d.name == "Zanger Wolfgang"));
+    assert!(pro_contra
+        .contra
+        .iter()
+        .any(|d| d.name == "Zanger Wolfgang"));
 
     assert_eq!(res.br_hidden_votes_info, None);
 }
 
 #[tokio::test]
 async fn test_xxvi_i_282() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/I/282")
@@ -2285,17 +1567,7 @@ async fn test_xxvi_i_282() {
 
 #[tokio::test]
 async fn test_xxvi_i_178() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/I/178")
@@ -2308,17 +1580,7 @@ async fn test_xxvi_i_178() {
 
 #[tokio::test]
 async fn test_xxv_uea_443() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXV/UEA/443")
@@ -2358,17 +1620,7 @@ async fn test_xxv_uea_443() {
 
 #[tokio::test]
 async fn test_xxiv_uea_1019() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXIV/UEA/1019")
@@ -2408,17 +1660,7 @@ async fn test_xxiv_uea_1019() {
 #[tokio::test]
 async fn test_xxvi_i_275() {
     let _ = simple_logger::init_with_level(log::Level::Info);
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/I/275")
@@ -2542,17 +1784,7 @@ async fn test_xxvi_i_275() {
 // XXVII/I/604
 #[tokio::test]
 async fn test_xxvii_i_604() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/604")
@@ -2565,17 +1797,7 @@ async fn test_xxvii_i_604() {
 // gegenstand/XXVII/I/2704
 #[tokio::test]
 async fn test_xxvii_i_2704() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/2704")
@@ -2587,17 +1809,7 @@ async fn test_xxvii_i_2704() {
 }
 #[tokio::test]
 async fn test_xxiii_i_204() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXIII/I/204")
@@ -2626,17 +1838,7 @@ async fn test_xxiii_i_204() {
 //
 #[tokio::test]
 async fn test_xxii_uea_373() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXII/UEA/373")
@@ -2684,17 +1886,7 @@ async fn test_xxii_uea_373() {
 
 #[tokio::test]
 async fn test_xvviii_uea_8() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/UEA/8")
@@ -2727,17 +1919,7 @@ async fn test_xvviii_uea_8() {
 // gegenstand/XXII/E/97
 #[tokio::test]
 async fn test_xxii_e_97() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXII/E/97")
@@ -2750,17 +1932,7 @@ async fn test_xxii_e_97() {
 
 #[tokio::test]
 async fn test_xxviii_i_26() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/I/26")
@@ -2777,17 +1949,7 @@ async fn test_xxviii_i_26() {
 
 #[tokio::test]
 async fn test_xxvii_uea_1266() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/UEA/1266")
@@ -2807,17 +1969,7 @@ async fn test_xxvii_uea_1266() {
 // gegenstand/XXVIII/AA/6
 #[tokio::test]
 async fn test_xxviii_aa_6() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/AA/6")
@@ -2835,17 +1987,7 @@ async fn test_xxviii_aa_6() {
 // gegenstand/XXVIII/III/79
 #[tokio::test]
 async fn test_xxviii_iii_79() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/III/79")
@@ -2868,17 +2010,7 @@ async fn test_xxviii_iii_79() {
 
 #[tokio::test]
 async fn test_xxviii_a_77() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/A/77")
@@ -2895,17 +2027,7 @@ async fn test_xxviii_a_77() {
 // XXVII/A/769
 #[tokio::test]
 async fn test_wrong_refs_xxvii_a_769() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
 
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/769")
@@ -2923,17 +2045,7 @@ async fn test_wrong_refs_xxvii_a_769() {
 // XXVII/A/2238
 #[tokio::test]
 async fn test_xxvii_a_2238() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/2238")
         .await
@@ -2962,17 +2074,7 @@ async fn test_xxvii_a_2238() {
 // XXVIII/J/439
 #[tokio::test]
 async fn test_xxviii_j_439() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/J/439")
         .await
@@ -2984,17 +2086,7 @@ async fn test_xxviii_j_439() {
 // https://www.parlament.gv.at/gegenstand/XXVII/A/110?selectedStage=100
 #[tokio::test]
 async fn test_xxvii_a_110() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/110")
         .await
@@ -3017,17 +2109,7 @@ async fn test_xxvii_a_110() {
 //XXVII/A/769
 #[tokio::test]
 async fn test_xxvii_a_769() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/A/769")
         .await
@@ -3046,17 +2128,7 @@ async fn test_xxvii_a_769() {
 }
 #[tokio::test]
 async fn test_named_vote_xxviii_a_372() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/A/372")
         .await
@@ -3073,45 +2145,37 @@ async fn test_named_vote_xxviii_a_372() {
     }
 
     for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 
-#[tokio::test]
-async fn test_named_vote_xxviii_a_372_by_document_link() {
-    let url =
-        "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/41/A_-_17_40_32_00837360.html#121.11";
-    let mut text_extractor = TextExtractor::default();
-    let text = text_extractor
-        .extract_text_from_url(&url, Some(find_optimal_votes_by_name), true)
-        .await
-        .unwrap();
+#[test]
+fn named_vote_falls_back_from_missing_subsection_to_complete_vote_list() {
+    // The published link points to missing RN/121.11. Fall back to RN/121
+    // in the checked-in protocol, which contains the complete vote list.
+    let document = ::scraper::Html::parse_document(include_str!(
+        "../../../test-data/www.parlament.gv.at/dokument/XXVIII/NRSITZ/41/fnameorig_1763008.html.json"
+    ));
+    let text = find_optimal_votes_by_name(&document, "121.11", TextExtractor::default())
+        .expect("missing sub-RN must fall back to the complete vote section");
 
     let res = extract_votes_by_name(&text).unwrap();
 
     let pro_contra = res;
+    assert_eq!(pro_contra.pro.len(), 121);
+    assert_eq!(pro_contra.contra.len(), 50);
     for pro_checks in ["Auer", "Baumann", "Köllner", "Maurer"] {
         assert!(pro_contra.pro.iter().any(|d| d.name == pro_checks));
     }
 
     for contra_checks in ["Nemeth", "Wurm", "Zanger", "Ragger"] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 
 #[tokio::test]
 async fn test_vote_result_xxviii_a_468() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/A/468")
         .await
@@ -3130,17 +2194,7 @@ async fn test_vote_result_xxviii_a_468() {
 
 #[tokio::test]
 async fn test_named_vote_xxviii_a_353() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/A/353")
         .await
@@ -3157,23 +2211,13 @@ async fn test_named_vote_xxviii_a_353() {
     }
 
     for contra_checks in ["Tomaselli", "Stögmüller", "Kaniak", "Lausch"] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
 }
 
 #[tokio::test]
 async fn test_named_vote_xxviii_i_136() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/I/136")
         .await
@@ -3207,53 +2251,15 @@ async fn test_named_vote_xxviii_i_136() {
         "Zanger",
         "Zorba",
     ] {
-        assert!(pro_contra.contra.iter()            .any(|d| d.name == *contra_checks));
+        assert!(pro_contra.contra.iter().any(|d| d.name == *contra_checks));
     }
-}
-
-#[tokio::test]
-async fn test_get_latest() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.scrape_info.gp = vec!["XXVIII".to_string()];
-    scraper.scrape_info.date_start = chrono::Local::now()
-        .naive_local()
-        .checked_sub_days(Days::new(100));
-
-    let legis_inits = scraper
-        .post_legis_payload(Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice()))
-        // .post_legis_payload(None)
-        .await
-        .unwrap();
-    let legis_init_paths = scraper.legis_paths(legis_inits).unwrap();
-
-    println!("legis_init_paths: {:?}", &legis_init_paths[..]);
 }
 
 #[tokio::test]
 async fn test_documents_of_xxviii_i_296() {
     // https://www.parlament.gv.at/gegenstand/XXVIII/I/296
 
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/I/296")
         .await
@@ -3301,17 +2307,7 @@ async fn test_documents_of_xxviii_i_296() {
 
 #[tokio::test]
 async fn test_legis_init_xxvii_i_2451() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVII/I/2451")
         .await
@@ -3328,17 +2324,7 @@ async fn test_legis_init_xxvii_i_2451() {
 
 #[tokio::test]
 async fn test_legis_init_xxviii_a_658() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/A/658")
         .await
@@ -3388,17 +2374,7 @@ async fn test_legis_init_xxviii_a_658() {
 // XXVIII/AA/48
 #[tokio::test]
 async fn test_legis_init_xxviii_aa_48() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/AA/48")
         .await
@@ -3428,17 +2404,7 @@ async fn test_legis_init_xxviii_aa_48() {
 // XXVIII/UEA/161
 #[tokio::test]
 async fn test_legis_init_xxviii_uea_161() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/UEA/161")
         .await
@@ -3469,17 +2435,7 @@ async fn test_legis_init_xxviii_uea_161() {
 // XXVIII/AA/43
 #[tokio::test]
 async fn test_legis_init_xxviii_aa_43() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/AA/43")
         .await
@@ -3503,17 +2459,7 @@ async fn test_legis_init_xxviii_aa_43() {
 // XX/A/1145
 #[tokio::test]
 async fn test_legis_init_xx_a_1145() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XX/A/1145")
         .await
@@ -3535,17 +2481,7 @@ async fn test_legis_init_xx_a_1145() {
 // XX/I/308
 #[tokio::test]
 async fn test_legis_init_xx_i_308() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XX/I/308")
         .await
@@ -3557,17 +2493,7 @@ async fn test_legis_init_xx_i_308() {
 // XXVIII/I/318
 #[tokio::test]
 async fn test_legis_init_xxviii_i_318_aub() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/I/318")
         .await
@@ -3579,17 +2505,7 @@ async fn test_legis_init_xxviii_i_318_aub() {
 // XXVIII/AEA/12
 #[tokio::test]
 async fn test_legis_init_xxviii_aea_12() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/AEA/12")
         .await
@@ -3602,17 +2518,7 @@ async fn test_legis_init_xxviii_aea_12() {
 
 #[tokio::test]
 async fn test_legis_init_xxviii_aea_21() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/AEA/21")
         .await
@@ -3626,17 +2532,7 @@ async fn test_legis_init_xxviii_aea_21() {
 
 #[tokio::test]
 async fn test_named_vote_xxvi_uea_144() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVI/UEA/144")
         .await
@@ -3741,17 +2637,7 @@ async fn test_named_vote_xxvi_uea_144() {
 
 #[tokio::test]
 async fn test_named_vote_xxv_uea_414() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXV/UEA/414")
         .await
@@ -3864,17 +2750,7 @@ async fn test_named_vote_xxv_uea_414() {
 // XXI/I/1183
 #[tokio::test]
 async fn test_named_vote_xxi_i_1183() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXI/I/1183")
         .await
@@ -3991,17 +2867,7 @@ async fn test_named_vote_xxi_i_1183() {
 
 #[tokio::test]
 async fn test_named_vote_xxi_i_624() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXI/I/624")
         .await
@@ -4117,17 +2983,7 @@ async fn test_named_vote_xxi_i_624() {
 // XXI/A/412
 #[tokio::test]
 async fn test_named_vote_xxi_a_412() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXI/A/412")
         .await
@@ -4243,17 +3099,7 @@ async fn test_named_vote_xxi_a_412() {
 // XXI/I/311
 #[tokio::test]
 async fn test_named_vote_xxi_i_311() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXI/I/311")
         .await
@@ -4368,17 +3214,7 @@ async fn test_named_vote_xxi_i_311() {
 
 #[tokio::test]
 async fn test_named_vote_xxi_i_181() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXI/I/181")
         .await
@@ -4493,17 +3329,7 @@ async fn test_named_vote_xxi_i_181() {
 
 #[tokio::test]
 async fn test_named_vote_xxiii_uea_288() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXIII/UEA/288")
         .await
@@ -4616,17 +3442,7 @@ async fn test_named_vote_xxiii_uea_288() {
 
 #[tokio::test]
 async fn test_named_vote_xxiii_uea_26() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXIII/UEA/26")
         .await
@@ -4738,38 +3554,21 @@ async fn test_named_vote_xxiii_uea_26() {
 }
 // XXIV/I/1516
 #[tokio::test]
-async fn test_xxiv_i_1516() {
-    // Zurückverwiesen ? wie handeln?
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    // let res = scraper
-    //     .get_legis_init("/gegenstand/XXIV/I/1516")
-    //     .await
-    //     .unwrap();
-    // dbg!(res);
+async fn referred_back_law_has_no_final_law_vote() {
+    let res = fixture_scraper()
+        .get_legis_init("/gegenstand/XXIV/I/1516")
+        .await
+        .unwrap();
+
+    assert_eq!(res.id, "XXIV/I/1516");
+    assert!(res.is_law);
+    assert_eq!(res.law_accepted, None);
+    assert!(res.votes.is_empty());
+    assert_eq!(res.ris_link, None);
 }
 #[tokio::test]
 async fn test_xxviii_rger_7() {
-    let mut scraper = AustriaScraper::default();
-    scraper.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
-    scraper.text_extractor.cache_config = CacheConfig {
-        cache_dir: "./test-data".into(),
-        ignore_current_gp_cache: false,
-        redo_secs: u64::MAX,
-    };
+    let scraper = fixture_scraper();
     let res = scraper
         .get_legis_init("/gegenstand/XXVIII/RGER/7")
         .await

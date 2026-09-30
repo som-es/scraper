@@ -161,7 +161,7 @@ impl MinistrialProposalScraper for AustriaScraper {
         gegenstand_info: GegenstandInfo,
     ) -> Option<MinistrialProposal> {
         let raw_ministrial_content = &raw_ministrial["content"];
-        let ityp = raw_ministrial_content["ityp"].as_str().unwrap().to_string();
+        let ityp = raw_ministrial_content["ityp"].as_str()?.to_string();
 
         // println!("{}", serde_json::to_string_pretty(&raw_ministrial).unwrap());
 
@@ -190,12 +190,10 @@ impl MinistrialProposalScraper for AustriaScraper {
             .ok()
             .map(convert_vienna_datetime_to_utc)??;
 
-        let updated_at = raw_ministrial_content["update"].as_str();
-        let updated_at = updated_at
-            .map(|updated_at| {
-                NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%dT%H:%M:%S").unwrap()
-            })
-            .map(convert_vienna_datetime_to_utc)?;
+        let updated_at = raw_ministrial_content["update"]
+            .as_str()
+            .and_then(|value| NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S").ok())
+            .and_then(convert_vienna_datetime_to_utc);
 
         let id = inr;
 

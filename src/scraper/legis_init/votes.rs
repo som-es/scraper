@@ -326,18 +326,18 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<NamedVoteProContra>
     let end_pro_idx = pro_open_ended.find('.');
     let pro_delegates = match end_pro_idx {
         Some(end_pro_idx) => {
-            let contra_idx = contra_match.start() - pro_match.end();
+            let contra_idx = contra_match.start().checked_sub(pro_match.end())?;
             let end_pro_idx = contra_idx.min(end_pro_idx);
             &pro_open_ended[..end_pro_idx]
         }
-        None => &from_html_text[pro_match.end()..contra_match.start() - 1],
+        None => from_html_text.get(pro_match.end()..contra_match.start().checked_sub(1)?)?,
     };
 
     // cannot use start end end as they are byte offsets: this leads to wrong bounds for "„Ja“" (not only a single byte long)
 
     let pro_delegates = group_names_from_vote_section(pro_delegates);
 
-    let contra_open_ended = &from_html_text[contra_match.end() + 1..];
+    let contra_open_ended = from_html_text.get(contra_match.end() + 1..)?;
     let end_contra_idx = contra_open_ended.find('.');
     let contra_delegates = match end_contra_idx {
         Some(end_contra_idx) => {
@@ -349,7 +349,7 @@ pub fn extract_votes_by_name(from_html_text: &str) -> Option<NamedVoteProContra>
         None => {
             let end_contra_idx = contra_open_ended.find('*')?;
 
-            &contra_open_ended[..end_contra_idx - 1]
+            contra_open_ended.get(..end_contra_idx.checked_sub(1)?)?
         }
     };
 

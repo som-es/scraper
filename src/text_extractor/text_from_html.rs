@@ -16,17 +16,15 @@ pub fn extract_text_from_html_till_next_name_attribute(html: &str, name_attribut
 
     let selector = Selector::parse(&format!("[name=\"{name_attribute}\"]")).unwrap();
 
-    let el = ElementRef::wrap(
-        document
-            .select(&selector)
-            .next()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap(),
-    )
-    .unwrap();
+    let Some(el) = document
+        .select(&selector)
+        .next()
+        .and_then(|node| node.parent())
+        .and_then(|node| node.parent())
+        .and_then(ElementRef::wrap)
+    else {
+        return String::new();
+    };
     let start_at_tree_traversal = el.id();
 
     let nodes = el
@@ -85,16 +83,21 @@ pub fn extract_text_from_html_via_rn_id(document: &Html, name_attribute: &str) -
         .select(&selector)
         .flat_map(|node| {
             let mut html = String::new();
-            let mut current_sibling = *node;
-            while let Some(sibling) = current_sibling.next_sibling() {
+            let mut next_sibling = node.next_sibling();
+            while let Some(sibling) = next_sibling {
+                next_sibling = sibling.next_sibling();
                 let Some(el) = ElementRef::wrap(sibling) else {
-                    break;
+                    continue; // Formatting whitespace/comments do not end a speech.
                 };
-                if el.attr("class") == Some("randnummer") {
+                if el.attr("class").is_some_and(|classes| {
+                    let classes = classes.split_ascii_whitespace().collect::<Vec<_>>();
+                    // Placeholder sub-RNs belong to the same complete section.
+                    classes.contains(&"randnummer")
+                        && !classes.contains(&"randnummer-placeholder-value")
+                }) {
                     break;
                 }
                 html.push_str(&format!("{}\n", el.html()));
-                current_sibling = sibling;
             }
 
             let text = extract_text_from_html(&html);

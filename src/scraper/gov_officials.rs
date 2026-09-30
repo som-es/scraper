@@ -47,9 +47,9 @@ pub async fn extract_gov_official(
 ) -> Option<GovOfficial> {
     // println!("{}", serde_json::to_string_pretty(raw_official).unwrap());
     let raw_official = raw_official.as_array()?;
-    let function_and_dates = extract_function_and_dates(raw_official[3].as_str()?)?;
+    let function_and_dates = extract_function_and_dates(raw_official.get(3)?.as_str()?)?;
 
-    let id = raw_official[0].as_u64()?;
+    let id = raw_official.first()?.as_u64()?;
     // let id = extract_id_from_unnecessary_link(raw_official[9].as_str()?)?;
 
     let start_date =
@@ -64,9 +64,9 @@ pub async fn extract_gov_official(
     //     .await
     //     .ok()?;
     Some(GovOfficial {
-        government: raw_official[1].as_str()?.to_string(),
+        government: raw_official.get(1)?.as_str()?.to_string(),
         function: function_and_dates.function.to_string(),
-        ministry: raw_official[5].as_str()?.to_string(),
+        ministry: raw_official.get(5)?.as_str()?.to_string(),
         start_date,
         end_date,
         delegate_id: id,

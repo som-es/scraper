@@ -321,7 +321,7 @@ fn extract_plenary_absences(
     single_doc: bool,
     absences_dates: &[NaiveDate],
 ) -> Vec<Absences> {
-    if absences.is_empty() {
+    if absences.is_empty() || absences_dates.is_empty() {
         vec![]
     } else {
         if single_doc {
@@ -351,10 +351,12 @@ fn extract_plenary_absences(
                 absences
                     .into_iter()
                     .zip(absences_dates)
-                    .map(|(absence, date)| Absences {
-                        absences: absence.absences[0].clone(),
-                        source_document: absence.source_document,
-                        date: *date,
+                    .filter_map(|(absence, date)| {
+                        Some(Absences {
+                            absences: absence.absences.into_iter().next()?,
+                            source_document: absence.source_document,
+                            date: *date,
+                        })
                     })
                     .collect()
             } else if !absences.is_empty() {

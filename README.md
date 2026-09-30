@@ -70,4 +70,32 @@ live request. The missing roll-call subsection case uses the saved full protocol
 
 The focused suites do not establish coverage of every Austrian scraper module,
 HTTP failure handling, or changes to the live website. Existing tests elsewhere
-may still require the network. No line-coverage percentage has been measured.
+may still require the network. The broad run measured 90.37% line coverage, but includes live tests and is not
+a parser-only quality measure.
+
+
+## Reproducible Austrian parser tests
+
+Run the explicit parser/fixture selection (Cargo dependencies must already be available):
+
+```bash
+bash scripts/test_austria_parsers.sh
+```
+
+On Linux, also disable runtime networking to detect accidental live requests:
+
+```bash
+unshare --user --map-root-user --net bash scripts/test_austria_parsers.sh
+```
+
+With `cargo-llvm-cov` and `llvm-tools-preview` installed, create a fresh report:
+
+```bash
+unshare --user --map-root-user --net bash scripts/test_austria_parsers.sh --coverage
+```
+
+The report is written to `target/coverage-parsers.lcov` and
+`target/coverage-parsers.json`. The summary still counts all instrumented Austrian
+and shared source lines, including HTTP/cache orchestration; it is not an isolated
+parser percentage. Test selection is explicit in the script; unrelated live tests
+and output-only diagnostic scans are not acceptance tests for this scope.

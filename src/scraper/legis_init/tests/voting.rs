@@ -62,3 +62,28 @@ fn simple_majority_requires_more_than_half_the_votes() {
         );
     }
 }
+
+#[test]
+fn named_votes_reject_reversed_or_truncated_sections_without_panicking() {
+    use crate::legis_init::votes::extract_votes_by_name;
+    for text in [
+        "Mit Nein stimmten die Abgeordneten: Beispiel.\nMit Ja stimmten die Abgeordneten: Muster.",
+        "Mit Ja stimmten die Abgeordneten: Muster.\nMit Nein stimmten die Abgeordneten:",
+    ] {
+        assert!(extract_votes_by_name(text).is_none());
+    }
+}
+
+#[test]
+fn named_votes_preserve_unicode_names_and_section_boundaries() {
+    use crate::legis_init::votes::extract_votes_by_name;
+    let v=extract_votes_by_name("Mit Ja stimmten die Abgeordneten: Müller, Huber.\nMit Nein stimmten die Abgeordneten: Öztürk, Maier.").unwrap();
+    assert_eq!(
+        v.pro.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+        ["Müller", "Huber"]
+    );
+    assert_eq!(
+        v.contra.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+        ["Öztürk", "Maier"]
+    );
+}

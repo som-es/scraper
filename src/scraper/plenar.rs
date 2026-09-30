@@ -376,3 +376,56 @@ fn extract_plenary_absences(
         }
     }
 }
+
+#[cfg(test)]
+mod parser_contracts {
+    use super::*;
+
+    fn day(n: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 1, n).unwrap()
+    }
+    fn entries(names: &[&str]) -> InnerAbsences {
+        InnerAbsences {
+            absences: names
+                .iter()
+                .map(|name| {
+                    vec![Absence {
+                        name: (*name).into(),
+                        id: None,
+                    }]
+                })
+                .collect(),
+            source_document: Document::default(),
+        }
+    }
+
+    #[test]
+    fn absences_preserve_date_and_document_order() {
+        for single in [true, false] {
+            let input = if single {
+                vec![entries(&["A", "B"])]
+            } else {
+                vec![entries(&["A"]), entries(&["B"])]
+            };
+            let result = extract_plenary_absences(input, single, &[day(1), day(2)]);
+            assert_eq!(result.len(), 2);
+            assert_eq!(
+                (&*result[0].absences[0].name, result[0].date),
+                ("A", day(1))
+            );
+            assert_eq!(
+                (&*result[1].absences[0].name, result[1].date),
+                ("B", day(2))
+            );
+        }
+    }
+
+    #[test]
+    fn absences_without_dates_or_entries_do_not_panic() {
+        for single in [true, false] {
+            assert!(extract_plenary_absences(vec![entries(&["A"])], single, &[]).is_empty());
+            assert!(extract_plenary_absences(vec![entries(&[])], single, &[day(1)]).is_empty());
+            assert!(extract_plenary_absences(vec![], single, &[day(1)]).is_empty());
+        }
+    }
+}
